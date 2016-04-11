@@ -18,5 +18,5 @@ before_install:
   stack --no-terminal setup
 
 script:
-  - stack test --flag hs-mapnik:examples --no-terminal
+  - stack test --flag hs-mapnik:examples --no-terminal --ghc-options="-pgmc g++-4.8"
   - stack exec hs-mapnik-demo
