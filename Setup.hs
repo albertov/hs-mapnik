@@ -33,7 +33,7 @@ configureWithMapnikConfig lbi = do
   let updBinfo bi = bi { extraLibDirs = extraLibDirs bi ++ mapnikLibDirs
                        , extraLibs    = extraLibs    bi ++ mapnikLibs
                        , includeDirs  = includeDirs  bi ++ mapnikInclude
-                       , ccOptions    = mapnikCcOptions ++ ccOptions    bi
+                       , ccOptions    = ccOptions    bi ++ mapnikCcOptions
                        , ldOptions    = ldOptions    bi ++ mapnikLdOptions
                        , cppOptions   = cppOptions   bi ++ mapnikCppOptions
                        }

@@ -1,8 +1,10 @@
 before_install:
 - sudo add-apt-repository ppa:mapnik/nightly-trunk -y
 - sudo apt-get update -q
-- sudo apt-get install libgmp-dev libmapnik-dev -y
+- sudo apt-get install libgmp-dev libmapnik-dev gcc-4.8 g++-4.8 -y
 - mapnik-config --version
+- g++ --version
+- gcc --version
 # Download, install and setup stack
 - |
   echo "Installing Stack"
