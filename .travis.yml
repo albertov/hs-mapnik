@@ -1,7 +1,7 @@
 before_install:
 - sudo add-apt-repository ppa:mapnik/nightly-trunk -y
 - sudo apt-get update -q
-- sudo apt-get install libgmp-dev mapnik -y
+- sudo apt-get install libgmp-dev libmapnik-dev -y
 - mapnik-config --version
 # Download, install and setup stack
 - |
