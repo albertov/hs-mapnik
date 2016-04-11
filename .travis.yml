@@ -1,0 +1,20 @@
+before_install:
+- sudo add-apt-repository ppa:mapnik/nightly-trunk -y
+- sudo apt-get update -q
+- sudo apt-get install libgmp-dev mapnik -y
+- mapnik-config --version
+# Download, install and setup stack
+- |
+  echo "Installing Stack"
+  set -e
+
+  mkdir -p $HOME/.local/bin
+
+  travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 \
+   | tar xz --wildcards --strip-components=1 -C $HOME/.local/bin '*/stack'
+
+  stack --no-terminal setup
+
+script:
+  - stack test --flag hs-mapnik:examples --no-terminal
+  - stack exec hs-mapnik-demo

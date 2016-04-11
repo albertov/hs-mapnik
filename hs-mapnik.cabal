@@ -9,18 +9,26 @@ author:              Alberto Valverde González
 maintainer:          allberto@toscat.net
 copyright:           2016 Alberto Valverde González
 category:            Bindings
-build-type:          Simple
+build-type:          Custom
 -- extra-source-files:
 cabal-version:       >=1.10
+
+flag examples
+  description: Build example apps
+  default: False
+  manual: True
 
 library
   hs-source-dirs:      src
   exposed-modules:     Mapnik
   build-depends:       base         >= 4.7 && < 5
-                     --, inline-c-cpp >= 0.1 && < 0.2
-  extra-libraries:     mapnik
+                     , inline-c-cpp >= 0.1 && < 0.2
+                     , inline-c
+                     , bytestring
   default-language:    Haskell2010
   ghc-options:         -Wall -Werror
+  extra-libraries:     stdc++
+  c-sources:           src/Mapnik.cpp
 
 test-suite spec
   type:             exitcode-stdio-1.0
@@ -35,6 +43,16 @@ test-suite spec
   other-modules:    MapnikSpec
   default-language: Haskell2010
   ghc-options:     -Wall -rtsopts -threaded -with-rtsopts=-N
+
+executable hs-mapnik-demo
+  build-depends:       base
+                     , hs-mapnik
+  ghc-options:         -Wall -rtsopts -O2
+  hs-source-dirs:      examples
+  main-is:             Demo.hs
+  default-language:    Haskell2010
+  if !flag(examples)
+    Buildable: False
 
 source-repository head
   type:     git
