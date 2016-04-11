@@ -1,0 +1,12 @@
+resolver: lts-5.12
+
+packages:
+- '.'
+
+extra-include-dirs:
+- /usr/local/inlcude
+- /usr/local/opt/icu4c/include
+
+extra-lib-dirs:
+- /usr/local/lib
+- /usr/local/opt/icu4c/lib

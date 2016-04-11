@@ -1,0 +1,41 @@
+name:                hs-mapnik
+version:             0.1.0.0
+synopsis:            Haskel bindings for Mapnik
+description:         Please see README.md
+homepage:            https://github.com/albertov/hs-mapnik#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Alberto Valverde González
+maintainer:          allberto@toscat.net
+copyright:           2016 Alberto Valverde González
+category:            Bindings
+build-type:          Simple
+-- extra-source-files:
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Mapnik
+  build-depends:       base         >= 4.7 && < 5
+                     --, inline-c-cpp >= 0.1 && < 0.2
+  extra-libraries:     mapnik
+  default-language:    Haskell2010
+  ghc-options:         -Wall -Werror
+
+test-suite spec
+  type:             exitcode-stdio-1.0
+  build-depends:    base
+                  , hspec
+                  , hspec-core >= 1.13
+                  , QuickCheck
+                  , hs-mapnik
+
+  hs-source-dirs:   spec
+  main-is:          Spec.hs
+  other-modules:    MapnikSpec
+  default-language: Haskell2010
+  ghc-options:     -Wall -rtsopts -threaded -with-rtsopts=-N
+
+source-repository head
+  type:     git
+  location: https://github.com/albertov/hs-mapnik
