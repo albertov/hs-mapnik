@@ -1,22 +1,46 @@
+language: generic
+
+matrix:
+  include:
+    - os: linux
+      sudo: false
+      env: ARGS="--ghc-options='-pgma clang++-3.5 -pgmc clang++-3.5 -pgml clang++-3.5'"
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - llvm-toolchain-precise-3.5
+          packages:
+            - clang-3.5
+            - libgmp-dev
+    - os: osx
+      osx_image: xcode7.3 # upgrades clang from 6 -> 7
+      env: ARGS=""
+
 before_install:
-- sudo add-apt-repository ppa:mapnik/nightly-trunk -y
-- sudo apt-get update -q
-- sudo apt-get install libgmp-dev libmapnik-dev gcc-4.8 g++-4.8 -y
-- mapnik-config --version
-- g++ --version
-- gcc --version
-# Download, install and setup stack
-- |
-  echo "Installing Stack"
-  set -e
+  # Download and unpack the stack executable
+  - |
+    set -e
+    mkdir -p ~/.local/bin
+    if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+      STACK_URL="https://www.stackage.org/stack/osx-x86_64"
+      travis_retry curl -L $STACK_URL \
+        | tar xz --strip-components=1 -C ~/.local/bin
+    else
+      STACK_URL="https://www.stackage.org/stack/linux-x86_64"
+      travis_retry curl -L $STACK_URL \
+        | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+    fi
+ -  export PATH=$HOME/.local/bin:$PATH
+ - ./bootstrap.sh
+ - export PATH=$(pwd)/mason_packages/.link/bin:${PATH}
+ - mapnik-config --version
 
-  mkdir -p $HOME/.local/bin
-
-  travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 \
-   | tar xz --wildcards --strip-components=1 -C $HOME/.local/bin '*/stack'
-
-  stack --no-terminal setup
 
 script:
-  - stack test --flag hs-mapnik:examples --no-terminal --ghc-options="-pgmc g++-4.8"
+  - stack --no-terminal --install-ghc build --test --haddock --flag hs-mapnik:examples
   - stack exec hs-mapnik-demo
+
+cache:
+  directories:
+  - $HOME/.stack
