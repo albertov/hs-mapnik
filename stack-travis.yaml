@@ -1,0 +1,5 @@
+resolver: lts-5.12
+packages:
+- '.'
+ghc-options:
+  hs-mapnik: -pgma clang++-3.5 -pgmc clang++-3.5 -pgml clang++-3.5
