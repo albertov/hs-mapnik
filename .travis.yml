@@ -31,14 +31,14 @@ before_install:
       travis_retry curl -L $STACK_URL \
         | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
     fi
- -  export PATH=$HOME/.local/bin:$PATH
- - ./bootstrap.sh
- - export PATH=$(pwd)/mason_packages/.link/bin:${PATH}
- - mapnik-config --version
+  -  export PATH=$HOME/.local/bin:$PATH
+  - ./bootstrap.sh
+  - export PATH=$(pwd)/mason_packages/.link/bin:${PATH}
+  - mapnik-config --version
 
 
 script:
-  - stack --no-terminal --install-ghc build --test --haddock --flag hs-mapnik:examples
+  - stack $ARGS --no-terminal --install-ghc build --test --haddock --flag hs-mapnik:examples
   - stack exec hs-mapnik-demo
 
 cache:
