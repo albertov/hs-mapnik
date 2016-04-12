@@ -39,13 +39,13 @@ before_install:
 
 
 script:
-  - stack $ARGS --no-terminal --install-ghc build --test --flag hs-mapnik:examples
   - |
     if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
       export DYLD_LIBRARY_PATH=`pwd`/mason_packages/.link/lib
     else
       export LD_LIBRARY_PATH=`pwd`/mason_packages/.link/lib
     fi
+  - stack $ARGS --no-terminal --install-ghc build --test --flag hs-mapnik:examples
   - stack exec hs-mapnik-demo
 
 cache:
