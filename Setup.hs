@@ -31,6 +31,7 @@ configureWithMapnikConfig lbi = do
     (getOutput "mapnik-config" ["--input-plugins"])
   mapnikFontDir <- liftM (head . words) $
     (getOutput "mapnik-config" ["--fonts"])
+  --error (show [ mapnikInclude, mapnikLibDirs])
   let updBinfo bi = bi { extraLibDirs = extraLibDirs bi ++ mapnikLibDirs
                        , extraLibs    = extraLibs    bi ++ mapnikLibs
                        , includeDirs  = includeDirs  bi ++ mapnikInclude
