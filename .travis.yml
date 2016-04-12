@@ -4,7 +4,7 @@ matrix:
   include:
     - os: linux
       sudo: false
-      env: ARGS="--ghc-options='-pgma clang++-3.5 -pgmc clang++-3.5 -pgml clang++-3.5'"
+      env: ARGS=--ghc-options="-pgma clang++-3.5 -pgmc clang++-3.5 -pgml clang++-3.5"
       addons:
         apt:
           sources:
