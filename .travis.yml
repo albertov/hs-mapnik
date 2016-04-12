@@ -1,5 +1,9 @@
 language: generic
 
+git:
+  submodules: true
+  depth: 10
+
 matrix:
   include:
     - os: linux
@@ -45,8 +49,7 @@ script:
     else
       export LD_LIBRARY_PATH=`pwd`/mason_packages/.link/lib
     fi
-  - stack $ARGS --no-terminal --install-ghc build --test --flag hs-mapnik:examples
-  - stack exec hs-mapnik-demo
+  - stack $ARGS --no-terminal --install-ghc test
 
 cache:
   directories:
