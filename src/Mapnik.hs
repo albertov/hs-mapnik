@@ -56,7 +56,7 @@ demo = do
         std::cout << font_dir << std::endl;
 
         std::cout << " running demo ... \n";
-        // datasource_cache::instance().register_datasources(plugin_dir);
+        datasource_cache::instance().register_datasources(plugin_dir);
         freetype_engine::register_font(font_dir + "/dejavu-fonts-ttf-2.34/ttf/DejaVuSans.ttf");
 
         Map m(800,600);
@@ -233,7 +233,7 @@ demo = do
             parameters p;
             p["type"]="shape";
             p["file"]="data/boundaries";
-            p["encoding"]="latin1";
+            // p["encoding"]="latin1";
 
             layer lyr("Provinces");
             lyr.set_datasource(datasource_cache::instance().create(p));
@@ -298,7 +298,7 @@ demo = do
             parameters p;
             p["type"]="shape";
             p["file"]="data/popplaces";
-            p["encoding"] = "latin1";
+            // p["encoding"] = "latin1";
             layer lyr("Populated Places");
             lyr.set_srs(srs_lcc);
             lyr.set_datasource(datasource_cache::instance().create(p));

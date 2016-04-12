@@ -2,6 +2,7 @@ import Control.Monad
 import Data.Maybe
 import System.Process
 import System.IO
+import System.Directory (makeAbsolute)
 import System.Exit
 import Data.List
 import Distribution.Simple
@@ -16,20 +17,20 @@ mapnikConf (pkg0, pbi) flags = do
  configureWithMapnikConfig lbi
 
 configureWithMapnikConfig lbi = do
-  mapnikInclude <- liftM (getFlagValues 'I') $
-    getOutput "mapnik-config" ["--includes", "--dep-includes"]
-  mapnikLibDirs <- liftM (getFlagValues 'L') $
-    getOutput "mapnik-config" ["--libs", "--dep-libs", "--ldflags"]
-  mapnikLibs    <- liftM (getFlagValues 'l') $
-    getOutput "mapnik-config" ["--libs", "--dep-libs", "--ldflags"]
+  mapnikInclude <- mapM makeAbsolute =<< liftM (getFlagValues 'I')
+    (getOutput "mapnik-config" ["--includes", "--dep-includes"])
+  mapnikLibDirs <- mapM makeAbsolute =<< liftM (getFlagValues 'L')
+    (getOutput "mapnik-config" ["--libs", "--dep-libs", "--ldflags"])
+  mapnikLibs    <- liftM (getFlagValues 'l')
+    (getOutput "mapnik-config" ["--libs", "--dep-libs", "--ldflags"])
   mapnikCcOptions <- liftM words $
-    getOutput "mapnik-config" ["--defines", "--cxxflags"]
-  mapnikLdOptions <- liftM (filter (\('-':x:_) -> x/='L') . words) $
-    getOutput "mapnik-config" ["--ldflags"]
-  mapnikInputPluginDir <- liftM (head . words) $
-    getOutput "mapnik-config" ["--input-plugins"]
+    (getOutput "mapnik-config" ["--defines", "--cxxflags"])
+  mapnikLdOptions <- liftM (filter (\('-':x:_) -> x/='L') . words)
+    (getOutput "mapnik-config" ["--ldflags"])
+  mapnikInputPluginDir <- liftM (head . words)
+    (getOutput "mapnik-config" ["--input-plugins"])
   mapnikFontDir <- liftM (head . words) $
-    getOutput "mapnik-config" ["--fonts"]
+    (getOutput "mapnik-config" ["--fonts"])
   let updBinfo bi = bi { extraLibDirs = extraLibDirs bi ++ mapnikLibDirs
                        , extraLibs    = extraLibs    bi ++ mapnikLibs
                        , includeDirs  = includeDirs  bi ++ mapnikInclude
