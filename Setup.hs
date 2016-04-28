@@ -17,15 +17,17 @@ mapnikConf (pkg0, pbi) flags = do
  configureWithMapnikConfig lbi
 
 configureWithMapnikConfig lbi = do
+  -- else we get link errors in client in client libs/apps
+  let noStatic = filter (/="-static")
   mapnikInclude <- mapM makeAbsolute =<< liftM (getFlagValues 'I')
     (getOutput "mapnik-config" ["--includes", "--dep-includes"])
   mapnikLibDirs <- mapM makeAbsolute =<< liftM (getFlagValues 'L')
     (getOutput "mapnik-config" ["--libs", "--dep-libs", "--ldflags"])
   mapnikLibs    <- liftM (getFlagValues 'l')
     (getOutput "mapnik-config" ["--libs", "--dep-libs", "--ldflags"])
-  mapnikCcOptions <- liftM words $
+  mapnikCcOptions <- liftM (noStatic . words) $
     (getOutput "mapnik-config" ["--defines", "--cxxflags"])
-  mapnikLdOptions <- liftM (filter (\('-':x:_) -> x/='L') . words)
+  mapnikLdOptions <- liftM (noStatic . words)
     (getOutput "mapnik-config" ["--ldflags"])
   mapnikInputPluginDir <- liftM (head . words)
     (getOutput "mapnik-config" ["--input-plugins"])
