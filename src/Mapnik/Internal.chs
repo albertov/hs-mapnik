@@ -45,6 +45,7 @@ import           Foreign.Ptr (Ptr, nullPtr)
 import           Foreign.Storable (peek)
 import           System.IO.Unsafe (unsafePerformIO)
 
+
 newtype MapnikM a = MapnikM (EitherT String IO a)
   deriving (Functor, Applicative, Monad, MonadIO)
 
@@ -140,14 +141,15 @@ load_map_string m xml =
   checkMapError "load_map_string" m $ \mPtr ->
   useAsCString xml ({#call mapnik_map_load_string #} mPtr)
 
-render_to_file :: Map -> FilePath -> MapnikM ()
-render_to_file m path =
+render_to_file :: Map -> FilePath -> Double -> MapnikM ()
+render_to_file m path scaleFactor =
   checkMapError "render_to_file" m $ \mPtr ->
-  withCString path ({#call mapnik_map_render_to_file #} mPtr)
+  withCString path $ \pPtr ->
+    {#call mapnik_map_render_to_file #} mPtr pPtr (realToFrac scaleFactor)
 
-render_to_image :: Map -> MapnikM Image
-render_to_image m = runIO $ withMap m $ \mPtr -> do
-  iPtr <- {#call mapnik_map_render_to_image#} mPtr
+render_to_image :: Map -> Double -> MapnikM Image
+render_to_image m scaleFactor = runIO $ withMap m $ \mPtr -> do
+  iPtr <- {#call mapnik_map_render_to_image#} mPtr (realToFrac scaleFactor)
   if iPtr == nullPtr
     then liftM (Left . ("render_to_image: " ++))
                (peekCString =<< {#call unsafe mapnik_map_last_error#} mPtr)

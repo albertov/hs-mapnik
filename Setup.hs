@@ -33,7 +33,7 @@ configureWithMapnikConfig lbi = do
     (getOutput "mapnik-config" ["--fonts"])
   --error (show [ mapnikInclude, mapnikLibDirs])
   let updBinfo bi = bi { extraLibDirs = extraLibDirs bi ++ mapnikLibDirs
-                       , extraLibs    = extraLibs    bi ++ mapnikLibs
+                       , extraLibs    = mapnikLibs      ++ extraLibs bi
                        , includeDirs  = includeDirs  bi ++ mapnikInclude
                        , ccOptions    = ccOptions    bi ++ mapnikCcOptions
                        , ldOptions    = ldOptions    bi ++ mapnikLdOptions

@@ -1,3 +1,0 @@
-[submodule "mapnik-c-api"]
-	path = mapnik-c-api
-	url = https://github.com/albertov/mapnik-c-api.git
