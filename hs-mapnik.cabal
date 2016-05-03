@@ -10,7 +10,7 @@ maintainer:          allberto@toscat.net
 copyright:           2016 Alberto Valverde González
 category:            Bindings
 build-type:          Custom
--- extra-source-files:
+extra-source-files:  cbits/mapnik_c_api.h
 cabal-version:       >=1.10
 
 library
@@ -26,7 +26,6 @@ library
   ghc-options:         -Wall
   extra-libraries:     stdc++
   include-dirs:        cbits
-  includes:            cbits/mapnik_c_api.h
   c-sources:           cbits/mapnik_c_api.cpp
 
 test-suite spec
