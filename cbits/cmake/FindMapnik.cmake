@@ -49,6 +49,7 @@ set(MAPNIK_LIBRARY_DIRS ${_mapnik_libs_dirs} ${_mapnik_dep_libs_dirs})
 list(REMOVE_DUPLICATES MAPNIK_LIBRARY_DIRS)
 
 mapnik_config(MAPNIK_CXXFLAGS "--cxxflags")
+#string(REPLACE ";" " " MAPNIK_CXXFLAGS ${MAPNIK_CXXFLAGS})
 
 
 # handle the QUIETLY and REQUIRED arguments and set MAPNIK_FOUND to TRUE if
