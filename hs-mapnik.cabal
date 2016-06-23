@@ -13,6 +13,26 @@ build-type:          Custom
 extra-source-files:  cbits/mapnik_c_api.h
 cabal-version:       >=1.10
 
+flag internal-mapnik_c
+  description: Let cabal build  mapnik_c
+  default: True
+  manual: True
+
+flag examples
+  description: Build example apps
+  default: False
+  manual: True
+
+flag embed-fonts
+  description: Embed defaults fonts in executable
+  default: False
+  manual: True
+
+flag static
+  description: Link executables statically
+  default: False
+  manual: True
+
 library
   build-tools:         c2hs >= 0.25
   hs-source-dirs:      src
@@ -24,9 +44,12 @@ library
                      , transformers
   default-language:    Haskell2010
   ghc-options:         -Wall
-  extra-libraries:     stdc++
-  include-dirs:        cbits
-  c-sources:           cbits/mapnik_c_api.cpp
+  if flag(internal-mapnik_c)
+    extra-libraries: stdc++
+    include-dirs: mapnik_c
+    c-sources: mapnik_c/mapnik_c_api.cpp
+  else
+    extra-libraries: mapnik_c mapnik
 
 test-suite spec
   type:             exitcode-stdio-1.0
@@ -42,6 +65,8 @@ test-suite spec
   other-modules:    Mapnik.InternalSpec
   default-language: Haskell2010
   ghc-options:     -Wall -rtsopts -threaded -with-rtsopts=-N
+  if flag(static)
+     ghc-options: -optl-static-libstdc++ -optl-static-libgcc -optl-static -optl-Wl,--allow-multiple-definition
 
 
 source-repository head

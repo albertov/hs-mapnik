@@ -2,6 +2,7 @@ import Control.Monad
 import Data.Maybe
 import System.Process
 import System.IO
+import System.Environment (lookupEnv)
 import System.Directory (makeAbsolute)
 import System.Exit
 import Data.List
@@ -20,22 +21,22 @@ configureWithMapnikConfig lbi = do
   -- else we get link errors in client in client libs/apps
   let noStatic = filter (/="-static")
   mapnikInclude <- mapM makeAbsolute =<< liftM (getFlagValues 'I')
-    (getOutput "mapnik-config" ["--includes", "--dep-includes"])
+    (mapnikConfig ["--includes", "--dep-includes"])
   mapnikLibDirs <- mapM makeAbsolute =<< liftM (getFlagValues 'L')
-    (getOutput "mapnik-config" ["--libs", "--dep-libs", "--ldflags"])
+    (mapnikConfig ["--libs", "--dep-libs", "--ldflags"])
   mapnikLibs    <- liftM (getFlagValues 'l')
-    (getOutput "mapnik-config" ["--libs", "--dep-libs", "--ldflags"])
+    (mapnikConfig ["--libs", "--dep-libs", "--ldflags"])
   mapnikCcOptions <- liftM (noStatic . words) $
-    (getOutput "mapnik-config" ["--defines", "--cxxflags"])
+    (mapnikConfig ["--defines", "--cxxflags"])
   mapnikLdOptions <- liftM (noStatic . words)
-    (getOutput "mapnik-config" ["--ldflags"])
-  mapnikInputPluginDir <- liftM (head . words)
-    (getOutput "mapnik-config" ["--input-plugins"])
-  mapnikFontDir <- liftM (head . words) $
-    (getOutput "mapnik-config" ["--fonts"])
+    (mapnikConfig ["--ldflags"])
+  mapnikInputPluginDir <- liftM (escapeWinPathSep . head . words)
+    (mapnikConfig ["--input-plugins"])
+  mapnikFontDir <- liftM (escapeWinPathSep . head . words) $
+    (mapnikConfig ["--fonts"])
   --error (show [ mapnikInclude, mapnikLibDirs])
   let updBinfo bi = bi { extraLibDirs = extraLibDirs bi ++ mapnikLibDirs
-                       , extraLibs    = mapnikLibs      ++ extraLibs bi
+                       , extraLibs    = extraLibs    bi ++ mapnikLibs
                        , includeDirs  = includeDirs  bi ++ mapnikInclude
                        , ccOptions    = ccOptions    bi ++ mapnikCcOptions
                        , ldOptions    = ldOptions    bi ++ mapnikLdOptions
@@ -62,3 +63,12 @@ getOutput s a = readProcess s a ""
 getFlagValues f = map (\(_:_:v) -> v)
                 . filter (\(_:f':_) -> f==f')
                 . words
+
+escapeWinPathSep = concatMap go
+  where go '\\' = "\\\\"
+        go x   = [x]
+
+mapnikConfig args = do
+  mCmd <- lookupEnv "MAPNIK_CONFIG"
+  cmd <- maybe (getOutput "bash" ["-c", "which mapnik-config"]) return mCmd
+  getOutput "bash" (cmd:args)
