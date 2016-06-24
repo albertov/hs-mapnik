@@ -39,6 +39,7 @@ before_install:
   -  export PATH=$HOME/.local/bin:$PATH
   - ./bootstrap.sh
   - export PATH=$(pwd)/mason_packages/.link/bin:${PATH}
+  - export ICU_DATA=$(pwd)/mason_packages/.link/share/icu/55.1
   - mapnik-config --version
 
 
