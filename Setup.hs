@@ -70,5 +70,5 @@ escapeWinPathSep = concatMap go
 
 mapnikConfig args = do
   mCmd <- lookupEnv "MAPNIK_CONFIG"
-  cmd <- maybe (getOutput "bash" ["-c", "which mapnik-config"]) return mCmd
+  cmd <- maybe (liftM init (getOutput "bash" ["-c", "which mapnik-config"])) return mCmd
   getOutput "bash" (cmd:args)
