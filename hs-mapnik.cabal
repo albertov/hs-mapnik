@@ -13,7 +13,7 @@ build-type:          Custom
 cabal-version:       >=1.10
 
 custom-setup
-  setup-depends: base, Cabal, filepath, process
+  setup-depends: base, Cabal, directory, filepath, process
 
 flag internal-mapnik_c
   description: Let cabal build  mapnik_c
