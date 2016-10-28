@@ -19,48 +19,11 @@ mapnikConf (pkg0, pbi) flags = do
  configureWithMapnikConfig lbi flags
 
 configureWithMapnikConfig lbi flags = do
-  mapnikDepLibs <- getFlagValues 'l' <$> mapnikConfig ["--dep-libs"]
-  -- else we get link errors in client in client libs/apps
-  let noStatic = filter (/="-static")
-      hasGdal  = any ("gdal" `isInfixOf`) mapnikDepLibs
-      hasPg    = any ("pq" `isInfixOf`) mapnikDepLibs
-      allIncludes =
-        [ getFlagValues 'I' <$> mapnikConfig ["--includes", "--dep-includes"]
-        ]
-      allLibDirs =
-        [ getFlagValues 'L' <$> mapnikConfig ["--libs", "--dep-libs", "--ldflags"]
-        , getFlagValues 'L' <$> if hasGdal then gdalConfig ["--dep-libs"] else return []
-        , getFlagValues 'L' <$> icuConfig ["--ldflags"]
-        ]
-      allLibs =
-        [ getFlagValues 'l' <$> mapnikConfig ["--libs", "--dep-libs", "--ldflags"]
-        , getFlagValues 'l' <$> if hasGdal then gdalConfig ["--dep-libs"] else return []
-        -- Assumes pg has been built with ssl support
-        , return (if hasPg then ["ssl", "crypto"] else [])
-        -- Mapnik config has the order wrong for static linkag
-        , getFlagValues 'l' <$> icuConfig ["--ldflags"]
-        ]
-      allCcOptions =
-        [ (noStatic . words) <$> mapnikConfig ["--defines", "--cxxflags"]
-        ]
-      allLdOptions =
-        [ (noStatic . words) <$> mapnikConfig ["--ldflags"] ]
-     
-      -- | appendGeos: makes sure 'geos_c' is included before 'geos' so symbols
-      --   can be resolved when linking statically
-      appendGeos [] = []
-      appendGeos ("geos_c":xs) = "geos_c" : "geos" : xs
-      appendGeos (x:xs)        = x : appendGeos xs
-
-      otherLibs = ["cairo", "pixman-1", "harfbuzz", "graphite2", "bz2"]
-
-                        
-  myIncludeDirs <- liftM nub . mapM makeAbsolute =<< liftM concat (sequence allIncludes)
-  myExtraLibDirs <- liftM nub . mapM makeAbsolute =<< liftM concat (sequence allLibDirs)
-  -- Do not nub the extraLibs
-  myExtraLibs <- ((++ otherLibs) . appendGeos . concat) <$> sequence allLibs
-  myCcOptions <- (nub . concat) <$> sequence allCcOptions
-  myLdOptions <- (nub . concat) <$> sequence allLdOptions
+  myExtraLibs    <- getFlagValues 'l' <$> mapnikConfig ["--libs"]
+  myExtraLibDirs <- getFlagValues 'L' <$> mapnikConfig ["--ldflags"]
+  myIncludeDirs  <- getFlagValues 'I' <$> mapnikConfig ["--includes", "--dep-includes"]
+  myCcOptions    <- words <$> mapnikConfig ["--defines", "--cxxflags"]
+  myLdOptions    <- words <$> mapnikConfig ["--ldflags"]
   mapnikInputPluginDir <- (escapeWinPathSep . head . words) <$>
     mapnikConfig ["--input-plugins"]
   mapnikFontDir <- (escapeWinPathSep . head . words) <$> (mapnikConfig ["--fonts"])
