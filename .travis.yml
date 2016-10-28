@@ -1,57 +1,16 @@
-language: generic
-
-git:
-  submodules: true
-  depth: 10
+language: nix
 
 matrix:
   include:
     - os: linux
       sudo: false
-      dist: trusty
-      env: ARGS="--stack-yaml=stack-travis.yaml"
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-            - llvm-toolchain-precise-3.5
-          packages:
-            - clang-3.5
-            - libgmp-dev
     - os: osx
       osx_image: xcode7.3 # upgrades clang from 6 -> 7
-      env: ARGS=""
 
-before_install:
-  # Download and unpack the stack executable
-  - |
-    set -e
-    mkdir -p ~/.local/bin
-    if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-      STACK_URL="https://www.stackage.org/stack/osx-x86_64"
-      travis_retry curl -L $STACK_URL \
-        | tar xz --strip-components=1 -C ~/.local/bin
-    else
-      STACK_URL="https://www.stackage.org/stack/linux-x86_64"
-      travis_retry curl -L $STACK_URL \
-        | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
-    fi
-  -  export PATH=$HOME/.local/bin:$PATH
-  - ./bootstrap.sh
-  - export PATH=$(pwd)/mason_packages/.link/bin:${PATH}
-  - export ICU_DATA=$(pwd)/mason_packages/.link/share/icu/55.1
-  - mapnik-config --version
-
+env:
+  - RECIPE=with_801
+    #- RECIPE=with_710
 
 script:
-  - |
-    if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-      export DYLD_LIBRARY_PATH=`pwd`/mason_packages/.link/lib
-    else
-      export LD_LIBRARY_PATH=`pwd`/mason_packages/.link/lib
-    fi
-  - stack $ARGS --no-terminal --install-ghc test
-
-cache:
-  directories:
-  - $HOME/.stack
+  - git clone --depth=1 https://github.com/NixOS/nixpkgs
+  - nix-build -A ${RECIPE} travix.nix

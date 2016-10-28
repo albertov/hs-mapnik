@@ -17,3 +17,4 @@ cabal.sandbox.config
 src/**/*.cpp
 examples/**/*.cpp
 dist-newstyle
+nixpkgs
