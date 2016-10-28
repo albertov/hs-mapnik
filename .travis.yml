@@ -13,4 +13,4 @@ env:
 
 script:
   - git clone --depth=1 https://github.com/NixOS/nixpkgs
-  - nix-build -A ${RECIPE} travix.nix
+  - nix-build -A ${RECIPE} travis.nix
