@@ -2,7 +2,6 @@ language: nix
 
 env:
   - RECIPE=with_801
-  - RECIPE=with_710
 
 script:
   - git clone --depth=1 https://github.com/NixOS/nixpkgs
