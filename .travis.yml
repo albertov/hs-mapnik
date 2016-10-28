@@ -1,15 +1,8 @@
 language: nix
 
-matrix:
-  include:
-    - os: linux
-      sudo: false
-    - os: osx
-      osx_image: xcode7.3 # upgrades clang from 6 -> 7
-
 env:
   - RECIPE=with_801
-    #- RECIPE=with_710
+  - RECIPE=with_710
 
 script:
   - git clone --depth=1 https://github.com/NixOS/nixpkgs
