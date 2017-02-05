@@ -87,11 +87,14 @@ register_defaults =
 
 {#pointer *mapnik_image_t as Image foreign finalizer mapnik_image_free newtype #}
 
-data ImageFormat = PNG256 | PNG | JPEG | TIFF | WEBP
-  deriving (Eq, Enum, Bounded, Show)
+type ImageFormat = String
+
+showImageFormat :: ImageFormat -> String
+showImageFormat = id
+
 
 serialize_image :: ImageFormat -> Image -> ByteString
-serialize_image (show -> format) im = unsafePerformIO $
+serialize_image (showImageFormat -> format) im = unsafePerformIO $
   withCString format $ \fmtPtr ->
   withImage im $ \imPtr ->
   alloca $ \lenPtr -> do
