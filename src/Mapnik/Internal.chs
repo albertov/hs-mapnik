@@ -28,6 +28,7 @@ module Mapnik.Internal (
   , render_to_image
   , set_srs
   , set_buffer_size
+  , resize
   , bbox
   , serialize_image
 ) where
@@ -133,6 +134,12 @@ set_buffer_size :: Map -> Int -> MapnikM ()
 set_buffer_size m (fromIntegral -> size) = runIO $ withMap m $ \mPtr -> do
   {#call unsafe mapnik_map_set_buffer_size #} mPtr size
   return (Right ())
+
+resize :: Map -> Int -> Int -> MapnikM ()
+resize m (fromIntegral -> width) (fromIntegral -> height) =
+  runIO $ withMap m $ \mPtr -> do
+    {#call unsafe mapnik_map_resize #} mPtr width height
+    return (Right ())
 
 load_map :: Map -> FilePath -> MapnikM ()
 load_map m path =

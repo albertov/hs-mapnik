@@ -10,7 +10,7 @@ mkDerivation {
   setupHaskellDepends = [ base Cabal directory filepath process ];
   libraryHaskellDepends = [ base bytestring either transformers ];
   librarySystemDepends = [ mapnik ];
-  libraryToolDepends = [ c2hs boost icu harfbuzz ];
+  libraryToolDepends = [ c2hs boost.dev icu.dev harfbuzz.dev ];
   testHaskellDepends = [
     base bytestring hspec hspec-core transformers
   ];
