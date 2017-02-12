@@ -230,10 +230,8 @@ struct _mapnik_image_t {
 };
 
 void mapnik_image_free(mapnik_image_t * i) {
-    if (i) {
-        if (i->i) delete i->i;
-        delete i;
-    }
+  if (i) delete i->i;
+  delete i;
 }
 
 mapnik_image_t *
@@ -260,11 +258,8 @@ mapnik_map_render_to_image(
 }
 
 void mapnik_image_blob_free(mapnik_image_blob_t * b) {
-    if (b) {
-        if (b->ptr)
-            delete[] b->ptr;
-        delete b;
-    }
+  if (b) delete[] b->ptr;
+  delete b;
 }
 
 mapnik_image_blob_t * mapnik_image_to_png_blob(mapnik_image_t * i) {
@@ -295,6 +290,33 @@ mapnik_image_data(mapnik_image_t * i, const char* format, unsigned int* len) {
     }
     return data;
 }
+
+char*
+mapnik_image_rgba8_data(mapnik_image_t * i, unsigned int* len) {
+  char *ret = NULL;
+  if (i && i->i) {
+    *len = i->i->size();
+    ret = static_cast<char*>(malloc(*len));
+    if (ret) {
+      memcpy(ret, i->i->data(), *len);
+    }
+  }
+  return ret;
+}
+
+mapnik_image_t *
+mapnik_image_from_rgba8_data(
+    const int width
+  , const int height
+  , unsigned char *rgba8_data
+  )
+{
+  mapnik_image_type *im = new mapnik_image_type(width,height,rgba8_data);
+  mapnik_image_t * i = new mapnik_image_t;
+  i->i = im;
+  return i;
+}
+
 
 
 #ifdef __cplusplus

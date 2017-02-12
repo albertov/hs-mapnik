@@ -10,7 +10,7 @@ module Mapnik.Internal (
   , Map
   , BBox
   , Image
-  , ImageFormat (..)
+  , ImageFormat
   , runMapnik
   , runMapnik_
   , createMap
@@ -31,18 +31,21 @@ module Mapnik.Internal (
   , resize
   , bbox
   , serialize_image
+  , image_from_rgba8
+  , image_to_rgba8
 ) where
 
 import           Control.Monad (liftM, (<=<))
 import           Control.Monad.Trans.Either
 import           Control.Monad.IO.Class (MonadIO, liftIO)
+import qualified Data.ByteString as BS
 import           Data.ByteString (ByteString, useAsCString)
-import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
+import           Data.ByteString.Unsafe (unsafePackMallocCStringLen, unsafeUseAsCString)
 import           Foreign.C.String (CString, withCString, peekCString)
 import           Foreign.C.Types (CInt)
 import           Foreign.ForeignPtr (newForeignPtr)
 import           Foreign.Marshal.Alloc (alloca)
-import           Foreign.Ptr (Ptr, nullPtr)
+import           Foreign.Ptr (Ptr, nullPtr, castPtr)
 import           Foreign.Storable (peek)
 import           System.IO.Unsafe (unsafePerformIO)
 
@@ -174,6 +177,31 @@ zoom_to_box m b = runIO $
   withBBox b $ \bPtr -> do
     {#call unsafe mapnik_map_zoom_to_box #} mPtr bPtr
     return (Right ())
+
+image_to_rgba8 :: Image -> ByteString
+image_to_rgba8 im = unsafePerformIO $
+  withImage im $ \imPtr ->
+  alloca $ \lenPtr -> do
+    ptr <- {#call unsafe mapnik_image_rgba8_data#} imPtr lenPtr
+    if ptr == nullPtr then return mempty else do
+      len <- peek lenPtr
+      unsafePackMallocCStringLen (ptr, fromIntegral len)
+{-# NOINLINE image_to_rgba8 #-}
+
+image_from_rgba8 :: Int -> Int -> ByteString -> Maybe Image
+image_from_rgba8 w h rgba8
+  | w*h*4 /= BS.length rgba8 = Nothing
+  | otherwise = unsafePerformIO $ unsafeUseAsCString rgba8 $ \rgba8Ptr -> do
+    iPtr <- {#call unsafe mapnik_image_from_rgba8_data#}
+            (fromIntegral w) (fromIntegral h) (castPtr rgba8Ptr)
+    if iPtr == nullPtr
+      then pure Nothing
+      else Just . Image <$> newForeignPtr mapnik_image_free iPtr
+{-# NOINLINE image_from_rgba8 #-}
+
+{-# RULES
+"image_from_rgba8/image_to_rgba8"  forall w h im. image_from_rgba8 w h (image_to_rgba8 im) = Just im
+  #-}
 
 -- * Internal Utils
 

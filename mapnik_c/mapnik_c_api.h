@@ -55,6 +55,16 @@ MAPNIKCAPICALL mapnik_image_blob_t * mapnik_image_to_png_blob(mapnik_image_t * i
 MAPNIKCAPICALL char*
 mapnik_image_data(mapnik_image_t * i, const char* format, unsigned int* len);
 
+MAPNIKCAPICALL char*
+mapnik_image_rgba8_data(mapnik_image_t * i, unsigned int* len);
+
+
+MAPNIKCAPICALL mapnik_image_t *
+mapnik_image_from_rgba8_data(
+    const int width
+  , const int height
+  , unsigned char *rgba8_data
+  );
 
 //  Map
 typedef struct _mapnik_map_t mapnik_map_t;
