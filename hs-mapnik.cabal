@@ -47,11 +47,11 @@ library
   default-language:    Haskell2010
   ghc-options:         -Wall
   if flag(internal-mapnik_c)
-    extra-libraries: mapnik
+    extra-libraries: mapnik stdc++
     include-dirs: mapnik_c
     c-sources: mapnik_c/mapnik_c_api.cpp
   else
-    extra-libraries: mapnik_c mapnik
+    extra-libraries: mapnik_c mapnik stdc++
 
 test-suite spec
   type:             exitcode-stdio-1.0
