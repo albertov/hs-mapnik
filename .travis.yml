@@ -1,7 +1,15 @@
 language: nix
+sudo: false
 
 env:
-  - RECIPE=with_801
+  - RECIPE=with_710
+  - RECIPE=with_802
+  - RECIPE=with_821
+
+os:
+  - linux
+  - osx
+
 
 script:
   - git clone --depth=1 https://github.com/NixOS/nixpkgs
