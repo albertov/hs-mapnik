@@ -2,7 +2,6 @@ language: nix
 sudo: false
 
 env:
-  - RECIPE=with_710
   - RECIPE=with_802
   - RECIPE=with_821
 

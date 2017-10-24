@@ -18,3 +18,5 @@ src/**/*.cpp
 examples/**/*.cpp
 dist-newstyle
 nixpkgs
+result
+*.sw?

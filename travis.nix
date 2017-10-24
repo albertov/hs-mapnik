@@ -16,6 +16,5 @@ let
       ]);
 in {
   with_802 = withGhc pkgs.haskell.packages.ghc802;
-  with_710 = withGhc pkgs.haskell.packages.ghc710;
   with_821 = withGhc pkgs.haskell.packages.ghc821;
 }
