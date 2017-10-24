@@ -9,7 +9,9 @@ os:
   - linux
   - osx
 
-
 script:
-  - git clone --depth=1 https://github.com/NixOS/nixpkgs
   - nix-build -A ${RECIPE} travis.nix
+
+cache:
+  directories:
+  - /nix/store
