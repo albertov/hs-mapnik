@@ -17,7 +17,7 @@ spec = beforeAll_ register_defaults $ do
     set_srs m merc
     zoom_to_box m box
     img <- render_to_image m 1
-    --BS.writeFile "map.png" (serialize_image PNG img)
+    -- BS.writeFile "map.webp" (serialize_image "webp" img)
     BS.take 6 (serialize_image "png8" img) `shouldBe` "\137PNG\r\n"
 
   it "throws on broken XML" $ do
@@ -25,15 +25,17 @@ spec = beforeAll_ register_defaults $ do
     loadFixtureFrom "spec/bad.xml" m `shouldThrow` anyException
 
   it "can convert image to rgba8 data and read it back" $ do
-    m <- createMap 512 512
+    m <- createMap 10 10
     loadFixture m
     set_srs m merc
     zoom_to_box m box
     img <- render_to_image m 1
     let rgba8 = image_to_rgba8 img
-        Just img2  = image_from_rgba8 512 512 rgba8
-    BS.length rgba8  `shouldBe` (512*512*4)
+        Just img2  = image_from_rgba8 10 10 rgba8
+    BS.length rgba8  `shouldBe` (10*10*4)
     BS.take 6 (serialize_image "png8" img2) `shouldBe` "\137PNG\r\n"
+    --BS.writeFile "map.webp" (serialize_image "webp" img2)
+    serialize_image "png8" img `shouldBe` serialize_image "png8" img2
 
   it "can resize" $ do
     m <- createMap 10 10

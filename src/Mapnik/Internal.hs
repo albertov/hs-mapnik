@@ -31,10 +31,9 @@ module Mapnik.Internal (
 
 import           Data.Monoid ((<>))
 import           Data.String (fromString)
-import           Data.ByteString (ByteString, packCStringLen)
+import           Data.ByteString (ByteString)
 import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
 import           Foreign.ForeignPtr (ForeignPtr, FinalizerPtr, newForeignPtr)
-import           Foreign.Ptr (castPtr)
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
@@ -164,18 +163,25 @@ serialize_image (fromString -> fmt) im = unsafePerformIO $ do
 image_to_rgba8 :: Image -> ByteString
 image_to_rgba8 im = unsafePerformIO $ do
   (ptr,len) <- C.withPtrs_ $ \(ptr, len) ->
-    [C.block| void {
+    [C.catchBlock|
     mapnik::image_rgba8 *im = static_cast<mapnik::image_rgba8*>($fptr-ptr:(void *im));
-    *$(unsigned char** ptr) = im->bytes();
-    *$(int* len) = im->size();
-    } |]
-  packCStringLen (castPtr ptr, fromIntegral len)
+    int len = *$(int* len) = im->size();
+    if (len <= 0) {
+      throw std::runtime_error("Invalid image size");
+    }
+    *$(char** ptr) = static_cast<char*>(malloc(len));
+    if ( ! *$(char** ptr) ) {
+      throw std::runtime_error("Could not malloc");
+    }
+    memcpy(*$(char** ptr), im->data(), len);
+    |]
+  unsafePackMallocCStringLen (ptr, fromIntegral len)
 {-# NOINLINE image_to_rgba8 #-}
 
 image_from_rgba8 :: Int -> Int -> ByteString -> Maybe Image
 image_from_rgba8 (fromIntegral -> width) (fromIntegral -> height) rgba8 = unsafePerformIO $ do
   ptr <- [C.exp|void * {
-    new mapnik::image_rgba8($(int width), $(int height), $bs-ptr:rgba8)
+    new mapnik::image_rgba8($(int width), $(int height), reinterpret_cast<unsigned char*>($bs-ptr:rgba8))
     }|]
   Just . Image <$> newForeignPtr destroyImage ptr
 {-# NOINLINE image_from_rgba8 #-}
