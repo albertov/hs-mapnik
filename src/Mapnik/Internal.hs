@@ -30,6 +30,7 @@ module Mapnik.Internal (
 ) where
 
 import           Mapnik.Internal.Context
+import           Control.Monad ((<=<))
 import           Data.String (fromString)
 import           Data.ByteString (ByteString)
 import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
@@ -62,14 +63,11 @@ C.using "mapnik::image_rgba8"
 foreign import ccall "&hs_mapnik_destroy_Map" destroyMap :: FinalizerPtr Map
 
 newMap :: (Ptr (Ptr Map) -> IO ()) -> IO Map
-newMap block = do
-  ptr <- C.withPtr_ block
-  Map <$> newForeignPtr destroyMap ptr
+newMap = fmap Map . newForeignPtr destroyMap <=< C.withPtr_
 
 createMap :: Int -> Int -> IO Map
 createMap (fromIntegral -> width) (fromIntegral -> height) =
-  newMap $ \ptr ->
-    [C.catchBlock|*$(Map** ptr) = new Map($(int width), $(int height));|]
+  newMap $ \p -> [C.catchBlock|*$(Map** p) = new Map($(int width), $(int height));|]
 
 load_map :: Map -> FilePath -> IO ()
 load_map m (fromString -> path) =
@@ -113,9 +111,7 @@ zoom_to_box m (Box (realToFrac -> x0) (realToFrac -> y0) (realToFrac -> x1) (rea
 foreign import ccall "&hs_mapnik_destroy_Image" destroyImage :: FinalizerPtr Image
 
 newImage :: (Ptr (Ptr Image) -> IO ()) -> IO Image
-newImage block = do
-  ptr <- C.withPtr_ block
-  Image <$> newForeignPtr destroyImage ptr
+newImage = fmap Image . newForeignPtr destroyImage <=< C.withPtr_
 
 render_to_image :: Map -> Double -> IO Image
 render_to_image m (realToFrac -> scale) = newImage $ \ptr ->
@@ -173,8 +169,8 @@ image_to_rgba8 im = unsafePerformIO $ newByteString $ \(ptr, len) ->
 image_from_rgba8 :: Int -> Int -> ByteString -> Maybe Image
 image_from_rgba8 (fromIntegral -> width) (fromIntegral -> height) rgba8 = unsafePerformIO $ fmap Just $ newImage $ \ptr ->
   [C.block|void {
-    *$(image_rgba8 **ptr) =
-      new mapnik::image_rgba8($(int width), $(int height), reinterpret_cast<unsigned char*>($bs-ptr:rgba8));
+  *$(image_rgba8 **ptr) =
+    new mapnik::image_rgba8($(int width), $(int height), reinterpret_cast<unsigned char*>($bs-ptr:rgba8));
   }|]
 {-# NOINLINE image_from_rgba8 #-}
   
@@ -193,17 +189,18 @@ fontDir = DEFAULT_FONT_DIR
 register_datasources :: FilePath -> IO ()
 register_datasources (fromString -> path) =
   [C.catchBlock|
-    std::string path($bs-ptr:path, $bs-len:path);
-    mapnik::datasource_cache::instance().register_datasources(path);
+  std::string path($bs-ptr:path, $bs-len:path);
+  mapnik::datasource_cache::instance().register_datasources(path);
   |]
 
 register_fonts :: FilePath -> IO ()
 register_fonts (fromString -> path) =
   [C.catchBlock|
-    std::string path($bs-ptr:path, $bs-len:path);
-    mapnik::freetype_engine::register_fonts(path);
+  std::string path($bs-ptr:path, $bs-len:path);
+  mapnik::freetype_engine::register_fonts(path);
   |]
   
 register_defaults :: IO ()
-register_defaults =
-  register_datasources pluginDir >> register_fonts fontDir
+register_defaults = do
+  register_datasources pluginDir
+  register_fonts fontDir
