@@ -1,5 +1,5 @@
 name:                hs-mapnik
-version:             0.1.0.0
+version:             0.2.0.0
 synopsis:            Haskel bindings for Mapnik
 description:         Please see README.md
 homepage:            https://github.com/albertov/hs-mapnik#readme
@@ -7,23 +7,13 @@ license:             BSD3
 license-file:        LICENSE
 author:              Alberto Valverde González
 maintainer:          allberto@toscat.net
-copyright:           2016 Alberto Valverde González
+copyright:           2016-2017 Alberto Valverde González
 category:            Bindings
 build-type:          Custom
 cabal-version:       >=1.10
 
 custom-setup
   setup-depends: base, Cabal, directory, filepath, process
-
-flag internal-mapnik_c
-  description: Let cabal build  mapnik_c
-  default: True
-  manual: True
-
-flag examples
-  description: Build example apps
-  default: False
-  manual: True
 
 flag embed-fonts
   description: Embed defaults fonts in executable
@@ -36,24 +26,16 @@ flag static
   manual: True
 
 library
-  build-tools:         c2hs >= 0.25
   hs-source-dirs:      src
   exposed-modules:     Mapnik
   other-modules:       Mapnik.Internal
-                     , Mapnik.InternalNew
   build-depends:       base                >= 4.7  && < 5
                      , bytestring          >= 0.10 && < 0.11
-                     , either              >= 4.4  && < 4.5
-                     , transformers        >= 0.4  && < 0.6
                      , inline-c-cpp        >= 0.2.1.0 && < 0.3
   default-language:    Haskell2010
   ghc-options:         -Wall
-  if flag(internal-mapnik_c)
-    extra-libraries: mapnik stdc++
-    include-dirs: mapnik_c
-    c-sources: mapnik_c/mapnik_c_api.cpp
-  else
-    extra-libraries: mapnik_c mapnik stdc++
+  extra-libraries:     mapnik stdc++
+  c-sources:           cbits/destructors.cpp
 
 test-suite spec
   type:             exitcode-stdio-1.0
