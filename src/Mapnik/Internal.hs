@@ -164,20 +164,19 @@ serialize_image (fromString -> fmt) im = unsafePerformIO $ do
 image_to_rgba8 :: Image -> ByteString
 image_to_rgba8 im = unsafePerformIO $ do
   (ptr,len) <- C.withPtrs_ $ \(ptr, len) ->
-    [C.catchBlock|
+    [C.block| void {
     mapnik::image_rgba8 *im = static_cast<mapnik::image_rgba8*>($fptr-ptr:(void *im));
     *$(unsigned char** ptr) = im->bytes();
     *$(int* len) = im->size();
-    |]
+    } |]
   packCStringLen (castPtr ptr, fromIntegral len)
 {-# NOINLINE image_to_rgba8 #-}
 
 image_from_rgba8 :: Int -> Int -> ByteString -> Maybe Image
 image_from_rgba8 (fromIntegral -> width) (fromIntegral -> height) rgba8 = unsafePerformIO $ do
-  ptr <- C.withPtr_ $ \resPtr ->
-    [C.catchBlock|
-    *$(void** resPtr) = new mapnik::image_rgba8($(int width), $(int height), $bs-ptr:rgba8);
-    |]
+  ptr <- [C.exp|void * {
+    new mapnik::image_rgba8($(int width), $(int height), $bs-ptr:rgba8)
+    }|]
   Just . Image <$> newForeignPtr destroyImage ptr
 {-# NOINLINE image_from_rgba8 #-}
   
