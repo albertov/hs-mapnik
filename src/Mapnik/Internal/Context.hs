@@ -14,7 +14,7 @@ import           Data.Monoid (mempty, (<>))
 import           Language.C.Inline.Context
 import qualified Language.C.Types as C
 import qualified Language.Haskell.TH as TH
-import           Foreign.ForeignPtr (ForeignPtr, FinalizerPtr, newForeignPtr)
+import           Foreign.ForeignPtr (ForeignPtr)
 
 newtype Map = Map (ForeignPtr Map)
 newtype Image = Image (ForeignPtr Image)
