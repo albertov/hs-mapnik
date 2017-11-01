@@ -29,18 +29,18 @@ module Mapnik.Internal (
 , fontDir
 ) where
 
-import           Data.Monoid ((<>))
+import           Mapnik.Internal.Context
 import           Data.String (fromString)
 import           Data.ByteString (ByteString)
 import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
-import           Foreign.ForeignPtr (ForeignPtr, FinalizerPtr, newForeignPtr)
+import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
 
 import           System.IO.Unsafe (unsafePerformIO)
 
-C.context (C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx)
+C.context mapnikCtx
 
 C.include "<string>"
 C.include "<mapnik/agg_renderer.hpp>"
@@ -51,59 +51,63 @@ C.include "<mapnik/load_map.hpp>"
 C.include "<mapnik/datasource_cache.hpp>"
 C.include "<mapnik/font_engine_freetype.hpp>"
 
+C.using "mapnik::Map"
+C.using "mapnik::image_rgba8"
+
+
+
 -- * Map
 
-newtype Map = Map (ForeignPtr ())
 
-foreign import ccall "&hs_mapnik_destroy_Map" destroyMap :: FinalizerPtr ()
+foreign import ccall "&hs_mapnik_destroy_Map" destroyMap :: FinalizerPtr Map
 
 createMap :: Int -> Int -> IO Map
 createMap (fromIntegral -> width) (fromIntegral -> height) = do
   ptr <- C.withPtr_ $ \resPtr ->
     [C.catchBlock|
-    *$(void** resPtr) = new mapnik::Map($(int width), $(int height));
+    *$(Map** resPtr) = new Map($(int width), $(int height));
     |]
   Map <$> newForeignPtr destroyMap ptr
 
 load_map :: Map -> FilePath -> IO ()
 load_map m (fromString -> path) =
   [C.catchBlock|
-  mapnik::Map *m = static_cast<mapnik::Map*>($fptr-ptr:(void *m));
+  mapnik::Map *m = $fptr-ptr:(Map *m);
   mapnik::load_map(*m, std::string($bs-ptr:path, $bs-len:path));
   |]
 
 load_map_string :: Map -> ByteString -> IO ()
 load_map_string m str =
   [C.catchBlock|
-  mapnik::Map *m = static_cast<mapnik::Map*>($fptr-ptr:(void *m));
+  mapnik::Map *m = $fptr-ptr:(Map *m);
   mapnik::load_map_string(*m, std::string($bs-ptr:str, $bs-len:str));
   |]
   
 set_srs :: Map -> String -> IO ()
 set_srs m (fromString -> srs) =
   [C.catchBlock|
-  mapnik::Map *m = static_cast<mapnik::Map*>($fptr-ptr:(void *m));
+  mapnik::Map *m = $fptr-ptr:(Map *m);
   m->set_srs(std::string($bs-ptr:srs, $bs-len:srs));
   |]
 
 set_buffer_size :: Map -> Int -> IO ()
 set_buffer_size m (fromIntegral -> size) =
   [C.catchBlock|
-  mapnik::Map *m = static_cast<mapnik::Map*>($fptr-ptr:(void *m));
+  mapnik::Map *m = $fptr-ptr:(Map *m);
   m->set_buffer_size($(int size));
   |]
 
 resize :: Map -> Int -> Int -> IO ()
 resize m (fromIntegral -> width) (fromIntegral -> height) =
   [C.catchBlock|
-  mapnik::Map *m = static_cast<mapnik::Map*>($fptr-ptr:(void *m));
+  mapnik::Map *m = $fptr-ptr:(Map *m);
   m->resize($(int width), $(int height));
   |]
 
 zoom_all :: Map -> IO ()
 zoom_all m = 
   [C.catchBlock|
-  mapnik::Map *m = static_cast<mapnik::Map*>($fptr-ptr:(void *m));
+  mapnik::Map *m = $fptr-ptr:(Map *m);
   m->zoom_all();
   |]
 
@@ -113,26 +117,25 @@ data Box = Box { x0, y0, x1, y1 :: {-# UNPACK #-}!Double }
 zoom_to_box :: Map -> Box -> IO ()
 zoom_to_box m (Box (realToFrac -> x0) (realToFrac -> y0) (realToFrac -> x1) (realToFrac -> y1)) = 
   [C.catchBlock|
-  mapnik::Map *m = static_cast<mapnik::Map*>($fptr-ptr:(void *m));
+  mapnik::Map *m = $fptr-ptr:(Map *m);
   m->zoom_to_box(mapnik::box2d<double>($(double x0), $(double y0), $(double x1), $(double y1)));
   |]
 
 -- * Image
 
-newtype Image = Image (ForeignPtr ())
 
-foreign import ccall "&hs_mapnik_destroy_Image" destroyImage :: FinalizerPtr ()
+foreign import ccall "&hs_mapnik_destroy_Image" destroyImage :: FinalizerPtr Image
 
 render_to_image :: Map -> Double -> IO Image
 render_to_image m (realToFrac -> scale) = do
   ptr <- C.withPtr_ $ \resPtr ->
     [C.catchBlock|
-    mapnik::Map *m = static_cast<mapnik::Map*>($fptr-ptr:(void *m));
+    mapnik::Map *m = $fptr-ptr:(Map *m);
     mapnik::image_rgba8 *im = new mapnik::image_rgba8(m->width(), m->height());
     try {
       mapnik::agg_renderer<mapnik::image_rgba8> ren(*m, *im, $(double scale));
       ren.apply();
-      *$(void** resPtr) = im;
+      *$(image_rgba8** resPtr) = im;
     } catch (...) {
       delete im;
       throw;
@@ -144,7 +147,7 @@ serialize_image :: String -> Image -> ByteString
 serialize_image (fromString -> fmt) im = unsafePerformIO $ do
   (ptr,len) <- C.withPtrs_ $ \(ptr, len) -> do
     [C.catchBlock|
-    mapnik::image_rgba8 *im = static_cast<mapnik::image_rgba8*>($fptr-ptr:(void *im));
+    mapnik::image_rgba8 *im = $fptr-ptr:(image_rgba8 *im);
     std::string fmt = std::string($bs-ptr:fmt, $bs-len:fmt);
     std::string s = save_to_string(*im, fmt);
     if (! s.length() ) {
@@ -164,7 +167,7 @@ image_to_rgba8 :: Image -> ByteString
 image_to_rgba8 im = unsafePerformIO $ do
   (ptr,len) <- C.withPtrs_ $ \(ptr, len) ->
     [C.catchBlock|
-    mapnik::image_rgba8 *im = static_cast<mapnik::image_rgba8*>($fptr-ptr:(void *im));
+    mapnik::image_rgba8 *im = $fptr-ptr:(image_rgba8 *im);
     int len = *$(int* len) = im->size();
     if (len <= 0) {
       throw std::runtime_error("Invalid image size");
@@ -180,7 +183,7 @@ image_to_rgba8 im = unsafePerformIO $ do
 
 image_from_rgba8 :: Int -> Int -> ByteString -> Maybe Image
 image_from_rgba8 (fromIntegral -> width) (fromIntegral -> height) rgba8 = unsafePerformIO $ do
-  ptr <- [C.exp|void * {
+  ptr <- [C.exp|image_rgba8 * {
     new mapnik::image_rgba8($(int width), $(int height), reinterpret_cast<unsigned char*>($bs-ptr:rgba8))
     }|]
   Just . Image <$> newForeignPtr destroyImage ptr
