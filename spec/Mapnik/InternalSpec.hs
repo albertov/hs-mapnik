@@ -3,8 +3,9 @@ module Mapnik.InternalSpec (main, spec) where
 
 import           Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString as BS
+import           Data.Either (isLeft)
 import           Test.Hspec
-import           Mapnik.Internal
+import           Mapnik
 
 main :: IO ()
 main = hspec spec
@@ -21,6 +22,14 @@ spec = beforeAll_ register_defaults $ do
       render_to_image m 1
     --BS.writeFile "map.png" (serialize_image PNG img)
     BS.take 6 (serialize_image "png8" img) `shouldBe` "\137PNG\r\n"
+
+  it "throws on broken XML" $ do
+    res <- runMapnik $ do
+      m <- createMap 512 512
+      loadFixtureFrom "spec/bad.xml" m
+      set_srs m merc
+      zoom_to_box m box
+    res `shouldSatisfy` isLeft
 
   it "can convert image to rgba8 data and read it back" $ do
     img <- runMapnik_ $ do
@@ -43,9 +52,10 @@ spec = beforeAll_ register_defaults $ do
     BS.take 6 (serialize_image "png8" img) `shouldBe` "\137PNG\r\n"
 
 loadFixture :: Map -> MapnikM ()
-loadFixture m =
-  load_map_string m =<< liftIO (BS.readFile "spec/map.xml")
+loadFixture = loadFixtureFrom "spec/map.xml"
 
+loadFixtureFrom :: String -> Map -> MapnikM ()
+loadFixtureFrom p m = load_map_string m =<< liftIO (BS.readFile p)
 
 box :: BBox
 box = bbox (-8024477.28459) 5445190.38849 (-7381388.20071) 5662941.44855

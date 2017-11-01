@@ -1,6 +1,7 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 #include "mapnik_c_api.h"
@@ -17,9 +18,6 @@ module Mapnik.Internal (
   , withMap
   , pluginDir
   , fontDir
-  , register_datasources
-  , register_fonts
-  , register_defaults
   , load_map
   , load_map_string
   , zoom_all
@@ -33,8 +31,11 @@ module Mapnik.Internal (
   , serialize_image
   , image_from_rgba8
   , image_to_rgba8
+
+  , tryIO
 ) where
 
+import           Control.Exception
 import           Control.Monad (liftM, (<=<))
 import           Control.Monad.Trans.Either
 import           Control.Monad.IO.Class (MonadIO, liftIO)
@@ -70,22 +71,12 @@ fontDir = DEFAULT_FONT_DIR
 
 -- * Initialization
 
-register_datasources :: FilePath -> MapnikM ()
-register_datasources path =
-  checkError "register_datasources" $ \errPtr ->
-  withCString path $ \cPath ->
-    {#call mapnik_register_datasources#} cPath errPtr
-
-
 register_fonts :: FilePath -> MapnikM ()
 register_fonts path =
   checkError "register_fonts" $ \errPtr ->
   withCString path $ \cPath ->
     {#call mapnik_register_fonts #} cPath errPtr
 
-register_defaults :: IO ()
-register_defaults =
-  runMapnik_ (register_datasources pluginDir >> register_fonts fontDir)
 
 -- * Image
 
@@ -207,6 +198,11 @@ image_from_rgba8 w h rgba8
 
 runIO :: IO (Either String a) -> MapnikM a
 runIO a = MapnikM (hoistEither =<< liftIO a)
+
+tryIO :: IO a -> MapnikM a
+tryIO a = MapnikM (hoistEither =<< fmap showExc (liftIO (try a)))
+  where
+    showExc = either (Left . show @SomeException) Right 
 
 checkError :: String -> (Ptr CString -> IO CInt) -> MapnikM ()
 checkError prefix act = runIO $ alloca $ \errPtr -> do
