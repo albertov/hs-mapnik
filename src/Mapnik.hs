@@ -5,6 +5,7 @@
 
 module Mapnik (
   Box (..)
+, C.CppException (..)
 , registerPluginDir
 , registerFontDir
 , registerDefaults
