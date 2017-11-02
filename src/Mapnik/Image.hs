@@ -15,7 +15,7 @@ module Mapnik.Image (
 import           Mapnik.Internal
 import           Control.Monad ((<=<))
 import           Data.String (fromString)
-import           Data.ByteString (ByteString)
+import           Data.ByteString as BS (ByteString, length)
 import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
@@ -83,6 +83,10 @@ toRgba8 im = unsafePerformIO $ newByteString $ \(ptr, len) ->
 {-# NOINLINE toRgba8 #-}
 
 fromRgba8 :: Int -> Int -> ByteString -> Maybe Image
+fromRgba8 width height rgba8
+  | 0 == BS.length rgba8 = Nothing
+  | height < 0 || width < 0 = Nothing
+  | width*height*4 /= BS.length rgba8 = Nothing
 fromRgba8 (fromIntegral -> width) (fromIntegral -> height) rgba8 = unsafePerformIO $ fmap Just $ unsafeNew $ \ptr ->
   [C.block|void {
   *$(image_rgba8 **ptr) =
