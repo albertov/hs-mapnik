@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedLists #-}
 module MapnikSpec (main, spec) where
 
 import qualified Data.ByteString as BS
@@ -6,6 +7,8 @@ import           Test.Hspec
 import           Mapnik
 import           Mapnik.Map as Map
 import           Mapnik.Image as Image
+import           Mapnik.Layer as Layer
+import           Mapnik.Datasource as Datasource
 
 main :: IO ()
 main = hspec spec
@@ -16,8 +19,6 @@ spec = beforeAll_ Mapnik.registerDefaults $ do
   it "renders map.xml as PNG" $ do
     m <- Map.create 512 512
     loadFixture m
-    Map.setSrs m merc
-    Map.zoomToBox m box
     img <- Map.render m 1
     -- BS.writeFile "map.webp" (Image.serialize "webp" img)
     BS.take 6 (Image.serialize "png8" img) `shouldBe` "\137PNG\r\n"
@@ -26,11 +27,26 @@ spec = beforeAll_ Mapnik.registerDefaults $ do
     m <- Map.create 512 512
     loadFixtureFrom "spec/bad.xml" m `shouldThrow` anyException
 
+  it "can add layer and render" $ do
+    m <- Map.create 10 10
+    loadFixture m
+
+    l <- Layer.create "Populated places"
+    Layer.setSrs l "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
+    Layer.addStyle l "popplaces"
+    Layer.setDatasource l =<< Datasource.create
+      [ ("type", "shape")
+      , ("encoding", "latin1")
+      , ("file", "spec/data/popplaces")
+      ]
+    Map.addLayer m l
+
+    img <- Map.render m 1
+    BS.take 6 (Image.serialize "png8" img) `shouldBe` "\137PNG\r\n"
+
   it "can convert image to rgba8 data and read it back" $ do
     m <- Map.create 10 10
     loadFixture m
-    Map.setSrs m merc
-    Map.zoomToBox m box
     img <- Map.render m 1
     let rgba8 = Image.toRgba8 img
         Just img2  = Image.fromRgba8 10 10 rgba8
@@ -47,7 +63,10 @@ spec = beforeAll_ Mapnik.registerDefaults $ do
     BS.take 6 (Image.serialize "png8" img) `shouldBe` "\137PNG\r\n"
 
 loadFixture :: Map -> IO ()
-loadFixture = loadFixtureFrom "spec/map.xml"
+loadFixture m = do
+  loadFixtureFrom "spec/map.xml" m
+  Map.setSrs m merc
+  Map.zoomToBox m box
 
 loadFixtureFrom :: String -> Map -> IO ()
 loadFixtureFrom p m = Map.loadXml m =<< BS.readFile p

@@ -4,7 +4,8 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module Mapnik (
-  registerPluginDir
+  Box (..)
+, registerPluginDir
 , registerFontDir
 , registerDefaults
 , pluginDir

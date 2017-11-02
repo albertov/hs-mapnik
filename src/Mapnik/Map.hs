@@ -1,5 +1,4 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -11,12 +10,14 @@ module Mapnik.Map (
 , create
 , loadXml
 , loadXmlFile
+, zoom
 , zoomAll
 , zoomToBox
 , setSrs
 , setBufferSize
 , resize
 , render
+, addLayer
 ) where
 
 import           Mapnik.Internal
@@ -39,6 +40,7 @@ C.include "<mapnik/map.hpp>"
 C.include "<mapnik/load_map.hpp>"
 
 C.using "namespace mapnik"
+
 --
 -- * Map
 
@@ -76,11 +78,12 @@ resize :: Map -> Int -> Int -> IO ()
 resize m (fromIntegral -> width) (fromIntegral -> height) =
   [C.catchBlock|$fptr-ptr:(Map *m)->resize($(int width), $(int height));|]
 
+zoom :: Map -> Double -> IO ()
+zoom m (realToFrac -> z) =
+  [C.catchBlock|$fptr-ptr:(Map *m)->zoom($(double z));|]
+
 zoomAll :: Map -> IO ()
 zoomAll m = [C.catchBlock|$fptr-ptr:(Map *m)->zoom_all();|]
-
-data Box = Box { x0, y0, x1, y1 :: {-# UNPACK #-}!Double }
-  deriving (Eq, Show)
 
 zoomToBox :: Map -> Box -> IO ()
 zoomToBox m (Box (realToFrac -> x0) (realToFrac -> y0) (realToFrac -> x1) (realToFrac -> y1)) = 
@@ -101,4 +104,9 @@ render m (realToFrac -> scale) = Image.unsafeNew $ \ptr ->
     delete im;
     throw;
   }
+  |]
+
+addLayer :: Map -> Layer -> IO ()
+addLayer m l = [C.catchBlock|
+  $fptr-ptr:(Map *m)->add_layer(*$fptr-ptr:(layer *l));
   |]
