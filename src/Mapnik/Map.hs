@@ -14,6 +14,9 @@ module Mapnik.Map (
 , zoom
 , zoomAll
 , zoomToBox
+, setBasePath
+, setBackgroundImage
+, setFontDirectory
 , setSrs
 , setBufferSize
 , setAspectFixMode
@@ -77,6 +80,24 @@ loadXml m str =
   [C.catchBlock|
   mapnik::load_map_string(*$fptr-ptr:(Map *m), std::string($bs-ptr:str, $bs-len:str));
   |]
+
+setBackgroundImage :: Map -> FilePath -> IO ()
+setBackgroundImage m (fromString -> path) =
+  [C.block| void {
+  $fptr-ptr:(Map *m)->set_background_image(std::string($bs-ptr:path, $bs-len:path));
+  }|]
+
+setBasePath :: Map -> FilePath -> IO ()
+setBasePath m (fromString -> path) =
+  [C.block| void {
+  $fptr-ptr:(Map *m)->set_base_path(std::string($bs-ptr:path, $bs-len:path));
+  }|]
+
+setFontDirectory :: Map -> FilePath -> IO ()
+setFontDirectory m (fromString -> path) =
+  [C.block| void {
+  $fptr-ptr:(Map *m)->set_font_directory(std::string($bs-ptr:path, $bs-len:path));
+  }|]
   
 setSrs :: Map -> String -> IO ()
 setSrs m (fromString -> srs) =
