@@ -6,6 +6,7 @@
 module Mapnik.Map (
   Map
 , Box (..)
+, AspectFixMode (..)
 , unsafeNew
 , create
 , loadXml
@@ -15,6 +16,7 @@ module Mapnik.Map (
 , zoomToBox
 , setSrs
 , setBufferSize
+, setAspectFixMode
 , resize
 , render
 , addLayer
@@ -44,6 +46,16 @@ C.using "namespace mapnik"
 --
 -- * Map
 
+data AspectFixMode = GrowBox
+                   | GrowCanvas
+                   | ShrinkBox
+                   | ShrinkCanvas
+                   | AdjustBoxWidth
+                   | AdjustBoxHeight
+                   | AdjustCanvasWidth
+                   | AdjustCanvasHeight
+                   | Respect
+                   deriving (Eq, Show)
 
 foreign import ccall "&hs_mapnik_destroy_Map" destroyMap :: FinalizerPtr Map
 
@@ -69,6 +81,17 @@ loadXml m str =
 setSrs :: Map -> String -> IO ()
 setSrs m (fromString -> srs) =
   [C.block|void { $fptr-ptr:(Map *m)->set_srs(std::string($bs-ptr:srs, $bs-len:srs));}|]
+
+setAspectFixMode :: Map -> AspectFixMode -> IO ()
+setAspectFixMode m GrowBox = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::GROW_BBOX);}|]
+setAspectFixMode m GrowCanvas = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::GROW_CANVAS);}|]
+setAspectFixMode m ShrinkBox = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::SHRINK_BBOX);}|]
+setAspectFixMode m ShrinkCanvas = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::SHRINK_CANVAS);}|]
+setAspectFixMode m AdjustBoxWidth = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::ADJUST_BBOX_WIDTH);}|]
+setAspectFixMode m AdjustBoxHeight = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::ADJUST_BBOX_HEIGHT);}|]
+setAspectFixMode m AdjustCanvasWidth = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::ADJUST_CANVAS_WIDTH);}|]
+setAspectFixMode m AdjustCanvasHeight = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::ADJUST_CANVAS_HEIGHT);}|]
+setAspectFixMode m Respect = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::RESPECT);}|]
 
 setBufferSize :: Map -> Int -> IO ()
 setBufferSize m (fromIntegral -> size) =
