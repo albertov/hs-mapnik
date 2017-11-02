@@ -68,15 +68,15 @@ loadXml m str =
   
 setSrs :: Map -> String -> IO ()
 setSrs m (fromString -> srs) =
-  [C.catchBlock|$fptr-ptr:(Map *m)->set_srs(std::string($bs-ptr:srs, $bs-len:srs));|]
+  [C.block|void { $fptr-ptr:(Map *m)->set_srs(std::string($bs-ptr:srs, $bs-len:srs));}|]
 
 setBufferSize :: Map -> Int -> IO ()
 setBufferSize m (fromIntegral -> size) =
-  [C.catchBlock|$fptr-ptr:(Map *m)->set_buffer_size($(int size)); |]
+  [C.block|void {$fptr-ptr:(Map *m)->set_buffer_size($(int size));}|]
 
 resize :: Map -> Int -> Int -> IO ()
 resize m (fromIntegral -> width) (fromIntegral -> height) =
-  [C.catchBlock|$fptr-ptr:(Map *m)->resize($(int width), $(int height));|]
+  [C.block|void {$fptr-ptr:(Map *m)->resize($(int width), $(int height));}|]
 
 zoom :: Map -> Double -> IO ()
 zoom m (realToFrac -> z) =

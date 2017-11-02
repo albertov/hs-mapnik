@@ -23,7 +23,6 @@ import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
 
 import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Cpp.Exceptions as C
 
 
 C.context mapnikCtx
@@ -44,7 +43,7 @@ unsafeNew = fmap Layer . newForeignPtr destroyLayer <=< C.withPtr_
 
 create :: String -> IO Layer
 create (fromString -> name) =
-  unsafeNew $ \p -> [C.catchBlock|*$(layer** p) = new layer(std::string($bs-ptr:name, $bs-len:name));|]
+  unsafeNew $ \p -> [C.block|void {*$(layer** p) = new layer(std::string($bs-ptr:name, $bs-len:name));}|]
 
 addStyle :: Layer -> String -> IO ()
 addStyle l (fromString -> s) = [C.block| void {

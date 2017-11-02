@@ -68,6 +68,11 @@ spec = beforeAll_ Mapnik.registerDefaults $ do
     img2 <- Map.render m 1
     BS.length (toRgba8 img2) `shouldBe` (300*200*4)
 
+  it "throws on invalid size" $ do
+    m <- Map.create (-1) (-1)
+    loadFixture m
+    Map.render m 1 `shouldThrow` cppStdException
+
 loadFixture :: Map -> IO ()
 loadFixture m = do
   loadFixtureFrom "spec/map.xml" m
