@@ -7,8 +7,10 @@ import           Mapnik
 import           Mapnik.Map as Map
 import           Mapnik.Image as Image
 import           Mapnik.Layer as Layer
+import           Mapnik.Projection as Projection
 import           Mapnik.Datasource as Datasource
 import           Control.Monad (void)
+import           Data.Either (isLeft, isRight)
 import           Data.String (fromString)
 
 main :: IO ()
@@ -72,6 +74,19 @@ spec = beforeAll_ Mapnik.registerDefaults $ do
     m <- Map.create (-1) (-1)
     loadFixture m
     Map.render m 1 `shouldThrow` cppStdException
+
+  it "can create valid projection" $ do
+    fromProj4 merc `shouldSatisfy` isRight
+
+  it "cannot create invalid projection" $ do
+    fromProj4 "foo" `shouldSatisfy` isLeft
+
+  it "can trasform" $ do
+    let Right src = fromProj4 merc
+        Right dst = fromProj4 "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
+        trans = transform src dst
+        expected = Box {x0 = 1372637.1001942465, y0 = -247003.8133187965, x1 = 1746737.6177269476, y1 = -25098.59307479199}
+    forward trans box `shouldBe` expected
 
 loadFixture :: Map -> IO ()
 loadFixture m = do

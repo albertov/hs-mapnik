@@ -9,6 +9,8 @@ module Mapnik.Internal (
 , Box (..)
 , Datasource (..)
 , Parameters (..)
+, Projection (..)
+, ProjTransform (..)
 , mapnikCtx
 ) where
 
@@ -23,6 +25,8 @@ newtype Image = Image (ForeignPtr Image)
 newtype Layer = Layer (ForeignPtr Layer)
 newtype Datasource = Datasource (ForeignPtr Datasource)
 newtype Parameters = Parameters (ForeignPtr Parameters)
+newtype Projection = Projection (ForeignPtr Projection)
+newtype ProjTransform = ProjTransform (ForeignPtr ProjTransform)
 
 data Box = Box { x0, y0, x1, y1 :: {-# UNPACK #-}!Double }
   deriving (Eq, Show)
@@ -36,5 +40,7 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> ctx
       , (C.TypeName "layer", [t| Layer |])
       , (C.TypeName "datasource_ptr", [t| Datasource |])
       , (C.TypeName "parameters", [t| Parameters |])
+      , (C.TypeName "projection", [t| Projection |])
+      , (C.TypeName "proj_transform", [t| ProjTransform |])
       ]
     }

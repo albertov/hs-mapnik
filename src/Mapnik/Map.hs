@@ -23,6 +23,7 @@ module Mapnik.Map (
 , resize
 , render
 , addLayer
+, removeAllLayers
 ) where
 
 import           Mapnik.Internal
@@ -42,6 +43,7 @@ C.context mapnikCtx
 C.include "<string>"
 C.include "<mapnik/agg_renderer.hpp>"
 C.include "<mapnik/map.hpp>"
+C.include "<mapnik/layer.hpp>"
 C.include "<mapnik/load_map.hpp>"
 
 C.using "namespace mapnik"
@@ -151,6 +153,11 @@ render m (realToFrac -> scale) = Image.unsafeNew $ \ptr ->
   |]
 
 addLayer :: Map -> Layer -> IO ()
-addLayer m l = [C.catchBlock|
+addLayer m l = [C.block|void {
   $fptr-ptr:(Map *m)->add_layer(*$fptr-ptr:(layer *l));
-  |]
+  }|]
+
+removeAllLayers :: Map -> IO ()
+removeAllLayers m =
+  [C.block| void { $fptr-ptr:(Map *m)->layers().clear(); }|]
+

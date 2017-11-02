@@ -13,13 +13,12 @@ module Mapnik.Image (
 ) where
 
 import           Mapnik.Internal
+import           Mapnik.Internal.Util (newByteString)
 import           Control.Monad ((<=<))
 import           Data.String (fromString)
 import           Data.ByteString as BS (ByteString, length)
-import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
-import           Foreign.C.String (CString)
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
@@ -43,11 +42,6 @@ foreign import ccall "&hs_mapnik_destroy_Image" destroyImage :: FinalizerPtr Ima
 unsafeNew :: (Ptr (Ptr Image) -> IO ()) -> IO Image
 unsafeNew = fmap Image . newForeignPtr destroyImage <=< C.withPtr_
 
-
-newByteString :: ((Ptr CString, Ptr C.CInt) -> IO ()) -> IO ByteString
-newByteString block = do
-  (ptr,len) <- C.withPtrs_ block
-  unsafePackMallocCStringLen (ptr, fromIntegral len)
 
 serialize :: String -> Image -> ByteString
 serialize (fromString -> fmt) im = unsafePerformIO $ newByteString $ \(ptr, len) ->

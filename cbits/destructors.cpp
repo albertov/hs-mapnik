@@ -2,6 +2,8 @@
 #include <mapnik/image.hpp>
 #include <mapnik/layer.hpp>
 #include <mapnik/datasource.hpp>
+#include <mapnik/projection.hpp>
+#include <mapnik/proj_transform.hpp>
 
 extern "C" {
 
@@ -23,6 +25,14 @@ void hs_mapnik_destroy_Datasource(void *p) {
 
 void hs_mapnik_destroy_Parameters(void *p) {
   delete static_cast<mapnik::parameters*>(p);
+}
+
+void hs_mapnik_destroy_Projection(void *p) {
+  delete static_cast<mapnik::projection*>(p);
+}
+
+void hs_mapnik_destroy_ProjTransform(void *p) {
+  delete static_cast<mapnik::proj_transform*>(p);
 }
 
 }

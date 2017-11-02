@@ -32,7 +32,9 @@ library
                      , Mapnik.Image
                      , Mapnik.Layer
                      , Mapnik.Datasource
+                     , Mapnik.Projection
   other-modules:       Mapnik.Internal
+                     , Mapnik.Internal.Util
   build-depends:       base                >= 4.7  && < 5
                      , bytestring          >= 0.10 && < 0.11
                      , inline-c-cpp        >= 0.2.1.0 && < 0.3
