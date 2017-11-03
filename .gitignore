@@ -1,0 +1,5 @@
+cabal.project.local
+result
+*.sw?
+dist
+dist-newstyle

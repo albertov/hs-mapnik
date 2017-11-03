@@ -19,17 +19,25 @@ library
   hs-source-dirs:      src
   exposed-modules:     Mapnik.Bindings
                      , Mapnik.Bindings.Map
+                     , Mapnik.Bindings.Color
                      , Mapnik.Bindings.Image
                      , Mapnik.Bindings.Layer
+                     , Mapnik.Bindings.Style
                      , Mapnik.Bindings.Datasource
                      , Mapnik.Bindings.Projection
                      , Mapnik.Bindings.Registry
+                     , Mapnik.Bindings.Rule
+                     , Mapnik.Bindings.Symbolizer
+                     , Mapnik.Bindings.Expression
                      , Mapnik.Bindings.Util
+                     , Mapnik.Bindings.ToMapnik
   build-depends:       base                >= 4.7  && < 5
                      , bytestring          >= 0.10 && < 0.11
                      , inline-c-cpp        >= 0.2.1.0 && < 0.3
                      , inline-c            >= 0.6.0.5
                      , text
+                     , hs-mapnik
+                     , unordered-containers
   default-language:    Haskell2010
   ghc-options:         -Wall
   extra-libraries:     mapnik stdc++

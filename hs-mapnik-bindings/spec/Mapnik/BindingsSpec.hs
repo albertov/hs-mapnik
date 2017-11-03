@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Mapnik.BindingsSpec (main, spec) where
 
 import qualified Data.ByteString as BS
@@ -10,7 +11,9 @@ import           Mapnik.Bindings.Image as Image
 import           Mapnik.Bindings.Layer as Layer
 import           Mapnik.Bindings.Projection as Projection
 import           Mapnik.Bindings.Datasource as Datasource
+import           Mapnik.Bindings.Color as Color
 import           Control.Monad (void)
+import           Data.Maybe (isJust, isNothing)
 import           Data.Either (isLeft, isRight)
 import           Data.String (fromString)
 
@@ -42,15 +45,15 @@ spec = beforeAll_ registerDefaults $ do
     Layer.setSrs l "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
     Layer.addStyle l "popplaces"
     Layer.setDatasource l =<< Datasource.create
-      [ "type"     .= "shape"
-      , "encoding" .= "latin1"
-      , "file"     .= "spec/data/popplaces"
+      [ "type"     .= ("shape" :: String)
+      , "encoding" .= ("latin1" :: String)
+      , "file"     .= ("spec/data/popplaces" :: String)
       ]
     Map.addLayer m l
     void $ Map.render m 1
 
   it "throws on invalid datasource" $
-    Datasource.create ["type".="shapes"] `shouldThrow` cppStdException
+    Datasource.create ["type".= ("shapes" :: String)] `shouldThrow` cppStdException
 
   it "can convert image to rgba8 data and read it back" $ do
     m <- Map.create 10 10
@@ -86,8 +89,20 @@ spec = beforeAll_ registerDefaults $ do
     let Right src = fromProj4 merc
         Right dst = fromProj4 "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
         trans = transform src dst
-        expected = Box {x0 = 1372637.1001942465, y0 = -247003.8133187965, x1 = 1746737.6177269476, y1 = -25098.59307479199}
+        expected = Box { minx = 1372637.1001942465
+                       , miny = -247003.8133187965
+                       , maxx = 1746737.6177269476
+                       , maxy = -25098.59307479199
+                       }
     forward trans box `shouldBe` expected
+
+  it "can parse good color" $ do
+    Color.create "rgba(3,4,5,1)" `shouldSatisfy` isJust
+    Color.create "steelblue" `shouldSatisfy` isJust
+
+  it "cannot parse bad color" $ do
+    Color.create "rgba(3,4,5" `shouldSatisfy` isNothing
+    Color.create "steelblu" `shouldSatisfy` isNothing
 
 loadFixture :: Map -> IO ()
 loadFixture m = do
@@ -101,7 +116,6 @@ loadFixtureFrom p m = Map.loadXml m =<< BS.readFile p
 box :: Box
 box = Box (-8024477.28459) 5445190.38849 (-7381388.20071) 5662941.44855
 
-merc :: String
 merc = "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over"
 
 cppStdException :: Selector CppException

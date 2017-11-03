@@ -15,21 +15,28 @@ module Mapnik.Bindings.Map (
 , zoomAll
 , zoomToBox
 , setBasePath
+, setBackground
 , setBackgroundImage
+, setBackgroundImageOpacity
 , setFontDirectory
 , setSrs
 , setBufferSize
 , setAspectFixMode
+, setMaxExtent
 , resize
 , render
 , addLayer
+, insertStyle
 , removeAllLayers
 ) where
 
+import           Mapnik (StyleName)
 import           Mapnik.Bindings
 import qualified Mapnik.Bindings.Image as Image
 import           Control.Monad ((<=<))
 import           Data.String (fromString)
+import           Data.Text (Text)
+import           Data.Text.Encoding (encodeUtf8)
 import           Data.ByteString (ByteString)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
@@ -83,10 +90,22 @@ loadXml m str =
   mapnik::load_map_string(*$fptr-ptr:(Map *m), std::string($bs-ptr:str, $bs-len:str));
   |]
 
+setBackground :: Map -> Color -> IO ()
+setBackground m col =
+  [C.block|void {
+  $fptr-ptr:(Map *m)->set_background(*$fptr-ptr:(color *col));
+  }|]
+
 setBackgroundImage :: Map -> FilePath -> IO ()
 setBackgroundImage m (fromString -> path) =
   [C.block| void {
   $fptr-ptr:(Map *m)->set_background_image(std::string($bs-ptr:path, $bs-len:path));
+  }|]
+
+setBackgroundImageOpacity :: Map -> Double -> IO ()
+setBackgroundImageOpacity m (realToFrac -> opacity) =
+  [C.block| void {
+  $fptr-ptr:(Map *m)->set_background_image_opacity($(double opacity));
   }|]
 
 setBasePath :: Map -> FilePath -> IO ()
@@ -101,8 +120,8 @@ setFontDirectory m (fromString -> path) =
   $fptr-ptr:(Map *m)->set_font_directory(std::string($bs-ptr:path, $bs-len:path));
   }|]
   
-setSrs :: Map -> String -> IO ()
-setSrs m (fromString -> srs) =
+setSrs :: Map -> Text -> IO ()
+setSrs m (encodeUtf8 -> srs) =
   [C.block|void { $fptr-ptr:(Map *m)->set_srs(std::string($bs-ptr:srs, $bs-len:srs));}|]
 
 setAspectFixMode :: Map -> AspectFixMode -> IO ()
@@ -137,7 +156,7 @@ zoomToBox m (Box (realToFrac -> x0) (realToFrac -> y0) (realToFrac -> x1) (realT
   $fptr-ptr:(Map *m)->zoom_to_box(mapnik::box2d<double>($(double x0), $(double y0), $(double x1), $(double y1)));
   |]
 
-render :: Map -> Double -> IO Image.Image
+render :: Map -> Double -> IO Image
 render m (realToFrac -> scale) = Image.unsafeNew $ \ptr ->
   [C.catchBlock|
   mapnik::Map *m = $fptr-ptr:(Map *m);
@@ -157,7 +176,19 @@ addLayer m l = [C.block|void {
   $fptr-ptr:(Map *m)->add_layer(*$fptr-ptr:(layer *l));
   }|]
 
+insertStyle :: Map -> StyleName -> Style -> IO ()
+insertStyle m (encodeUtf8 -> n) l = [C.block|void {
+  $fptr-ptr:(Map *m)->insert_style(
+      std::string($bs-ptr:n, $bs-len:n), *$fptr-ptr:(feature_type_style *l)
+      );
+  }|]
+
 removeAllLayers :: Map -> IO ()
 removeAllLayers m =
   [C.block| void { $fptr-ptr:(Map *m)->layers().clear(); }|]
 
+setMaxExtent :: Map -> Box -> IO ()
+setMaxExtent m (Box (realToFrac -> x0) (realToFrac -> y0) (realToFrac -> x1) (realToFrac -> y1)) = 
+  [C.block|void {
+  $fptr-ptr:(Map *m)->set_maximum_extent(mapnik::box2d<double>($(double x0), $(double y0), $(double x1), $(double y1)));
+  }|]

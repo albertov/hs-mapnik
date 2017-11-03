@@ -10,15 +10,21 @@ module Mapnik.Bindings.Layer (
 , addStyle
 , setDatasource
 , setSrs
+, setBufferSize
 , setMaxExtent
 , setMaxScaleDenominator
 , setMinScaleDenominator
 , setQueryable
+, setGroupBy
+, setClearLabelCache
+, setCacheFeatures
 ) where
 
 import           Mapnik.Bindings
+import           Mapnik.Bindings.Datasource ()
 import           Control.Monad ((<=<))
-import           Data.String (fromString)
+import           Data.Text (Text)
+import           Data.Text.Encoding (encodeUtf8)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
 
@@ -41,18 +47,26 @@ foreign import ccall "&hs_mapnik_destroy_Layer" destroyLayer :: FinalizerPtr Lay
 unsafeNew :: (Ptr (Ptr Layer) -> IO ()) -> IO Layer
 unsafeNew = fmap Layer . newForeignPtr destroyLayer <=< C.withPtr_
 
-create :: String -> IO Layer
-create (fromString -> name) =
+create :: Text -> IO Layer
+create (encodeUtf8 -> name) =
   unsafeNew $ \p -> [C.block|void {*$(layer** p) = new layer(std::string($bs-ptr:name, $bs-len:name));}|]
 
-addStyle :: Layer -> String -> IO ()
-addStyle l (fromString -> s) = [C.block| void {
+addStyle :: Layer -> Text -> IO ()
+addStyle l (encodeUtf8 -> s) = [C.block| void {
   $fptr-ptr:(layer *l)->add_style(std::string($bs-ptr:s, $bs-len:s));
   }|]
 
-setSrs :: Layer -> String -> IO ()
-setSrs l (fromString -> srs) =
+setGroupBy :: Layer -> Text -> IO ()
+setGroupBy l (encodeUtf8 -> srs) =
+  [C.block|void { $fptr-ptr:(layer *l)->set_group_by(std::string($bs-ptr:srs, $bs-len:srs)); }|]
+
+setSrs :: Layer -> Text -> IO ()
+setSrs l (encodeUtf8 -> srs) =
   [C.block|void { $fptr-ptr:(layer *l)->set_srs(std::string($bs-ptr:srs, $bs-len:srs)); }|]
+
+setBufferSize :: Layer -> Int -> IO ()
+setBufferSize l (fromIntegral -> s) =
+  [C.block|void { $fptr-ptr:(layer *l)->set_buffer_size($(int s)); }|]
 
 setMaxScaleDenominator :: Layer -> Double -> IO ()
 setMaxScaleDenominator l (realToFrac -> s) =
@@ -66,6 +80,14 @@ setQueryable :: Layer -> Bool -> IO ()
 setQueryable l (fromIntegral . fromEnum -> q) =
   [C.block|void { $fptr-ptr:(layer *l)->set_queryable($(int q)); }|]
 
+setClearLabelCache :: Layer -> Bool -> IO ()
+setClearLabelCache l (fromIntegral . fromEnum -> q) =
+  [C.block|void { $fptr-ptr:(layer *l)->set_clear_label_cache($(int q)); }|]
+
+setCacheFeatures :: Layer -> Bool -> IO ()
+setCacheFeatures l (fromIntegral . fromEnum -> q) =
+  [C.block|void { $fptr-ptr:(layer *l)->set_cache_features($(int q)); }|]
+
 setDatasource :: Layer -> Datasource -> IO ()
 setDatasource l ds =
   [C.block|void { $fptr-ptr:(layer *l)->set_datasource(*$fptr-ptr:(datasource_ptr *ds)); }|]
@@ -75,4 +97,3 @@ setMaxExtent l (Box (realToFrac -> x0) (realToFrac -> y0) (realToFrac -> x1) (re
   [C.block|void {
   $fptr-ptr:(layer *l)->set_maximum_extent(mapnik::box2d<double>($(double x0), $(double y0), $(double x1), $(double y1)));
   }|]
-

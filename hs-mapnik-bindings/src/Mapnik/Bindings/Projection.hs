@@ -17,7 +17,8 @@ import           Data.ByteString (unpack)
 import           Data.Char (chr)
 import           Control.Exception (try)
 import           Control.Monad ((<=<))
-import           Data.String (fromString)
+import           Data.Text (Text)
+import           Data.Text.Encoding (encodeUtf8)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
 
@@ -44,8 +45,8 @@ foreign import ccall "&hs_mapnik_destroy_Projection" destroyProjection :: Finali
 unsafeNew :: (Ptr (Ptr Projection) -> IO ()) -> IO Projection
 unsafeNew = fmap Projection . newForeignPtr destroyProjection <=< C.withPtr_
 
-fromProj4 :: String -> Either String Projection
-fromProj4 (fromString -> s) =
+fromProj4 :: Text -> Either String Projection
+fromProj4 (encodeUtf8 -> s) =
   unsafePerformIO $ fmap showExc $ try $ unsafeNew $ \p ->
     [C.catchBlock|*$(projection **p) = new projection(std::string($bs-ptr:s, $bs-len:s));|]
   where

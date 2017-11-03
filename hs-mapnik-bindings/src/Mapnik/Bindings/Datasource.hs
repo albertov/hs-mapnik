@@ -10,14 +10,13 @@
 module Mapnik.Bindings.Datasource (
   Datasource
 , Parameters
-, ParamValue
-, ToParam (..)
-, (.=)
 , unsafeNew
 , create
 , fromList
+, module X
 ) where
 
+import           Mapnik.Parameter as X (ParamValue(..), Parameter, (.=))
 import           Mapnik.Bindings
 import           Control.Monad ((<=<), forM_)
 import           Data.Text (Text)
@@ -26,7 +25,6 @@ import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
 import           System.IO.Unsafe (unsafePerformIO)
 import qualified GHC.Exts as Exts
-import           Data.String(IsString(..))
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
@@ -58,29 +56,6 @@ create params = unsafeNew $ \ ptr ->
   *$(datasource_ptr** ptr) = new datasource_ptr(p);
   |]
 
-data ParamValue = StringParam Text
-                | DoubleParam Double
-                | IntParam Int
-                | BoolParam Bool
-  deriving (Show, Eq)
-
-class ToParam p where
-  toParam :: p -> ParamValue
-instance ToParam ParamValue where toParam = id
-instance ToParam String where toParam = StringParam . fromString
-instance ToParam Text where toParam = StringParam
-instance ToParam Double where toParam = DoubleParam
-instance ToParam Int where toParam = IntParam
-instance ToParam Bool where toParam = BoolParam
-
-type Parameter = (Text, ParamValue)
-
-(.=) :: ToParam v => String -> v -> Parameter
-k .= v = (fromString k, toParam v)
-
-instance IsString ParamValue where
-  fromString = StringParam . fromString
-
 instance Exts.IsList Parameters where
   type Item Parameters = Parameter
   fromList = fromList
@@ -111,6 +86,11 @@ fromList ps = unsafePerformIO $ do
         [C.block|void {
           std::string k($bs-ptr:k, $bs-len:k);
           (*$fptr-ptr:(parameters *p))[k] = value_holder($(int v)?true:false);
+        }|]
+      NullParam ->
+        [C.block|void {
+          std::string k($bs-ptr:k, $bs-len:k);
+          (*$fptr-ptr:(parameters *p))[k] = value_null();
         }|]
   return p
 
