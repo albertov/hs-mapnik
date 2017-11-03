@@ -10,6 +10,7 @@ module Mapnik.Bindings (
 , Style (..)
 , Rule (..)
 , Symbolizer (..)
+, SymbolizerBase (..)
 , Expression (..)
 , Box (..)
 , Datasource (..)
@@ -42,6 +43,7 @@ newtype Color = Color (ForeignPtr Color)
 newtype Style = Style (ForeignPtr Style)
 newtype Rule = Rule (ForeignPtr Rule)
 newtype Symbolizer = Symbolizer (ForeignPtr Symbolizer)
+newtype SymbolizerBase = SymbolizerBase (ForeignPtr SymbolizerBase)
 newtype Expression = Expression (ForeignPtr Expression)
 
 mapnikCtx :: Context
@@ -59,6 +61,7 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> ctx
       , (C.TypeName "feature_type_style", [t| Style |])
       , (C.TypeName "rule", [t| Rule |])
       , (C.TypeName "symbolizer", [t| Symbolizer |])
+      , (C.TypeName "symbolizer_base", [t| SymbolizerBase |])
       , (C.TypeName "expression_ptr", [t| Expression |])
       ]
     }

@@ -75,7 +75,7 @@ instance ToMapnik Mapnik.Rule where
   toMapnik Mapnik.Rule {..} = do
     r <- Rule.create
     forM_ _ruleName                    (Rule.setName r)
-    forM_ _ruleFilter                  (either (throwIO . userError) (Rule.setFilter r) . Expression.parse)
+    forM_ _ruleFilter                  (Rule.setFilter r <=< toMapnik)
     forM_ _ruleMinimumScaleDenominator (Rule.setMinScale r)
     forM_ _ruleMaximumScaleDenominator (Rule.setMaxScale r)
     forM_ _ruleSymbolizers             (appendSymbolizer r <=< toMapnik)
@@ -83,6 +83,7 @@ instance ToMapnik Mapnik.Rule where
 
 instance ToMapnik Mapnik.Symbolizer where
   type MapnikType Mapnik.Symbolizer = Symbolizer
+  toMapnik = Symbolizer.create
 
 instance ToMapnik Mapnik.Layer where
   type MapnikType Mapnik.Layer = Layer
@@ -114,3 +115,7 @@ instance ToMapnik Mapnik.Color where
   toMapnik = maybe (throwIO (userError "Invalid color")) return 
            . Color.create
 
+instance ToMapnik Mapnik.Expression where
+  type MapnikType Mapnik.Expression = Expression
+  toMapnik = either (throwIO . userError . ("Invalid expression: " ++)) return
+           . Expression.parse . Mapnik.unExpression

@@ -6,11 +6,16 @@
 module Mapnik.Symbolizer where
 
 import Mapnik.Imports
-import Data.Text
 
-data Symbolizer = Symbolizer
-  { 
-  } deriving (Eq, Show, Generic, ToJSON, FromJSON)
+data Symbolizer
+  = PointSymbolizer
+    { _symbolizerOpacity :: !(Maybe Double)
+    }
+  | LineSymbolizer
+    { _symbolizerOpacity :: !(Maybe Double)
+    }
+  deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
 makeClassy ''Symbolizer
 makeFields ''Symbolizer
+makePrisms ''Symbolizer

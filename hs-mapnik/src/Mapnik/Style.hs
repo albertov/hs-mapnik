@@ -7,6 +7,7 @@ module Mapnik.Style where
 
 import Mapnik.Imports
 import Mapnik.Rule
+import Mapnik.Symbolizer
 import Data.Text
 import qualified Data.HashMap.Strict as M
 

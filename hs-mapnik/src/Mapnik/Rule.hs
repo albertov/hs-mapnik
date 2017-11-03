@@ -9,7 +9,8 @@ import Mapnik.Imports
 import Mapnik.Symbolizer
 import Data.Text (Text)
 
-type Expression = Text
+newtype Expression = Expression {unExpression :: Text}
+  deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
 data Rule = Rule
   { _ruleName                    :: !(Maybe Text)
