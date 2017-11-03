@@ -4,7 +4,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Mapnik.Image (
+module Mapnik.Bindings.Image (
   Image
 , unsafeNew
 , serialize
@@ -12,8 +12,8 @@ module Mapnik.Image (
 , toRgba8
 ) where
 
-import           Mapnik.Internal
-import           Mapnik.Internal.Util (newByteString)
+import           Mapnik.Bindings
+import           Mapnik.Bindings.Util (newByteString)
 import           Control.Monad ((<=<))
 import           Data.String (fromString)
 import           Data.ByteString as BS (ByteString, length)

@@ -3,10 +3,8 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Mapnik (
-  Box (..)
-, C.CppException (..)
-, registerPluginDir
+module Mapnik.Bindings.Registry (
+  registerPluginDir
 , registerFontDir
 , registerDefaults
 , pluginDir
@@ -14,7 +12,7 @@ module Mapnik (
 , mapnikCtx
 ) where
 
-import           Mapnik.Internal
+import           Mapnik.Bindings
 import           Data.String (fromString)
 
 import qualified Language.C.Inline.Cpp as C

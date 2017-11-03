@@ -1,14 +1,15 @@
 {-# LANGUAGE OverloadedLists #-}
-module MapnikSpec (main, spec) where
+module Mapnik.BindingsSpec (main, spec) where
 
 import qualified Data.ByteString as BS
 import           Test.Hspec
-import           Mapnik
-import           Mapnik.Map as Map
-import           Mapnik.Image as Image
-import           Mapnik.Layer as Layer
-import           Mapnik.Projection as Projection
-import           Mapnik.Datasource as Datasource
+import           Mapnik.Bindings
+import           Mapnik.Bindings.Registry (registerDefaults)
+import           Mapnik.Bindings.Map as Map
+import           Mapnik.Bindings.Image as Image
+import           Mapnik.Bindings.Layer as Layer
+import           Mapnik.Bindings.Projection as Projection
+import           Mapnik.Bindings.Datasource as Datasource
 import           Control.Monad (void)
 import           Data.Either (isLeft, isRight)
 import           Data.String (fromString)
@@ -20,7 +21,7 @@ isPng :: BS.ByteString -> Bool
 isPng s = BS.take 6 s == fromString "\137PNG\r\n"
 
 spec :: Spec
-spec = beforeAll_ Mapnik.registerDefaults $ do
+spec = beforeAll_ registerDefaults $ do
 
   it "renders map.xml as PNG" $ do
     m <- Map.create 512 512

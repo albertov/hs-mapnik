@@ -1,4 +1,4 @@
-module Mapnik.Internal.Util where
+module Mapnik.Bindings.Util where
 
 import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
 import           Data.ByteString (ByteString)

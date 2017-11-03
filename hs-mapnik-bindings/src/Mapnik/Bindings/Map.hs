@@ -3,7 +3,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Mapnik.Map (
+module Mapnik.Bindings.Map (
   Map
 , Box (..)
 , AspectFixMode (..)
@@ -26,8 +26,8 @@ module Mapnik.Map (
 , removeAllLayers
 ) where
 
-import           Mapnik.Internal
-import qualified Mapnik.Image as Image
+import           Mapnik.Bindings
+import qualified Mapnik.Bindings.Image as Image
 import           Control.Monad ((<=<))
 import           Data.String (fromString)
 import           Data.ByteString (ByteString)

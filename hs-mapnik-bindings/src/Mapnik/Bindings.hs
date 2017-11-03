@@ -2,7 +2,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedLists #-}
-module Mapnik.Internal (
+module Mapnik.Bindings (
   Map (..)
 , Image (..)
 , Layer (..)
@@ -11,10 +11,12 @@ module Mapnik.Internal (
 , Parameters (..)
 , Projection (..)
 , ProjTransform (..)
+, C.CppException (..)
 , mapnikCtx
 ) where
 
 import qualified Language.C.Inline.Cpp as C
+import qualified Language.C.Inline.Cpp.Exceptions as C
 import           Data.Monoid (mempty, (<>))
 import           Language.C.Inline.Context
 import qualified Language.C.Types as C

@@ -7,7 +7,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Mapnik.Datasource (
+module Mapnik.Bindings.Datasource (
   Datasource
 , Parameters
 , ParamValue
@@ -18,7 +18,7 @@ module Mapnik.Datasource (
 , fromList
 ) where
 
-import           Mapnik.Internal
+import           Mapnik.Bindings
 import           Control.Monad ((<=<), forM_)
 import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)

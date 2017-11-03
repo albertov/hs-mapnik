@@ -3,7 +3,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Mapnik.Layer (
+module Mapnik.Bindings.Layer (
   Layer
 , unsafeNew
 , create
@@ -16,7 +16,7 @@ module Mapnik.Layer (
 , setQueryable
 ) where
 
-import           Mapnik.Internal
+import           Mapnik.Bindings
 import           Control.Monad ((<=<))
 import           Data.String (fromString)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)

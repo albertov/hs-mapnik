@@ -5,14 +5,14 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-module Mapnik.Projection (
+module Mapnik.Bindings.Projection (
   fromProj4
 , transform
 , Transform (..)
 ) where
 
-import           Mapnik.Internal
-import           Mapnik.Internal.Util (newByteString)
+import           Mapnik.Bindings
+import           Mapnik.Bindings.Util (newByteString)
 import           Data.ByteString (unpack)
 import           Data.Char (chr)
 import           Control.Exception (try)
