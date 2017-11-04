@@ -45,7 +45,7 @@ instance FromMapnik Map where
     _mapBackgroundImageOpacity <- Just <$> getBackgroundImageOpacity m
     _mapSrs <- Just <$> getSrs m
     _mapBufferSize <- Just <$> getBufferSize m
-    _mapMaximumExtent <- undefined
+    _mapMaximumExtent <- getMaxExtent m
     _mapFontDirectory <- getFontDirectory m
     _mapLayers <- mapM fromMapnik =<< getLayers m
     _mapStyles <- HM.fromList

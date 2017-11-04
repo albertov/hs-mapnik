@@ -3,6 +3,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RecordWildCards #-}
 module Mapnik.Bindings.Map (
   Map
 , Box (..)
@@ -28,6 +29,7 @@ module Mapnik.Bindings.Map (
 , getBufferSize
 , setBufferSize
 , setAspectFixMode
+, getMaxExtent
 , setMaxExtent
 , getLayer
 , getLayers
@@ -287,6 +289,28 @@ insertStyle m (encodeUtf8 -> n) l = [C.block|void {
 removeAllLayers :: Map -> IO ()
 removeAllLayers m =
   [C.block| void { $fptr-ptr:(Map *m)->layers().clear(); }|]
+
+getMaxExtent :: Map -> IO (Maybe Box)
+getMaxExtent m =  do
+  (   has
+    , realToFrac -> minx
+    , realToFrac -> miny
+    , realToFrac -> maxx
+    , realToFrac -> maxy
+    ) <- C.withPtrs_ $ \(has,x0,y0,x1,y1) ->
+    [C.block|void {
+      auto res = $fptr-ptr:(Map *m)->maximum_extent();
+      if (res) {
+        *$(double *x0) = res->minx();
+        *$(double *y0) = res->miny();
+        *$(double *x1) = res->maxx();
+        *$(double *y1) = res->maxy();
+        *$(int *has) = 1;
+      } else {
+        *$(int *has) = 0;
+      }
+      }|]
+  return $ if has==1 then Just Box{..} else Nothing
 
 setMaxExtent :: Map -> Box -> IO ()
 setMaxExtent m (Box (realToFrac -> x0) (realToFrac -> y0) (realToFrac -> x1) (realToFrac -> y1)) = 

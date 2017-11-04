@@ -128,6 +128,17 @@ spec = beforeAll_ registerDefaults $ do
     srs <- getSrs m
     srs `shouldBe` merc
 
+  it "can get max extent when Nothing" $ do
+    m <- Map.create 512 512
+    e <- getMaxExtent m
+    e `shouldBe` Nothing
+
+  it "can get max extent when Just" $ do
+    m <- Map.create 512 512
+    Map.setMaxExtent m box
+    e <- Map.getMaxExtent m
+    e `shouldBe` Just box
+
 loadFixture :: Map -> IO ()
 loadFixture m = do
   loadFixtureFrom "spec/map.xml" m
