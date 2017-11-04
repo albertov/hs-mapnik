@@ -261,7 +261,7 @@ getLayers m = do
   n <- getLayerCount m
   mapM (getLayer m) [0..n-1]
 
-getStyles :: Map -> IO [(Text,Style)]
+getStyles :: Map -> IO [(StyleName,Style)]
 getStyles m = do
   stylesRef <- newIORef []
   let callback :: CString -> C.CInt -> Ptr Style -> IO ()

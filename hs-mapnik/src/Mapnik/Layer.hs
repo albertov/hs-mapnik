@@ -14,7 +14,7 @@ import Data.Text (Text)
 
 data Layer = Layer
   { _layerName                    :: !Text
-  , _layerDataSource              :: !Datasource
+  , _layerDataSource              :: !(Maybe Datasource)
   , _layerStyles                  :: ![StyleName]
   , _layerSrs                     :: !(Maybe Proj4)
   , _layerMinimumScaleDenominator :: !(Maybe Double)
@@ -32,10 +32,10 @@ makeFields ''Layer
 instance ToJSON Layer where toEncoding = mapnikJsonEncoder 6
 instance FromJSON Layer where parseJSON = mapnikJsonDecoder 6
 
-mkLayer :: Text -> Datasource -> Layer
-mkLayer n ds = Layer
+mkLayer :: Text -> Layer
+mkLayer n = Layer
   { _layerName                    = n
-  , _layerDataSource              = ds
+  , _layerDataSource              = Nothing
   , _layerStyles                  = []
   , _layerSrs                     = Nothing
   , _layerMinimumScaleDenominator = Nothing

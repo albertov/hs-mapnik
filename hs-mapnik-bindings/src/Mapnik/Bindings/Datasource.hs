@@ -11,6 +11,7 @@ module Mapnik.Bindings.Datasource (
   Datasource
 , Parameters
 , unsafeNew
+, unsafeNewMaybe
 , create
 , fromList
 , module X
@@ -18,7 +19,8 @@ module Mapnik.Bindings.Datasource (
 
 import           Mapnik.Parameter as X (ParamValue(..), Parameter, (.=))
 import           Mapnik.Bindings
-import           Control.Monad ((<=<), forM_)
+import           Mapnik.Bindings.Util
+import           Control.Monad (forM_)
 import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
@@ -47,7 +49,10 @@ foreign import ccall "&hs_mapnik_destroy_Parameters" destroyParameters :: Finali
 foreign import ccall "&hs_mapnik_destroy_Datasource" destroyDatasource :: FinalizerPtr Datasource
 
 unsafeNew :: (Ptr (Ptr Datasource) -> IO ()) -> IO Datasource
-unsafeNew = fmap Datasource . newForeignPtr destroyDatasource <=< C.withPtr_
+unsafeNew = mkUnsafeNew Datasource destroyDatasource
+
+unsafeNewMaybe :: (Ptr (Ptr Datasource) -> IO ()) -> IO (Maybe Datasource)
+unsafeNewMaybe = mkUnsafeNewMaybe Datasource destroyDatasource
 
 create :: Parameters -> IO Datasource
 create params = unsafeNew $ \ ptr ->

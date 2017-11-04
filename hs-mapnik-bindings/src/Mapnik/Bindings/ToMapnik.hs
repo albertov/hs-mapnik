@@ -86,7 +86,7 @@ instance ToMapnik Mapnik.Layer where
   type MapnikType Mapnik.Layer = Layer
   toMapnik Mapnik.Layer {..} = do
     l <- Layer.create _layerName
-    setDatasource l =<< toMapnik _layerDataSource
+    forM_ _layerDataSource              (Layer.setDatasource l <=< toMapnik)
     forM_ _layerSrs                     (Layer.setSrs l)
     forM_ _layerMinimumScaleDenominator (setMinScaleDenominator l)
     forM_ _layerMaximumScaleDenominator (setMaxScaleDenominator l)

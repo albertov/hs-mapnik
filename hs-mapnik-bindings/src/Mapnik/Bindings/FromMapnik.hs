@@ -9,6 +9,7 @@ module Mapnik.Bindings.FromMapnik where
 import qualified Mapnik
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Map as Map
+import           Mapnik.Bindings.Layer as Layer
 import qualified Data.HashMap.Strict as HM
 
 class FromMapnik a where
@@ -43,14 +44,18 @@ instance FromMapnik Map where
     _mapBackgroundImage <- getBackgroundImage m
     _mapBackgroundImageCompOp <- undefined
     _mapBackgroundImageOpacity <- Just <$> getBackgroundImageOpacity m
-    _mapSrs <- Just <$> getSrs m
-    _mapBufferSize <- Just <$> getBufferSize m
-    _mapMaximumExtent <- getMaxExtent m
+    _mapSrs <- Just <$> Map.getSrs m
+    _mapBufferSize <- Just <$> Map.getBufferSize m
+    _mapMaximumExtent <- Map.getMaxExtent m
     _mapFontDirectory <- getFontDirectory m
     _mapLayers <- mapM fromMapnik =<< getLayers m
     _mapStyles <- HM.fromList
-             <$> (mapM (\(k,v) -> (k,) <$> fromMapnik v) =<< getStyles m)
+             <$> (mapM (\(k,v) -> (k,) <$> fromMapnik v) =<< Map.getStyles m)
     return Mapnik.Map{..}
+
+instance FromMapnik Datasource where
+  type HsType Datasource = Mapnik.Datasource
+  fromMapnik = undefined
 
 instance FromMapnik Color where
   type HsType Color = Mapnik.Color
@@ -58,8 +63,25 @@ instance FromMapnik Color where
 
 instance FromMapnik Layer where
   type HsType Layer = Mapnik.Layer
-  fromMapnik = undefined
+  fromMapnik l = do
+    _layerName                    <- Layer.getName l
+    _layerDataSource              <- fromMapnik =<< Layer.getDatasource l
+    _layerSrs                     <- Just <$> Layer.getSrs l
+    _layerMinimumScaleDenominator <- Just <$> Layer.getMinScaleDenominator l
+    _layerMaximumScaleDenominator <- Just <$> Layer.getMaxScaleDenominator l
+    _layerQueryable               <- Just <$> Layer.getQueryable l
+    _layerClearLabelCache         <- Just <$> Layer.getClearLabelCache l
+    _layerCacheFeatures           <- Just <$> Layer.getCacheFeatures l
+    _layerGroupBy                 <- Just <$> Layer.getGroupBy l
+    _layerBufferSize              <- Layer.getBufferSize l
+    _layerMaximumExtent           <- Layer.getMaxExtent l
+    _layerStyles                  <- Layer.getStyles l
+    return Mapnik.Layer{..}
 
 instance FromMapnik Style where
   type HsType Style = Mapnik.Style
-  fromMapnik = undefined
+  fromMapnik s = do
+    _styleOpacity             <- undefined
+    _styleImageFiltersInflate <- undefined
+    _styleRules               <- undefined
+    return Mapnik.Style{..}

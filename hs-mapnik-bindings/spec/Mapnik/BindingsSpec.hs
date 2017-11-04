@@ -118,19 +118,19 @@ spec = beforeAll_ registerDefaults $ do
   it "can get Map styles" $ do
     m <- Map.create 512 512
     loadFixture m
-    sts <- map fst <$> getStyles m
+    sts <- map fst <$> Map.getStyles m
     sts `shouldBe` ["drainage","highway-border","highway-fill","popplaces","provinces","provlines","road-border","road-fill","smallroads"]
 
   it "can get Map srs" $ do
     m <- Map.create 512 512
     loadFixture m
     Map.setSrs m merc
-    srs <- getSrs m
+    srs <- Map.getSrs m
     srs `shouldBe` merc
 
   it "can get max extent when Nothing" $ do
     m <- Map.create 512 512
-    e <- getMaxExtent m
+    e <- Map.getMaxExtent m
     e `shouldBe` Nothing
 
   it "can get max extent when Just" $ do
@@ -138,6 +138,30 @@ spec = beforeAll_ registerDefaults $ do
     Map.setMaxExtent m box
     e <- Map.getMaxExtent m
     e `shouldBe` Just box
+
+  it "getDatasource returns Nothing if no datasource" $ do
+    l <- Layer.create "fooo"
+    ds <- Layer.getDatasource l
+    ds `shouldBe` Nothing
+
+  it "getDatasource returns Just if datasource" $ do
+    l <- Layer.create "fooo"
+    Layer.setDatasource l =<< Datasource.create
+      [ "type"     .= ("shape" :: String)
+      , "encoding" .= ("latin1" :: String)
+      , "file"     .= ("spec/data/popplaces" :: String)
+      ]
+    ds <- Layer.getDatasource l
+    ds `shouldSatisfy` isJust
+
+  it "can get Layer styles" $ do
+    l <- Layer.create "fooo"
+    sts <- Layer.getStyles l
+    sts `shouldBe` []
+    Layer.addStyle l "foo"
+    Layer.addStyle l "bar"
+    sts2 <- Layer.getStyles l
+    sts2 `shouldBe` ["foo", "bar"]
 
 loadFixture :: Map -> IO ()
 loadFixture m = do
