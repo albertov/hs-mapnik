@@ -11,6 +11,7 @@ import           Data.Aeson
 import           Data.Text (Text)
 import qualified Data.HashMap.Strict as M
 import           Data.String(IsString(..))
+import           Data.Scientific (floatingOrInteger)
 
 
 data ParamValue = StringParam !Text
@@ -30,7 +31,9 @@ instance ToJSON ParamValue where
 
 instance FromJSON ParamValue where
   parseJSON (String s) = return (StringParam s)
-  parseJSON (Number s) = return undefined --TODO
+  parseJSON (Number s) = case floatingOrInteger s of
+                            Left v -> return (DoubleParam v)
+                            Right v -> return (IntParam v)
   parseJSON (Bool s)   = return (BoolParam s)
   parseJSON Null       = return NullParam
   parseJSON _          = fail "parseJSON @ParamValue: Invalid type"

@@ -18,8 +18,12 @@ mapnikJsonEncoder n = genericToEncoding defaultMapnikOptions {
     fieldLabelModifier = dropAndUncapitalize n
   }
 
-dropAndUncapitalize n s =
-  case drop n s of
+dropAndUncapitalize :: Int -> String -> String
+dropAndUncapitalize n = uncapitalize . drop n
+
+uncapitalize :: String -> String
+uncapitalize s =
+  case s of
     []     -> []
     (x:xs) -> toLower x : xs
 
