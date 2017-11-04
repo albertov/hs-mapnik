@@ -1,13 +1,43 @@
 module Mapnik.Bindings.Util where
 
+import           Control.Monad ((<=<))
+import           Control.Exception
 import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
 import           Data.ByteString (ByteString)
-import           Foreign.Ptr (Ptr)
+import           Data.Text (Text)
+import           Data.Text.Encoding (decodeUtf8)
+import           Foreign.Ptr (Ptr, nullPtr)
 import           Foreign.C.String (CString)
+import           Foreign.ForeignPtr (ForeignPtr, FinalizerPtr, newForeignPtr)
 
 import qualified Language.C.Inline.Cpp as C
 
+newText :: ((Ptr CString, Ptr C.CInt) -> IO ()) -> IO Text
+newText = fmap decodeUtf8 . newByteString
+
+newTextMaybe :: ((Ptr CString, Ptr C.CInt) -> IO ()) -> IO (Maybe Text)
+newTextMaybe = fmap (fmap decodeUtf8) . newByteStringMaybe
+
+
 newByteString :: ((Ptr CString, Ptr C.CInt) -> IO ()) -> IO ByteString
-newByteString block = do
+newByteString =
+  maybe (throwIO (userError "nullPtr")) return <=< newByteStringMaybe
+
+newByteStringMaybe :: ((Ptr CString, Ptr C.CInt) -> IO ()) -> IO (Maybe ByteString)
+newByteStringMaybe block = do
   (ptr,len) <- C.withPtrs_ block
-  unsafePackMallocCStringLen (ptr, fromIntegral len)
+  if ptr == nullPtr then return Nothing else
+    Just <$> unsafePackMallocCStringLen (ptr, fromIntegral len)
+
+mkUnsafeNew
+  :: (ForeignPtr a -> c)
+  -> FinalizerPtr a -> (Ptr (Ptr a) -> IO ()) -> IO c
+mkUnsafeNew a b = maybe (throwIO (userError "nullPtr")) return <=< mkUnsafeNewMaybe a b
+
+mkUnsafeNewMaybe
+  :: (ForeignPtr a -> c)
+  -> FinalizerPtr a -> (Ptr (Ptr a) -> IO ()) -> IO (Maybe c)
+mkUnsafeNewMaybe ctor dtor fun = do
+  ptr <- C.withPtr_ fun
+  if ptr == nullPtr then return Nothing else 
+    Just . ctor <$> newForeignPtr dtor ptr

@@ -6,6 +6,7 @@
 module Mapnik.Bindings.Layer (
   Layer
 , unsafeNew
+, unsafeNewMaybe
 , create
 , addStyle
 , setDatasource
@@ -21,11 +22,11 @@ module Mapnik.Bindings.Layer (
 ) where
 
 import           Mapnik.Bindings
+import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Datasource ()
-import           Control.Monad ((<=<))
 import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
-import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
+import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
 
 import qualified Language.C.Inline.Cpp as C
@@ -45,7 +46,10 @@ C.using "namespace mapnik"
 foreign import ccall "&hs_mapnik_destroy_Layer" destroyLayer :: FinalizerPtr Layer
 
 unsafeNew :: (Ptr (Ptr Layer) -> IO ()) -> IO Layer
-unsafeNew = fmap Layer . newForeignPtr destroyLayer <=< C.withPtr_
+unsafeNew = mkUnsafeNew Layer destroyLayer
+
+unsafeNewMaybe :: (Ptr (Ptr Layer) -> IO ()) -> IO (Maybe Layer)
+unsafeNewMaybe = mkUnsafeNewMaybe Layer destroyLayer
 
 create :: Text -> IO Layer
 create (encodeUtf8 -> name) =

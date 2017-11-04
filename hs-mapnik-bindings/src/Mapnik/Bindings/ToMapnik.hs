@@ -33,12 +33,9 @@ instance ToMapnik X where {\
 }
 
 toMapnikId(Map)
-toMapnikId(Image)
 toMapnikId(Layer)
 toMapnikId(Datasource)
 toMapnikId(Parameters)
-toMapnikId(Projection)
-toMapnikId(ProjTransform)
 toMapnikId(Color)
 toMapnikId(Style)
 toMapnikId(Rule)

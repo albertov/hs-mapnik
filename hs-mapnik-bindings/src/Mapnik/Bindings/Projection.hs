@@ -64,15 +64,11 @@ transform src dst = unsafePerformIO $ do
   
 instance Show Projection where
   show pr = unsafePerformIO $ fmap (map (chr . fromIntegral) . unpack) $ newByteString $ \(ptr,len) ->
-    [C.catchBlock|
+    [C.block|void {
     std::string const &s = $fptr-ptr:(projection *pr)->params();
-    *$(char** ptr) = static_cast<char*>(malloc(s.length()));
-    if ( ! *$(char** ptr) ) {
-      throw std::runtime_error("Could not malloc");
-    }
-    memcpy( *$(char** ptr), s.c_str(), s.length());
+    *$(char** ptr) = strdup(s.c_str());
     *$(int* len) = s.length();
-    |]
+    }|]
     
 class Transform p where
   forward :: ProjTransform -> p -> p

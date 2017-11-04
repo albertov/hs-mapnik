@@ -16,13 +16,23 @@ module Mapnik.Bindings.Map (
 , zoomToBox
 , setBasePath
 , setBackground
+, getBackground
 , setBackgroundImage
+, getBackgroundImage
 , setBackgroundImageOpacity
+, getBackgroundImageOpacity
 , setFontDirectory
+, getFontDirectory
+, getSrs
 , setSrs
+, getBufferSize
 , setBufferSize
 , setAspectFixMode
 , setMaxExtent
+, getLayer
+, getLayers
+, getStyles
+, getLayerCount
 , resize
 , render
 , addLayer
@@ -32,14 +42,22 @@ module Mapnik.Bindings.Map (
 
 import           Mapnik (StyleName)
 import           Mapnik.Bindings
+import           Mapnik.Bindings.Util
 import qualified Mapnik.Bindings.Image as Image
+import qualified Mapnik.Bindings.Layer as Layer
+import qualified Mapnik.Bindings.Color as Color
+import qualified Mapnik.Bindings.Style as Style
 import           Control.Monad ((<=<))
+import           Data.IORef
 import           Data.String (fromString)
-import           Data.Text (Text)
-import           Data.Text.Encoding (encodeUtf8)
+import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
+import           Data.Text (Text, unpack)
+import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.ByteString (ByteString)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
+import           Foreign.C.String (CString)
+import           Foreign.Storable (poke)
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
@@ -49,6 +67,7 @@ C.context mapnikCtx
 
 C.include "<string>"
 C.include "<mapnik/agg_renderer.hpp>"
+C.include "<mapnik/feature_type_style.hpp>"
 C.include "<mapnik/map.hpp>"
 C.include "<mapnik/layer.hpp>"
 C.include "<mapnik/load_map.hpp>"
@@ -90,6 +109,13 @@ loadXml m str =
   mapnik::load_map_string(*$fptr-ptr:(Map *m), std::string($bs-ptr:str, $bs-len:str));
   |]
 
+getBackground :: Map -> IO (Maybe Color)
+getBackground m = Color.unsafeNewMaybe $ \p ->
+  [C.block|void {
+  auto mColor = $fptr-ptr:(Map *m)->background();
+  *$(color **p) = mColor ? new color(*mColor) : NULL;
+  }|]
+
 setBackground :: Map -> Color -> IO ()
 setBackground m col =
   [C.block|void {
@@ -102,11 +128,28 @@ setBackgroundImage m (fromString -> path) =
   $fptr-ptr:(Map *m)->set_background_image(std::string($bs-ptr:path, $bs-len:path));
   }|]
 
+getBackgroundImage :: Map -> IO (Maybe FilePath)
+getBackgroundImage m = fmap (fmap unpack) $ newTextMaybe $ \(p,len) ->
+  [C.block| void {
+  auto mPath = $fptr-ptr:(Map *m)->background_image();
+  if (mPath) {
+    *$(int *len) = mPath->size();
+    *$(char **p) = strdup(mPath->c_str());
+  } else {
+    *$(char **p) = NULL;
+  }
+  }|]
+
+
 setBackgroundImageOpacity :: Map -> Double -> IO ()
 setBackgroundImageOpacity m (realToFrac -> opacity) =
   [C.block| void {
   $fptr-ptr:(Map *m)->set_background_image_opacity($(double opacity));
   }|]
+
+getBackgroundImageOpacity :: Map -> IO Double
+getBackgroundImageOpacity m = realToFrac <$>
+  [C.block| float { $fptr-ptr:(Map *m)->background_image_opacity(); }|]
 
 setBasePath :: Map -> FilePath -> IO ()
 setBasePath m (fromString -> path) =
@@ -119,11 +162,29 @@ setFontDirectory m (fromString -> path) =
   [C.block| void {
   $fptr-ptr:(Map *m)->set_font_directory(std::string($bs-ptr:path, $bs-len:path));
   }|]
+
+getFontDirectory :: Map -> IO (Maybe FilePath)
+getFontDirectory m = fmap (fmap unpack) $ newTextMaybe $ \(p,len) ->
+  [C.block| void {
+  auto mPath = $fptr-ptr:(Map *m)->font_directory();
+  if (mPath) {
+    *$(int *len) = mPath->size();
+    *$(char **p) = strdup(mPath->c_str());
+  } else {
+    *$(char **p) = NULL;
+  }
+  }|]
   
 setSrs :: Map -> Text -> IO ()
 setSrs m (encodeUtf8 -> srs) =
   [C.block|void { $fptr-ptr:(Map *m)->set_srs(std::string($bs-ptr:srs, $bs-len:srs));}|]
 
+getSrs :: Map -> IO Text
+getSrs m = newText $ \(p,len) -> [C.block|void {
+  std::string const &srs = $fptr-ptr:(Map *m)->srs();
+  *$(int *len) = srs.size();
+  *$(char **p) = strdup (srs.c_str());
+  }|]
 setAspectFixMode :: Map -> AspectFixMode -> IO ()
 setAspectFixMode m GrowBox = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::GROW_BBOX);}|]
 setAspectFixMode m GrowCanvas = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::GROW_CANVAS);}|]
@@ -138,6 +199,9 @@ setAspectFixMode m Respect = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_
 setBufferSize :: Map -> Int -> IO ()
 setBufferSize m (fromIntegral -> size) =
   [C.block|void {$fptr-ptr:(Map *m)->set_buffer_size($(int size));}|]
+
+getBufferSize :: Map -> IO Int
+getBufferSize m = fromIntegral <$> [C.exp|int { $fptr-ptr:(Map *m)->buffer_size() }|]
 
 resize :: Map -> Int -> Int -> IO ()
 resize m (fromIntegral -> width) (fromIntegral -> height) =
@@ -175,6 +239,43 @@ addLayer :: Map -> Layer -> IO ()
 addLayer m l = [C.block|void {
   $fptr-ptr:(Map *m)->add_layer(*$fptr-ptr:(layer *l));
   }|]
+
+getLayerCount :: Map -> IO Int
+getLayerCount m = fromIntegral <$>
+  [C.exp| size_t { $fptr-ptr:(Map *m)->layer_count() }|]
+
+getLayer :: Map -> Int -> IO Layer
+getLayer m (fromIntegral -> i) = Layer.unsafeNew $ \p ->
+  [C.catchBlock|
+  if (0<=$(int i) && $(int i) < $fptr-ptr:(Map *m)->layer_count()) {
+    *$(layer **p) = new layer($fptr-ptr:(Map *m)->get_layer($(int i)));
+  } else {
+    throw std::runtime_error("Invalid layer index");
+  }
+  |]
+
+getLayers :: Map -> IO [Layer]
+getLayers m = do
+  n <- getLayerCount m
+  mapM (getLayer m) [0..n-1]
+
+getStyles :: Map -> IO [(Text,Style)]
+getStyles m = do
+  stylesRef <- newIORef []
+  let callback :: CString -> C.CInt -> Ptr Style -> IO ()
+      callback ptr (fromIntegral -> len) ptrStyle = do
+        style <- Style.unsafeNew (flip poke ptrStyle)
+        styleName <- decodeUtf8 <$> unsafePackMallocCStringLen (ptr, len)
+        modifyIORef' stylesRef ((styleName,style):)
+  [C.block|void {
+  typedef std::map<std::string,feature_type_style> style_map;
+  style_map const& styles = $fptr-ptr:(Map *m)->styles();
+  for (style_map::const_iterator it=styles.begin(); it!=styles.end(); ++it) {
+    $fun:(void (*callback)(char*, int, feature_type_style*))(strdup(it->first.c_str()), it->first.size(), new feature_type_style(it->second));
+  }
+  }|]
+  reverse <$> readIORef stylesRef
+
 
 insertStyle :: Map -> StyleName -> Style -> IO ()
 insertStyle m (encodeUtf8 -> n) l = [C.block|void {

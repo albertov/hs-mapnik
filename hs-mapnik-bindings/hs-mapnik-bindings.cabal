@@ -31,6 +31,7 @@ library
                      , Mapnik.Bindings.Expression
                      , Mapnik.Bindings.Util
                      , Mapnik.Bindings.ToMapnik
+                     , Mapnik.Bindings.FromMapnik
   build-depends:       base                >= 4.7  && < 5
                      , bytestring          >= 0.10 && < 0.11
                      , inline-c-cpp        >= 0.2.1.0 && < 0.3

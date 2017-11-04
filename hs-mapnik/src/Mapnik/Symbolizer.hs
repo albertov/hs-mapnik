@@ -35,9 +35,13 @@ instance FromJSON v => FromJSON (PropValue v) where
 data Property where
   (:=>) :: (ToJSON v, Show v, Eq v, Typeable v) => Key v -> PropValue v -> Property
 
-deriving instance Show Property
+(==>) :: (ToJSON v, Show v, Eq v, Typeable v) => Key v -> v -> Property
+k ==> v = k :=> PropValue v
 
-toProperties = _symbolizerProperties
+(=~>) :: (ToJSON v, Show v, Eq v, Typeable v) => Key v -> Expression -> Property
+k =~> v = k :=> PropExpression v
+
+deriving instance Show Property
 
 instance Eq Property where
   (ka :: Key a) :=> a == (kb :: Key b) :=> b = case (eqT :: Maybe (a :~: b)) of
@@ -126,7 +130,7 @@ data Symbolizer
   | Building       { _symbolizerProperties :: Properties }
   | Marker         { _symbolizerProperties :: Properties }
   | Group          { _symbolizerProperties :: Properties }
-  | Debug           { _symbolizerProperties :: Properties }
+  | Debug          { _symbolizerProperties :: Properties }
   | Dot            { _symbolizerProperties :: Properties }
   deriving (Eq, Show, Generic)
 makeClassy ''Symbolizer

@@ -33,21 +33,34 @@ import           Foreign.ForeignPtr (ForeignPtr)
 
 
 newtype Map = Map (ForeignPtr Map)
+  deriving (Eq, Show)
 newtype Image = Image (ForeignPtr Image)
+  deriving (Eq, Show)
 newtype Layer = Layer (ForeignPtr Layer)
+  deriving (Eq, Show)
 newtype Datasource = Datasource (ForeignPtr Datasource)
+  deriving (Eq, Show)
 newtype Parameters = Parameters (ForeignPtr Parameters)
+  deriving (Eq, Show)
 newtype Projection = Projection (ForeignPtr Projection)
+  deriving (Eq)
 newtype ProjTransform = ProjTransform (ForeignPtr ProjTransform)
+  deriving (Eq, Show)
 newtype Color = Color (ForeignPtr Color)
+  deriving (Eq)
 newtype Style = Style (ForeignPtr Style)
+  deriving (Eq, Show)
 newtype Rule = Rule (ForeignPtr Rule)
+  deriving (Eq, Show)
 newtype Symbolizer = Symbolizer (ForeignPtr Symbolizer)
+  deriving (Eq, Show)
 newtype SymbolizerBase = SymbolizerBase (ForeignPtr SymbolizerBase)
+  deriving (Eq, Show)
 newtype Expression = Expression (ForeignPtr Expression)
+  deriving (Eq)
 
 mapnikCtx :: Context
-mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> ctx
+mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> ctx
   where ctx = mempty {
     ctxTypesTable =
       [ (C.TypeName "Map", [t| Map |])
@@ -63,6 +76,6 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> ctx
       , (C.TypeName "symbolizer", [t| Symbolizer |])
       , (C.TypeName "symbolizer_base", [t| SymbolizerBase |])
       , (C.TypeName "expression_ptr", [t| Expression |])
-      , (C.TypeName "keys", [t| C.CInt |])
+      , (C.TypeName "keys", [t| C.CUChar |])
       ]
     }

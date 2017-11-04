@@ -82,6 +82,10 @@ spec = beforeAll_ registerDefaults $ do
   it "can create valid projection" $ do
     fromProj4 merc `shouldSatisfy` isRight
 
+  it "can show valid projection" $ do
+    show (fromProj4 merc) `shouldBe` "Right +proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over"
+
+
   it "cannot create invalid projection" $ do
     fromProj4 "foo" `shouldSatisfy` isLeft
 
@@ -100,9 +104,29 @@ spec = beforeAll_ registerDefaults $ do
     Color.create "rgba(3,4,5,1)" `shouldSatisfy` isJust
     Color.create "steelblue" `shouldSatisfy` isJust
 
+  it "can show color" $ do
+    show (Color.create "rgb(3,4,5)") `shouldBe` "Just rgb(3,4,5)"
+
   it "cannot parse bad color" $ do
     Color.create "rgba(3,4,5" `shouldSatisfy` isNothing
     Color.create "steelblu" `shouldSatisfy` isNothing
+
+  it "cannot get unexistent layer" $ do
+    m <- Map.create 512 512
+    getLayer m 1 `shouldThrow` cppStdException
+
+  it "can get Map styles" $ do
+    m <- Map.create 512 512
+    loadFixture m
+    sts <- map fst <$> getStyles m
+    sts `shouldBe` ["drainage","highway-border","highway-fill","popplaces","provinces","provlines","road-border","road-fill","smallroads"]
+
+  it "can get Map srs" $ do
+    m <- Map.create 512 512
+    loadFixture m
+    Map.setSrs m merc
+    srs <- getSrs m
+    srs `shouldBe` merc
 
 loadFixture :: Map -> IO ()
 loadFixture m = do

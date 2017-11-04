@@ -8,17 +8,18 @@
 module Mapnik.Bindings.Color (
   create
 , bsShowColor
+, unsafeNew
+, unsafeNewMaybe
 ) where
 
 import qualified Mapnik
 import           Mapnik.Bindings
-import           Mapnik.Bindings.Util (newByteString)
+import           Mapnik.Bindings.Util
 import           Data.ByteString (ByteString, unpack)
 import           Data.Char (chr)
 import           Control.Exception (try)
-import           Control.Monad ((<=<))
 import           Data.Text.Encoding (encodeUtf8)
-import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
+import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
 
 import qualified Language.C.Inline.Cpp as C
@@ -37,7 +38,10 @@ C.using "namespace mapnik"
 foreign import ccall "&hs_mapnik_destroy_Color" destroyColor :: FinalizerPtr Color
 
 unsafeNew :: (Ptr (Ptr Color) -> IO ()) -> IO Color
-unsafeNew = fmap Color . newForeignPtr destroyColor <=< C.withPtr_
+unsafeNew = mkUnsafeNew Color destroyColor
+
+unsafeNewMaybe :: (Ptr (Ptr Color) -> IO ()) -> IO (Maybe Color)
+unsafeNewMaybe = mkUnsafeNewMaybe Color destroyColor
 
 create :: Mapnik.Color -> Maybe Color
 create col = unsafePerformIO $ case col of
@@ -54,12 +58,8 @@ instance Show Color where
 
 bsShowColor :: Color -> ByteString
 bsShowColor c = unsafePerformIO $ newByteString $ \(ptr,len) ->
-    [C.catchBlock|
-    std::string s = $fptr-ptr:(color *c)->to_string();
-    *$(char** ptr) = static_cast<char*>(malloc(s.length()));
-    if ( ! *$(char** ptr) ) {
-      throw std::runtime_error("Could not malloc");
-    }
-    memcpy( *$(char** ptr), s.c_str(), s.length());
-    *$(int* len) = s.length();
-    |]
+  [C.block|void {
+  std::string s = $fptr-ptr:(color *c)->to_string();
+  *$(char** ptr)= strdup(s.c_str());
+  *$(int* len) = s.length();
+  }|]

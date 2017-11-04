@@ -14,7 +14,7 @@ module Mapnik.Bindings.Symbolizer (
 ) where
 
 import qualified Mapnik
-import           Mapnik (Property(..), Key(..), toProperties, PropValue(..))
+import           Mapnik (Property(..), Key(..), _symbolizerProperties, PropValue(..))
 import           Mapnik.Bindings
 import qualified Mapnik.Bindings.Color as Color
 import qualified Mapnik.Bindings.Expression as Expression
@@ -48,7 +48,7 @@ newSym = fmap Symbolizer . newForeignPtr destroySymbolizer
 
 create :: Mapnik.Symbolizer -> IO Symbolizer
 create sym = bracket alloc dealloc $ \p -> do
-  mapM_ (flip setProperty p) (toProperties sym)
+  mapM_ (flip setProperty p) (_symbolizerProperties sym)
   newSym =<< castSym sym p
   where
     alloc = [C.exp|symbolizer_base * { new symbolizer_base() }|]
@@ -193,7 +193,7 @@ setProperty (Direction :=> v) = setProp Direction v
 setProperty (AvoidEdges :=> v) = setProp AvoidEdges v
 setProperty (FfSettings :=> v) = setProp FfSettings v
 
-keyIndex :: Key a -> C.CInt
+keyIndex :: Key a -> C.CUChar
 keyIndex Gamma = [C.pure|keys{keys::gamma}|]
 keyIndex GammaMethod = [C.pure|keys{keys::gamma_method}|]
 keyIndex Opacity = [C.pure|keys{keys::opacity}|]
