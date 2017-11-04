@@ -49,14 +49,14 @@ import qualified Mapnik.Bindings.Image as Image
 import qualified Mapnik.Bindings.Layer as Layer
 import qualified Mapnik.Bindings.Color as Color
 import qualified Mapnik.Bindings.Style as Style
-import           Control.Monad ((<=<))
+
 import           Data.IORef
 import           Data.String (fromString)
 import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
 import           Data.Text (Text, unpack)
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.ByteString (ByteString)
-import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
+import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
 import           Foreign.C.String (CString)
 import           Foreign.Storable (poke)
@@ -93,7 +93,7 @@ data AspectFixMode = GrowBox
 foreign import ccall "&hs_mapnik_destroy_Map" destroyMap :: FinalizerPtr Map
 
 unsafeNew :: (Ptr (Ptr Map) -> IO ()) -> IO Map
-unsafeNew = fmap Map . newForeignPtr destroyMap <=< C.withPtr_
+unsafeNew = mkUnsafeNew Map destroyMap
 
 create :: Int -> Int -> IO Map
 create (fromIntegral -> width) (fromIntegral -> height) =

@@ -7,7 +7,6 @@
 module Mapnik.Bindings.Layer (
   Layer
 , unsafeNew
-, unsafeNewMaybe
 , create
 , addStyle
 , getStyles
@@ -66,9 +65,6 @@ foreign import ccall "&hs_mapnik_destroy_Layer" destroyLayer :: FinalizerPtr Lay
 
 unsafeNew :: (Ptr (Ptr Layer) -> IO ()) -> IO Layer
 unsafeNew = mkUnsafeNew Layer destroyLayer
-
-unsafeNewMaybe :: (Ptr (Ptr Layer) -> IO ()) -> IO (Maybe Layer)
-unsafeNewMaybe = mkUnsafeNewMaybe Layer destroyLayer
 
 create :: Text -> IO Layer
 create (encodeUtf8 -> name) =
