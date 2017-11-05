@@ -10,6 +10,7 @@ import qualified Mapnik
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Map as Map
 import           Mapnik.Bindings.Layer as Layer
+import           Mapnik.Bindings.Style as Style
 import qualified Data.HashMap.Strict as HM
 
 class FromMapnik a where
@@ -61,6 +62,11 @@ instance FromMapnik Color where
   type HsType Color = Mapnik.Color
   fromMapnik = undefined
 
+instance FromMapnik Rule where
+  type HsType Rule = Mapnik.Rule
+  fromMapnik = undefined
+
+
 instance FromMapnik Layer where
   type HsType Layer = Mapnik.Layer
   fromMapnik l = do
@@ -81,7 +87,7 @@ instance FromMapnik Layer where
 instance FromMapnik Style where
   type HsType Style = Mapnik.Style
   fromMapnik s = do
-    _styleOpacity             <- undefined
-    _styleImageFiltersInflate <- undefined
-    _styleRules               <- undefined
+    _styleOpacity             <- Just <$> Style.getOpacity s
+    _styleImageFiltersInflate <- Just <$> Style.getImageFiltersInflate s
+    _styleRules               <- mapM fromMapnik =<< Style.getRules s
     return Mapnik.Style{..}

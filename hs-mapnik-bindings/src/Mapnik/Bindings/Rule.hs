@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -17,10 +18,10 @@ module Mapnik.Bindings.Rule (
 ) where
 
 import           Mapnik.Bindings
-import           Control.Monad ((<=<))
+import           Mapnik.Bindings.Util
 import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
-import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
+import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
 
 import qualified Language.C.Inline.Cpp as C
@@ -41,7 +42,7 @@ C.using "namespace mapnik"
 foreign import ccall "&hs_mapnik_destroy_Rule" destroyRule :: FinalizerPtr Rule
 
 unsafeNew :: (Ptr (Ptr Rule) -> IO ()) -> IO Rule
-unsafeNew = fmap Rule . newForeignPtr destroyRule <=< C.withPtr_
+unsafeNew = mkUnsafeNew Rule destroyRule
 
 create :: IO Rule
 create  = unsafeNew $ \p ->
@@ -67,7 +68,8 @@ appendSymbolizer l s = [C.block| void {
 
 setFilter :: Rule -> Expression -> IO ()
 setFilter l s = [C.block| void {
-  $fptr-ptr:(rule *l)->set_filter(*$fptr-ptr:(expression_ptr *s));
+  expression_ptr const& filter(*$fptr-ptr:(expression_ptr *s));
+  $fptr-ptr:(rule *l)->set_filter(filter);
   }|]
 
 setElse :: Rule -> Bool -> IO ()

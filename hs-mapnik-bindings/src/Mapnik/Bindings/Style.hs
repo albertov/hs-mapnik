@@ -7,15 +7,22 @@ module Mapnik.Bindings.Style (
   Style
 , unsafeNew
 , create
+, getOpacity
 , setOpacity
 , setImageFiltersInflate
+, getImageFiltersInflate
 , addRule
+, getRules
 ) where
 
 import           Mapnik.Bindings
+import qualified Mapnik.Bindings.Rule as Rule
+
 import           Control.Monad ((<=<))
+import           Data.IORef
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
+import           Foreign.Storable (poke)
 
 import qualified Language.C.Inline.Cpp as C
 
@@ -41,9 +48,16 @@ create :: IO Style
 create  = unsafeNew $ \p ->
   [C.block|void {*$(feature_type_style** p) = new feature_type_style();}|]
 
+getOpacity :: Style -> IO Double
+getOpacity s = realToFrac <$> [C.exp| float { $fptr-ptr:(feature_type_style *s)->get_opacity() }|]
+
 setOpacity :: Style -> Double -> IO ()
-setOpacity l (realToFrac -> s) =
-  [C.block|void { $fptr-ptr:(feature_type_style *l)->set_opacity($(double s)); }|]
+setOpacity s (realToFrac -> v) =
+  [C.block|void { $fptr-ptr:(feature_type_style *s)->set_opacity($(double v)); }|]
+
+getImageFiltersInflate :: Style -> IO Bool
+getImageFiltersInflate s = toEnum . fromIntegral <$> [C.exp|int { $fptr-ptr:(feature_type_style *s)->image_filters_inflate() }|]
+
 
 setImageFiltersInflate :: Style -> Bool -> IO ()
 setImageFiltersInflate l (fromIntegral . fromEnum -> q) =
@@ -55,3 +69,18 @@ addRule s r = [C.block| void {
   $fptr-ptr:(feature_type_style *s)->add_rule(std::move(rule));
   }|]
 
+getRules :: Style -> IO [Rule]
+getRules s = do
+  rulesRef <- newIORef []
+  let callback :: Ptr Rule -> IO ()
+      callback ptr = do
+        rule <- Rule.unsafeNew (flip poke ptr)
+        modifyIORef' rulesRef (rule:)
+  [C.block|void {
+  typedef std::vector<rule> rule_list;
+  rule_list const& rules = $fptr-ptr:(feature_type_style *s)->get_rules();
+  for (rule_list::const_iterator it=rules.begin(); it!=rules.end(); ++it) {
+    $fun:(void (*callback)(rule *))(new rule(*it));
+  }
+  }|]
+  reverse <$> readIORef rulesRef

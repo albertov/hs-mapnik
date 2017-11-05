@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -83,10 +84,17 @@ fromList ps = unsafePerformIO $ do
           (*$fptr-ptr:(parameters *p))[k] = value_holder($(double v));
         }|]
       IntParam (fromIntegral -> v) ->
+#ifdef BIGINT
+        [C.block|void {
+          std::string k($bs-ptr:k, $bs-len:k);
+          (*$fptr-ptr:(parameters *p))[k] = value_holder($(long v));
+        }|]
+#else
         [C.block|void {
           std::string k($bs-ptr:k, $bs-len:k);
           (*$fptr-ptr:(parameters *p))[k] = value_holder($(int v));
         }|]
+#endif
       BoolParam (fromIntegral . fromEnum -> v) ->
         [C.block|void {
           std::string k($bs-ptr:k, $bs-len:k);

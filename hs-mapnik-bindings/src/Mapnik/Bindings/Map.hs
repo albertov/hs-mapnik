@@ -151,7 +151,7 @@ setBackgroundImageOpacity m (realToFrac -> opacity) =
 
 getBackgroundImageOpacity :: Map -> IO Double
 getBackgroundImageOpacity m = realToFrac <$>
-  [C.block| float { $fptr-ptr:(Map *m)->background_image_opacity(); }|]
+  [C.exp| float { $fptr-ptr:(Map *m)->background_image_opacity() }|]
 
 setBasePath :: Map -> FilePath -> IO ()
 setBasePath m (fromString -> path) =
@@ -249,8 +249,8 @@ getLayerCount m = fromIntegral <$>
 getLayer :: Map -> Int -> IO Layer
 getLayer m (fromIntegral -> i) = Layer.unsafeNew $ \p ->
   [C.catchBlock|
-  if (0<=$(int i) && $(int i) < $fptr-ptr:(Map *m)->layer_count()) {
-    *$(layer **p) = new layer($fptr-ptr:(Map *m)->get_layer($(int i)));
+  if (0<=$(unsigned int i) && $(unsigned int i) < $fptr-ptr:(Map *m)->layer_count()) {
+    *$(layer **p) = new layer($fptr-ptr:(Map *m)->get_layer($(unsigned int i)));
   } else {
     throw std::runtime_error("Invalid layer index");
   }

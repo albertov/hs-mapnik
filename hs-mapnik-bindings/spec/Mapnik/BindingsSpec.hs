@@ -10,10 +10,14 @@ import           Mapnik.Bindings.Map as Map
 import           Mapnik.Bindings.Image as Image
 import           Mapnik.Bindings.Layer as Layer
 import           Mapnik.Bindings.Projection as Projection
+import           Mapnik.Bindings.Rule as Rule
+import           Mapnik.Bindings.Style as Style
+import           Mapnik.Bindings.Expression as Expression
 import           Mapnik.Bindings.Datasource as Datasource
 import           Mapnik.Bindings.Color as Color
 import           Control.Monad (void)
 import           Data.Maybe (isJust, isNothing)
+import           Data.List (lookup)
 import           Data.Either (isLeft, isRight)
 import           Data.String (fromString)
 
@@ -121,6 +125,13 @@ spec = beforeAll_ registerDefaults $ do
     sts <- map fst <$> Map.getStyles m
     sts `shouldBe` ["drainage","highway-border","highway-fill","popplaces","provinces","provlines","road-border","road-fill","smallroads"]
 
+  it "can get Style rules" $ do
+    m <- Map.create 512 512
+    loadFixture m
+    Just style <- lookup "provinces" <$> Map.getStyles m
+    rules <- Style.getRules style
+    length rules `shouldBe` 2
+
   it "can get Map srs" $ do
     m <- Map.create 512 512
     loadFixture m
@@ -162,6 +173,11 @@ spec = beforeAll_ registerDefaults $ do
     Layer.addStyle l "bar"
     sts2 <- Layer.getStyles l
     sts2 `shouldBe` ["foo", "bar"]
+
+  it "can create rule and set filter" $ do
+    r <- Rule.create
+    let Right e = Expression.parse "[foo]=bar"
+    Rule.setFilter r e
 
 loadFixture :: Map -> IO ()
 loadFixture m = do

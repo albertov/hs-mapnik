@@ -22,23 +22,30 @@ configureWithMapnikConfig lbi flags = do
   myExtraLibs    <- getFlagValues 'l' <$> mapnikConfig ["--libs"]
   myExtraLibDirs <- getFlagValues 'L' <$> mapnikConfig ["--ldflags"]
   myIncludeDirs  <- getFlagValues 'I' <$> mapnikConfig ["--includes", "--dep-includes"]
+  myCppOptions    <- words <$> mapnikConfig ["--defines"]
   myCcOptions    <- words <$> mapnikConfig ["--defines", "--cxxflags"]
   myLdOptions    <- words <$> mapnikConfig ["--ldflags"]
   mapnikInputPluginDir <- (escapeWinPathSep . head . words) <$>
     mapnikConfig ["--input-plugins"]
   mapnikFontDir <- (escapeWinPathSep . head . words) <$> (mapnikConfig ["--fonts"])
-  --error (show [ myIncludeDirs, myExtraLibDirs])
   let updBinfo bi = bi { extraLibDirs = extraLibDirs bi ++ myExtraLibDirs
                        , extraLibs    = extraLibs    bi ++ myExtraLibs
                        , includeDirs  = includeDirs  bi ++ myIncludeDirs
                        , ccOptions    = ccOptions    bi ++ myCcOptions
                        , ldOptions    = ldOptions    bi ++ myLdOptions
                        , cppOptions   = cppOptions   bi ++ mapnikCppOptions
+                       , options      = options      bi ++ myGhcOptions
                        }
+
+      -- | Work around https://github.com/haskell/cabal/issues/4435
+      -- | We *must* compile auto-generated code with, at least, the correct
+      -- | BIGINT flag or else obscure linking errors will ensue
+      myGhcOptions = [(GHC, "-Wall":map ("-optc"++) myCppOptions)]
+
       mapnikCppOptions =
         [ "-DDEFAULT_FONT_DIR=\""         ++ mapnikFontDir ++ "\""
         , "-DDEFAULT_INPUT_PLUGIN_DIR=\"" ++ mapnikInputPluginDir ++ "\""
-        ]
+        ] ++ myCppOptions
       updLib lib = lib { libBuildInfo  = updBinfo (libBuildInfo lib)}
       updTs  ts  = ts  { testBuildInfo = updBinfo (testBuildInfo ts)}
       updBm  bm  = bm  { benchmarkBuildInfo = updBinfo (benchmarkBuildInfo bm)}

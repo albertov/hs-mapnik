@@ -2,6 +2,7 @@
 #include <mapnik/image.hpp>
 #include <mapnik/layer.hpp>
 #include <mapnik/datasource.hpp>
+#include <mapnik/expression.hpp>
 #include <mapnik/color.hpp>
 #include <mapnik/projection.hpp>
 #include <mapnik/proj_transform.hpp>
@@ -53,6 +54,10 @@ void hs_mapnik_destroy_Rule(void *p) {
 
 void hs_mapnik_destroy_Symbolizer(void *p) {
   delete static_cast<mapnik::symbolizer*>(p);
+}
+
+void hs_mapnik_destroy_Expression(void *p) {
+  delete static_cast<mapnik::expression_ptr*>(p);
 }
 }
 
