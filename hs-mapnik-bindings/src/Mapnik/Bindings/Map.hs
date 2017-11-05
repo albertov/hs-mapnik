@@ -31,10 +31,8 @@ module Mapnik.Bindings.Map (
 , setAspectFixMode
 , getMaxExtent
 , setMaxExtent
-, getLayer
 , getLayers
 , getStyles
-, getLayerCount
 , resize
 , render
 , addLayer
@@ -242,24 +240,21 @@ addLayer m l = [C.block|void {
   $fptr-ptr:(Map *m)->add_layer(*$fptr-ptr:(layer *l));
   }|]
 
-getLayerCount :: Map -> IO Int
-getLayerCount m = fromIntegral <$>
-  [C.exp| size_t { $fptr-ptr:(Map *m)->layer_count() }|]
-
-getLayer :: Map -> Int -> IO Layer
-getLayer m (fromIntegral -> i) = Layer.unsafeNew $ \p ->
-  [C.catchBlock|
-  if (0<=$(unsigned int i) && $(unsigned int i) < $fptr-ptr:(Map *m)->layer_count()) {
-    *$(layer **p) = new layer($fptr-ptr:(Map *m)->get_layer($(unsigned int i)));
-  } else {
-    throw std::runtime_error("Invalid layer index");
-  }
-  |]
-
 getLayers :: Map -> IO [Layer]
 getLayers m = do
-  n <- getLayerCount m
-  mapM (getLayer m) [0..n-1]
+  layersRef <- newIORef []
+  let callback :: Ptr Layer -> IO ()
+      callback ptr = do
+        layer <- Layer.unsafeNew (flip poke ptr)
+        modifyIORef' layersRef (layer:)
+  [C.block|void {
+  typedef std::vector<layer> layer_list;
+  layer_list const& layers = $fptr-ptr:(Map *m)->layers();
+  for (layer_list::const_iterator it=layers.begin(); it!=layers.end(); ++it) {
+    $fun:(void (*callback)(layer*))(new layer(*it));
+  }
+  }|]
+  reverse <$> readIORef layersRef
 
 getStyles :: Map -> IO [(StyleName,Style)]
 getStyles m = do

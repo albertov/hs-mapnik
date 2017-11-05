@@ -115,15 +115,17 @@ spec = beforeAll_ registerDefaults $ do
     Color.create "rgba(3,4,5" `shouldSatisfy` isNothing
     Color.create "steelblu" `shouldSatisfy` isNothing
 
-  it "cannot get unexistent layer" $ do
-    m <- Map.create 512 512
-    getLayer m 1 `shouldThrow` cppStdException
-
   it "can get Map styles" $ do
     m <- Map.create 512 512
     loadFixture m
     sts <- map fst <$> Map.getStyles m
     sts `shouldBe` ["drainage","highway-border","highway-fill","popplaces","provinces","provlines","road-border","road-fill","smallroads"]
+
+  it "can get Map layers" $ do
+    m <- Map.create 512 512
+    loadFixture m
+    layers <- Map.getLayers m
+    length layers `shouldBe` 5
 
   it "can get Style rules" $ do
     m <- Map.create 512 512
