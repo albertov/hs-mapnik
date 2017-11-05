@@ -12,9 +12,8 @@ module Mapnik.Bindings.Projection (
 ) where
 
 import           Mapnik.Bindings
-import           Mapnik.Bindings.Util (newByteString)
-import           Data.ByteString (unpack)
-import           Data.Char (chr)
+import           Mapnik.Bindings.Util (newText)
+import           Data.Text (unpack)
 import           Control.Exception (try)
 import           Control.Monad ((<=<))
 import           Data.Text (Text)
@@ -63,7 +62,7 @@ transform src dst = unsafePerformIO $ do
 
   
 instance Show Projection where
-  show pr = unsafePerformIO $ fmap (map (chr . fromIntegral) . unpack) $ newByteString $ \(ptr,len) ->
+  show pr = unsafePerformIO $ fmap unpack $ newText $ \(ptr,len) ->
     [C.block|void {
     std::string const &s = $fptr-ptr:(projection *pr)->params();
     *$(char** ptr) = strdup(s.c_str());

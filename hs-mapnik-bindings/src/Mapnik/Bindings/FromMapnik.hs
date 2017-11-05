@@ -11,6 +11,8 @@ import           Mapnik.Bindings
 import           Mapnik.Bindings.Map as Map
 import           Mapnik.Bindings.Layer as Layer
 import           Mapnik.Bindings.Style as Style
+import           Mapnik.Bindings.Rule as Rule
+import           Mapnik.Bindings.Expression as Expression
 import qualified Data.HashMap.Strict as HM
 
 class FromMapnik a where
@@ -62,9 +64,23 @@ instance FromMapnik Color where
   type HsType Color = Mapnik.Color
   fromMapnik = undefined
 
+instance FromMapnik Expression where
+  type HsType Expression = Mapnik.Expression
+  fromMapnik = return . Mapnik.Expression . Expression.toText
+
+instance FromMapnik Symbolizer where
+  type HsType Symbolizer = Mapnik.Symbolizer
+  fromMapnik = undefined
+
 instance FromMapnik Rule where
   type HsType Rule = Mapnik.Rule
-  fromMapnik = undefined
+  fromMapnik r = do
+    _ruleName                    <- Just <$> Rule.getName r
+    _ruleFilter                  <- fromMapnik =<< Rule.getFilter r
+    _ruleMinimumScaleDenominator <- Just <$> Rule.getMinScale r
+    _ruleMaximumScaleDenominator <- Just <$> Rule.getMaxScale r
+    _ruleSymbolizers             <- mapM fromMapnik =<< Rule.getSymbolizers r
+    return Mapnik.Rule {..}
 
 
 instance FromMapnik Layer where

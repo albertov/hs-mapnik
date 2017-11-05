@@ -11,6 +11,7 @@
 module Mapnik.Bindings.Symbolizer (
   Symbolizer
 , create
+, unsafeNew
 ) where
 
 import qualified Mapnik
@@ -43,13 +44,13 @@ C.using "namespace mapnik"
 
 foreign import ccall "&hs_mapnik_destroy_Symbolizer" destroySymbolizer :: FinalizerPtr Symbolizer
 
-newSym :: Ptr Symbolizer -> IO Symbolizer
-newSym = fmap Symbolizer . newForeignPtr destroySymbolizer
+unsafeNew :: Ptr Symbolizer -> IO Symbolizer
+unsafeNew = fmap Symbolizer . newForeignPtr destroySymbolizer
 
 create :: Mapnik.Symbolizer -> IO Symbolizer
 create sym = bracket alloc dealloc $ \p -> do
   mapM_ (flip setProperty p) (_symbolizerProperties sym)
-  newSym =<< castSym sym p
+  unsafeNew =<< castSym sym p
   where
     alloc = [C.exp|symbolizer_base * { new symbolizer_base() }|]
     dealloc p = [C.block|void { delete $(symbolizer_base *p);}|]

@@ -134,6 +134,16 @@ spec = beforeAll_ registerDefaults $ do
     rules <- Style.getRules style
     length rules `shouldBe` 2
 
+  it "can get Rule symbolizers" $ do
+    m <- Map.create 512 512
+    loadFixture m
+    Just style <- lookup "provinces" <$> Map.getStyles m
+    [r1,r2] <- Style.getRules style
+    syms1 <- Rule.getSymbolizers r1
+    length syms1 `shouldBe` 1
+    syms2 <- Rule.getSymbolizers r2
+    length syms2 `shouldBe` 1
+
   it "can get Map srs" $ do
     m <- Map.create 512 512
     loadFixture m
@@ -176,10 +186,26 @@ spec = beforeAll_ registerDefaults $ do
     sts2 <- Layer.getStyles l
     sts2 `shouldBe` ["foo", "bar"]
 
-  it "can create rule and set filter" $ do
-    r <- Rule.create
-    let Right e = Expression.parse "[foo]=bar"
-    Rule.setFilter r e
+  describe "Rule" $ do
+    it "no filter returns Nothing" $ do
+      r <- Rule.create
+      f <- Rule.getFilter r
+      f `shouldBe` Nothing
+
+    it "can get/set filter" $ do
+      r <- Rule.create
+      let Right e = Expression.parse expr
+          expr = "([foo]='bar')"
+      Rule.setFilter r e
+      Just f <- Rule.getFilter r
+      Expression.toText f `shouldBe` expr
+
+    it "can get/set name" $ do
+      r <- Rule.create
+      let name = "foo"
+      Rule.setName r name
+      name' <- Rule.getName r
+      name' `shouldBe` name
 
 loadFixture :: Map -> IO ()
 loadFixture m = do
