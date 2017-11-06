@@ -4,6 +4,7 @@ module Mapnik.BindingsSpec (main, spec) where
 
 import qualified Data.ByteString as BS
 import           Test.Hspec
+import           Mapnik (Symbolizer(..), Color(..), Key(..), (==>))
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Registry (registerDefaults)
 import           Mapnik.Bindings.Map as Map
@@ -14,8 +15,10 @@ import           Mapnik.Bindings.Rule as Rule
 import           Mapnik.Bindings.Style as Style
 import           Mapnik.Bindings.Expression as Expression
 import           Mapnik.Bindings.Datasource as Datasource
+import           Mapnik.Bindings.Symbolizer as Symbolizer
 import           Mapnik.Bindings.Color as Color
 import           Control.Monad (void)
+import           Data.Text (Text)
 import           Data.Maybe (isJust, isNothing)
 import           Data.List (lookup)
 import           Data.Either (isLeft, isRight)
@@ -141,8 +144,9 @@ spec = beforeAll_ registerDefaults $ do
     [r1,r2] <- Style.getRules style
     syms1 <- Rule.getSymbolizers r1
     length syms1 `shouldBe` 1
-    syms2 <- Rule.getSymbolizers r2
-    length syms2 `shouldBe` 1
+    [sym] <- Rule.getSymbolizers r2
+    mSym <- Symbolizer.unCreate sym
+    mSym `shouldBe` Polygon [Fill ==> RGBA 217 235 203 255]
 
   it "can get Map srs" $ do
     m <- Map.create 512 512
@@ -234,6 +238,7 @@ loadFixtureFrom p m = Map.loadXml m =<< BS.readFile p
 box :: Box
 box = Box (-8024477.28459) 5445190.38849 (-7381388.20071) 5662941.44855
 
+merc :: Text
 merc = "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over"
 
 cppStdException :: Selector CppException

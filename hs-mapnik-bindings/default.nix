@@ -12,7 +12,7 @@ mkDerivation {
   libraryHaskellDepends = [ base bytestring inline-c-cpp inline-c hs-mapnik ];
   librarySystemDepends = [ mapnik boost.dev icu.dev harfbuzz.dev ];
   testHaskellDepends = [
-    base bytestring hspec hspec-core
+    base bytestring hspec hspec-core text hs-mapnik
   ];
   homepage = "https://github.com/albertov/hs-mapnik#readme";
   description = "Haskel bindings for Mapnik";

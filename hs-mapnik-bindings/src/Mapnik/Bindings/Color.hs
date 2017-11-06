@@ -8,18 +8,19 @@
 {-# LANGUAGE RecordWildCards #-}
 module Mapnik.Bindings.Color (
   create
-, bsShowColor
+, tShowColor
 , unsafeNew
 , unsafeNewMaybe
 , unCreate
+, mkCreateMaybe
 ) where
 
 import qualified Mapnik
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
-import           Data.ByteString (ByteString, unpack)
-import           Data.Char (chr)
+import           Data.Maybe (fromJust)
 import           Control.Exception (try)
+import           Data.Text (Text, unpack)
 import           Data.Text.Encoding (encodeUtf8)
 import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
@@ -55,19 +56,27 @@ create col = unsafePerformIO $ case col of
   where
     fromExc = either (const Nothing) Just
 
+mkCreateMaybe :: ((Ptr C.CInt, Ptr C.CUChar, Ptr C.CUChar, Ptr C.CUChar, Ptr C.CUChar) -> IO ()) -> IO (Maybe Mapnik.Color)
+mkCreateMaybe fun = do
+  (has,fromIntegral->r,fromIntegral->g,fromIntegral->b,fromIntegral->a) <- C.withPtrs_ fun
+  return $ if has==1 then Just (Mapnik.RGBA r g b a) else Nothing
+
 unCreate :: Color -> IO Mapnik.Color
-unCreate c = do
-  red <- fromIntegral <$> [C.exp|unsigned char {$fptr-ptr:(color *c)->red()}|]
-  blue <- fromIntegral <$> [C.exp|unsigned char {$fptr-ptr:(color *c)->blue()}|]
-  green <- fromIntegral <$> [C.exp|unsigned char {$fptr-ptr:(color *c)->green()}|]
-  alpha <- fromIntegral <$> [C.exp|unsigned char {$fptr-ptr:(color *c)->alpha()}|]
-  return Mapnik.RGBA {..}
+unCreate c = fmap fromJust $ mkCreateMaybe $ \(has,r,g,b,a) ->
+  [C.block|void {
+  color const& c = *$fptr-ptr:(color *c);
+  *$(int *has) = 1;
+  *$(unsigned char *r) = c.red();
+  *$(unsigned char *g) = c.green();
+  *$(unsigned char *b) = c.blue();
+  *$(unsigned char *a) = c.alpha();
+  }|]
 
 instance Show Color where
-  show = map (chr . fromIntegral) . unpack . bsShowColor
+  show = unpack . tShowColor
 
-bsShowColor :: Color -> ByteString
-bsShowColor c = unsafePerformIO $ newByteString $ \(ptr,len) ->
+tShowColor :: Color -> Text
+tShowColor c = unsafePerformIO $ newText $ \(ptr,len) ->
   [C.block|void {
   std::string s = $fptr-ptr:(color *c)->to_string();
   *$(char** ptr)= strdup(s.c_str());

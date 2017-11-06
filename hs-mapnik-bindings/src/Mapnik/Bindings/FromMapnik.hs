@@ -15,6 +15,7 @@ import qualified Mapnik.Bindings.Style as Style
 import qualified Mapnik.Bindings.Rule as Rule
 import qualified Mapnik.Bindings.Expression as Expression
 import qualified Mapnik.Bindings.Datasource as Datasource
+import qualified Mapnik.Bindings.Symbolizer as Symbolizer
 import qualified Data.HashMap.Strict as HM
 
 class FromMapnik a where
@@ -109,5 +110,5 @@ instance FromMapnik Datasource where
 
 instance FromMapnik Symbolizer where
   type HsType Symbolizer = Mapnik.Symbolizer
-  fromMapnik = undefined
+  fromMapnik = Symbolizer.unCreate
 

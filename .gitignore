@@ -3,3 +3,4 @@ result
 *.sw?
 dist
 dist-newstyle
+core

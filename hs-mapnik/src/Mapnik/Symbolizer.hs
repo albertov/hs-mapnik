@@ -10,6 +10,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE TypeFamilies #-}
 module Mapnik.Symbolizer (
   module Mapnik.Symbolizer
 , DSum (..)
@@ -28,6 +29,12 @@ import Data.GADT.Show.TH
 import Data.Dependent.Sum as DSum (DSum(..), ShowTag(..), EqTag(..))
 import qualified Data.Dependent.Map as DMap
 import Data.String (fromString)
+import GHC.Exts (IsList(..))
+
+instance IsList Properties where
+  type Item Properties = Property
+  fromList = DMap.fromList
+  toList = DMap.toList
 
 data PropValue v = PropValue      v
                  | PropExpression Expression
