@@ -15,7 +15,7 @@ module Mapnik.Bindings.Symbolizer (
 ) where
 
 import qualified Mapnik
-import           Mapnik (Property(..), Key(..), _symbolizerProperties, PropValue(..))
+import           Mapnik (Property, DSum(..), Key(..), toProperties, PropValue(..))
 import           Mapnik.Bindings
 import qualified Mapnik.Bindings.Color as Color
 import qualified Mapnik.Bindings.Expression as Expression
@@ -49,7 +49,7 @@ unsafeNew = fmap Symbolizer . newForeignPtr destroySymbolizer
 
 create :: Mapnik.Symbolizer -> IO Symbolizer
 create sym = bracket alloc dealloc $ \p -> do
-  mapM_ (flip setProperty p) (_symbolizerProperties sym)
+  mapM_ (flip setProperty p) (toProperties sym)
   unsafeNew =<< castSym sym p
   where
     alloc = [C.exp|symbolizer_base * { new symbolizer_base() }|]

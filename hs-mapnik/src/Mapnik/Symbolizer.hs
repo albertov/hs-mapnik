@@ -8,22 +8,30 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeOperators #-}
-module Mapnik.Symbolizer where
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE KindSignatures #-}
+module Mapnik.Symbolizer (
+  module Mapnik.Symbolizer
+, DSum (..)
+) where
 
 import Mapnik.Imports
 import Mapnik.Expression
 import Control.Applicative
+import Data.Functor.Identity (Identity)
 import Data.Aeson
 import Data.Aeson.Types
-import Data.Typeable
 import Data.Text (Text)
 import qualified Data.HashMap.Strict as HM
+import Data.GADT.Compare.TH
+import Data.GADT.Show.TH
+import Data.Dependent.Sum as DSum (DSum(..), ShowTag(..), EqTag(..))
+import qualified Data.Dependent.Map as DMap
 import Data.String (fromString)
 
 data PropValue v = PropValue      v
                  | PropExpression Expression
-  deriving (Eq, Show)
+  deriving (Eq, Show, Functor)
 
 instance ToJSON v => ToJSON (PropValue v) where
   toJSON (PropValue v)      = toJSON v
@@ -32,23 +40,9 @@ instance ToJSON v => ToJSON (PropValue v) where
 instance FromJSON v => FromJSON (PropValue v) where
   parseJSON o = (PropValue <$> parseJSON o) <|> (PropExpression <$> parseJSON o)
 
-data Property where
-  (:=>) :: (ToJSON v, Show v, Eq v, Typeable v) => Key v -> PropValue v -> Property
+type Property = DSum Key PropValue
 
-(==>) :: (ToJSON v, Show v, Eq v, Typeable v) => Key v -> v -> Property
-k ==> v = k :=> PropValue v
-
-(=~>) :: (ToJSON v, Show v, Eq v, Typeable v) => Key v -> Expression -> Property
-k =~> v = k :=> PropExpression v
-
-deriving instance Show Property
-
-instance Eq Property where
-  (ka :: Key a) :=> a == (kb :: Key b) :=> b = case (eqT :: Maybe (a :~: b)) of
-    Just Refl -> ka == kb && a == b
-    Nothing   -> False
-
-type Properties = [Property]
+type Properties = DMap.DMap Key PropValue
 
 data Key a where
     Gamma :: Key Double
@@ -114,8 +108,150 @@ data Key a where
     Direction :: Key ()
     AvoidEdges :: Key Bool
     FfSettings :: Key ()
+
+deriveGCompare ''Key
+deriveGEq ''Key
+deriveGShow ''Key
 deriving instance Show (Key a)
 deriving instance Eq (Key a)
+
+(==>) :: Key v -> v -> Property
+k ==> v = k :=> PropValue v
+
+(=~>) :: Key v -> Expression -> Property
+k =~> v = k :=> PropExpression v
+
+instance ShowTag Key PropValue where
+  showTaggedPrec Gamma = showsPrec
+  showTaggedPrec GammaMethod = showsPrec
+  showTaggedPrec Opacity = showsPrec
+  showTaggedPrec Alignment = showsPrec
+  showTaggedPrec Offset = showsPrec
+  showTaggedPrec CompOp = showsPrec
+  showTaggedPrec Clip = showsPrec
+  showTaggedPrec Fill = showsPrec
+  showTaggedPrec FillOpacity = showsPrec
+  showTaggedPrec Stroke = showsPrec
+  showTaggedPrec StrokeWidth = showsPrec
+  showTaggedPrec StrokeOpacity = showsPrec
+  showTaggedPrec StrokeLinejoin = showsPrec
+  showTaggedPrec StrokeLinecap = showsPrec
+  showTaggedPrec StrokeGamma = showsPrec
+  showTaggedPrec StrokeGammaMethod = showsPrec
+  showTaggedPrec StrokeDashoffset = showsPrec
+  showTaggedPrec StrokeDasharray = showsPrec
+  showTaggedPrec StrokeMiterlimit = showsPrec
+  showTaggedPrec GeometryTransform = showsPrec
+  showTaggedPrec LineRasterizer = showsPrec
+  showTaggedPrec ImageTransform = showsPrec
+  showTaggedPrec Spacing = showsPrec
+  showTaggedPrec MaxError = showsPrec
+  showTaggedPrec AllowOverlap = showsPrec
+  showTaggedPrec IgnorePlacement = showsPrec
+  showTaggedPrec Width = showsPrec
+  showTaggedPrec Height = showsPrec
+  showTaggedPrec File = showsPrec
+  showTaggedPrec ShieldDx = showsPrec
+  showTaggedPrec ShieldDy = showsPrec
+  showTaggedPrec UnlockImage = showsPrec
+  showTaggedPrec Mode = showsPrec
+  showTaggedPrec Scaling = showsPrec
+  showTaggedPrec FilterFactor = showsPrec
+  showTaggedPrec MeshSize = showsPrec
+  showTaggedPrec Premultiplied = showsPrec
+  showTaggedPrec Smooth = showsPrec
+  showTaggedPrec SimplifyAlgorithm = showsPrec
+  showTaggedPrec SimplifyTolerance = showsPrec
+  showTaggedPrec HaloRasterizer = showsPrec
+  showTaggedPrec TextPlacements_ = showsPrec
+  showTaggedPrec LabelPlacement = showsPrec
+  showTaggedPrec MarkersPlacementType = showsPrec
+  showTaggedPrec MarkersMultipolicy = showsPrec
+  showTaggedPrec PointPlacementType = showsPrec
+  showTaggedPrec Colorizer = showsPrec
+  showTaggedPrec HaloTransform = showsPrec
+  showTaggedPrec NumColumns = showsPrec
+  showTaggedPrec StartColumn = showsPrec
+  showTaggedPrec RepeatKey = showsPrec
+  showTaggedPrec GroupProperties = showsPrec
+  showTaggedPrec LargestBoxOnly = showsPrec
+  showTaggedPrec MinimumPathLength = showsPrec
+  showTaggedPrec HaloCompOp = showsPrec
+  showTaggedPrec TextTransform = showsPrec
+  showTaggedPrec HorizontalAlignment = showsPrec
+  showTaggedPrec JustifyAlignment = showsPrec
+  showTaggedPrec VerticalAlignment = showsPrec
+  showTaggedPrec Upright = showsPrec
+  showTaggedPrec Direction = showsPrec
+  showTaggedPrec AvoidEdges = showsPrec
+  showTaggedPrec FfSettings = showsPrec
+
+instance EqTag Key PropValue where
+  eqTagged Gamma Gamma = (==)
+  eqTagged GammaMethod GammaMethod = (==)
+  eqTagged Opacity Opacity = (==)
+  eqTagged Alignment Alignment = (==)
+  eqTagged Offset Offset = (==)
+  eqTagged CompOp CompOp = (==)
+  eqTagged Clip Clip = (==)
+  eqTagged Fill Fill = (==)
+  eqTagged FillOpacity FillOpacity = (==)
+  eqTagged Stroke Stroke = (==)
+  eqTagged StrokeWidth StrokeWidth = (==)
+  eqTagged StrokeOpacity StrokeOpacity = (==)
+  eqTagged StrokeLinejoin StrokeLinejoin = (==)
+  eqTagged StrokeLinecap StrokeLinecap = (==)
+  eqTagged StrokeGamma StrokeGamma = (==)
+  eqTagged StrokeGammaMethod StrokeGammaMethod = (==)
+  eqTagged StrokeDashoffset StrokeDashoffset = (==)
+  eqTagged StrokeDasharray StrokeDasharray = (==)
+  eqTagged StrokeMiterlimit StrokeMiterlimit = (==)
+  eqTagged GeometryTransform GeometryTransform = (==)
+  eqTagged LineRasterizer LineRasterizer = (==)
+  eqTagged ImageTransform ImageTransform = (==)
+  eqTagged Spacing Spacing = (==)
+  eqTagged MaxError MaxError = (==)
+  eqTagged AllowOverlap AllowOverlap = (==)
+  eqTagged IgnorePlacement IgnorePlacement = (==)
+  eqTagged Width Width = (==)
+  eqTagged Height Height = (==)
+  eqTagged File File = (==)
+  eqTagged ShieldDx ShieldDx = (==)
+  eqTagged ShieldDy ShieldDy = (==)
+  eqTagged UnlockImage UnlockImage = (==)
+  eqTagged Mode Mode = (==)
+  eqTagged Scaling Scaling = (==)
+  eqTagged FilterFactor FilterFactor = (==)
+  eqTagged MeshSize MeshSize = (==)
+  eqTagged Premultiplied Premultiplied = (==)
+  eqTagged Smooth Smooth = (==)
+  eqTagged SimplifyAlgorithm SimplifyAlgorithm = (==)
+  eqTagged SimplifyTolerance SimplifyTolerance = (==)
+  eqTagged HaloRasterizer HaloRasterizer = (==)
+  eqTagged TextPlacements_ TextPlacements_ = (==)
+  eqTagged LabelPlacement LabelPlacement = (==)
+  eqTagged MarkersPlacementType MarkersPlacementType = (==)
+  eqTagged MarkersMultipolicy MarkersMultipolicy = (==)
+  eqTagged PointPlacementType PointPlacementType = (==)
+  eqTagged Colorizer Colorizer = (==)
+  eqTagged HaloTransform HaloTransform = (==)
+  eqTagged NumColumns NumColumns = (==)
+  eqTagged StartColumn StartColumn = (==)
+  eqTagged RepeatKey RepeatKey = (==)
+  eqTagged GroupProperties GroupProperties = (==)
+  eqTagged LargestBoxOnly LargestBoxOnly = (==)
+  eqTagged MinimumPathLength MinimumPathLength = (==)
+  eqTagged HaloCompOp HaloCompOp = (==)
+  eqTagged TextTransform TextTransform = (==)
+  eqTagged HorizontalAlignment HorizontalAlignment = (==)
+  eqTagged JustifyAlignment JustifyAlignment = (==)
+  eqTagged VerticalAlignment VerticalAlignment = (==)
+  eqTagged Upright Upright = (==)
+  eqTagged Direction Direction = (==)
+  eqTagged AvoidEdges AvoidEdges = (==)
+  eqTagged FfSettings FfSettings = (==)
+  eqTagged _ _ = \_ _ -> False
+
 
 
 data Symbolizer
@@ -152,16 +288,81 @@ symType Group{} = "group"
 symType Debug{} = "debug"
 symType Dot{} = "dot"
 
+toProperties :: Symbolizer -> [DSum Key PropValue]
+toProperties = DMap.toList . _symbolizerProperties
+
 instance ToJSON Symbolizer where
-  toJSON sym = object (("type",toJSON (symType sym)):map go  (_symbolizerProperties sym))
+  toJSON sym = object (("type",toJSON (symType sym)):map go  (toProperties sym))
     where
       go :: Property -> (Text,Value)
-      go (k :=> v) = (fromString (uncapitalize (show k)), toJSON v)
+      go (Gamma :=> v) = ("gamma", toJSON v)
+      go (GammaMethod :=> v) = ("gammaMethod", toJSON v)
+      go (Opacity :=> v) = ("opacity", toJSON v)
+      go (Alignment :=> v) = ("alignment", toJSON v)
+      go (Offset :=> v) = ("offset", toJSON v)
+      go (CompOp :=> v) = ("compOp", toJSON v)
+      go (Clip :=> v) = ("clip", toJSON v)
+      go (Fill :=> v) = ("fill", toJSON v)
+      go (FillOpacity :=> v) = ("fillOpacity", toJSON v)
+      go (Stroke :=> v) = ("stroke", toJSON v)
+      go (StrokeWidth :=> v) = ("strokeWidth", toJSON v)
+      go (StrokeOpacity :=> v) = ("strokeOpacity", toJSON v)
+      go (StrokeLinejoin :=> v) = ("strokeLinejoin", toJSON v)
+      go (StrokeLinecap :=> v) = ("strokeLinecap", toJSON v)
+      go (StrokeGamma :=> v) = ("strokeGamma", toJSON v)
+      go (StrokeGammaMethod :=> v) = ("strokeGammaMethod", toJSON v)
+      go (StrokeDashoffset :=> v) = ("strokeDashoffset", toJSON v)
+      go (StrokeDasharray :=> v) = ("strokeDasharray", toJSON v)
+      go (StrokeMiterlimit :=> v) = ("strokeMiterlimit", toJSON v)
+      go (GeometryTransform :=> v) = ("geometryTransform", toJSON v)
+      go (LineRasterizer :=> v) = ("lineRasterizer", toJSON v)
+      go (ImageTransform :=> v) = ("imageTransform", toJSON v)
+      go (Spacing :=> v) = ("spacing", toJSON v)
+      go (MaxError :=> v) = ("maxError", toJSON v)
+      go (AllowOverlap :=> v) = ("allowOverlap", toJSON v)
+      go (IgnorePlacement :=> v) = ("ignorePlacement", toJSON v)
+      go (Width :=> v) = ("width", toJSON v)
+      go (Height :=> v) = ("height", toJSON v)
+      go (File :=> v) = ("file", toJSON v)
+      go (ShieldDx :=> v) = ("shieldDx", toJSON v)
+      go (ShieldDy :=> v) = ("shieldDy", toJSON v)
+      go (UnlockImage :=> v) = ("unlockImage", toJSON v)
+      go (Mode :=> v) = ("mode", toJSON v)
+      go (Scaling :=> v) = ("scaling", toJSON v)
+      go (FilterFactor :=> v) = ("filterFactor", toJSON v)
+      go (MeshSize :=> v) = ("meshSize", toJSON v)
+      go (Premultiplied :=> v) = ("premultiplied", toJSON v)
+      go (Smooth :=> v) = ("smooth", toJSON v)
+      go (SimplifyAlgorithm :=> v) = ("simplifyAlgorithm", toJSON v)
+      go (SimplifyTolerance :=> v) = ("simplifyTolerance", toJSON v)
+      go (HaloRasterizer :=> v) = ("haloRasterizer", toJSON v)
+      go (TextPlacements_ :=> v) = ("textPlacements_", toJSON v)
+      go (LabelPlacement :=> v) = ("labelPlacement", toJSON v)
+      go (MarkersPlacementType :=> v) = ("markersPlacementType", toJSON v)
+      go (MarkersMultipolicy :=> v) = ("markersMultipolicy", toJSON v)
+      go (PointPlacementType :=> v) = ("pointPlacementType", toJSON v)
+      go (Colorizer :=> v) = ("colorizer", toJSON v)
+      go (HaloTransform :=> v) = ("haloTransform", toJSON v)
+      go (NumColumns :=> v) = ("numColumns", toJSON v)
+      go (StartColumn :=> v) = ("startColumn", toJSON v)
+      go (RepeatKey :=> v) = ("repeatKey", toJSON v)
+      go (GroupProperties :=> v) = ("groupProperties", toJSON v)
+      go (LargestBoxOnly :=> v) = ("largestBoxOnly", toJSON v)
+      go (MinimumPathLength :=> v) = ("minimumPathLength", toJSON v)
+      go (HaloCompOp :=> v) = ("haloCompOp", toJSON v)
+      go (TextTransform :=> v) = ("textTransform", toJSON v)
+      go (HorizontalAlignment :=> v) = ("horizontalAlignment", toJSON v)
+      go (JustifyAlignment :=> v) = ("justifyAlignment", toJSON v)
+      go (VerticalAlignment :=> v) = ("verticalAlignment", toJSON v)
+      go (Upright :=> v) = ("upright", toJSON v)
+      go (Direction :=> v) = ("direction", toJSON v)
+      go (AvoidEdges :=> v) = ("avoidEdges", toJSON v)
+      go (FfSettings :=> v) = ("ffSettings", toJSON v)
 
 instance FromJSON Symbolizer where
   parseJSON = withObject "Symbolizer" $ \o -> do
     type_ :: Text <- o .: "type" 
-    props <- mapM (uncurry parseProperty) (HM.toList (HM.delete "type" o))
+    props <- DMap.fromList <$> mapM (uncurry parseProperty) (HM.toList (HM.delete "type" o))
     case type_ of
       "point" -> return (Point props)
       "line" -> return (Line props)
