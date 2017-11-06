@@ -76,9 +76,9 @@ unsafeNewParams = mkUnsafeNew Parameters destroyParameters
 
 getParameters :: Datasource -> IO Parameters
 getParameters ds = unsafeNewParams $ \ ptr ->
-  [C.catchBlock|
+  [C.block|void{
   *$(parameters** ptr) = new parameters((*$fptr-ptr:(datasource_ptr *ds))->params());
-  |]
+  }|]
 
 instance Exts.IsList Parameters where
   type Item Parameters = Parameter

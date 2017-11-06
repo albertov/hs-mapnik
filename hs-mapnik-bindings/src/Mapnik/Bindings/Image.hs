@@ -13,7 +13,7 @@ module Mapnik.Bindings.Image (
 ) where
 
 import           Mapnik.Bindings
-import           Mapnik.Bindings.Util (newByteString)
+import           Mapnik.Bindings.Util
 import           Control.Monad ((<=<))
 import           Data.String (fromString)
 import           Data.ByteString as BS (ByteString, length)
@@ -21,7 +21,6 @@ import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
 
 import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Cpp.Exceptions as C
 
 import           System.IO.Unsafe (unsafePerformIO)
 
@@ -43,37 +42,37 @@ unsafeNew :: (Ptr (Ptr Image) -> IO ()) -> IO Image
 unsafeNew = fmap Image . newForeignPtr destroyImage <=< C.withPtr_
 
 
-serialize :: String -> Image -> ByteString
-serialize (fromString -> fmt) im = unsafePerformIO $ newByteString $ \(ptr, len) ->
-  [C.catchBlock|
+serialize :: String -> Image -> Maybe ByteString
+serialize (fromString -> fmt) im = unsafePerformIO $ newByteStringMaybe $ \(ptr, len) ->
+  [C.block|void {
   std::string fmt = std::string($bs-ptr:fmt, $bs-len:fmt);
-  std::string s = save_to_string(*$fptr-ptr:(image_rgba8 *im), fmt);
-  if (! s.length() ) {
-    throw std::runtime_error("could not serialize image");
+  *$(char** ptr) = NULL;
+  try {
+    std::string s = save_to_string(*$fptr-ptr:(image_rgba8 *im), fmt);
+    if (s.length() ) {
+      *$(int* len) = s.length();
+      *$(char** ptr) = static_cast<char*>(malloc(s.length()));
+      memcpy( *$(char** ptr), s.c_str(), s.length());
+    }
+  } catch (...) {
+    // pass
   }
-  *$(char** ptr) = static_cast<char*>(malloc(s.length()));
-  if ( ! *$(char** ptr) ) {
-    throw std::runtime_error("Could not malloc");
-  }
-  memcpy( *$(char** ptr), s.c_str(), s.length());
-  *$(int* len) = s.length();
-  |]
+  }|]
 
 
 toRgba8 :: Image -> ByteString
 toRgba8 im = unsafePerformIO $ newByteString $ \(ptr, len) ->
-  [C.catchBlock|
+  [C.block|void {
+  static char empty='\0';
   mapnik::image_rgba8 *im = $fptr-ptr:(image_rgba8 *im);
   int len = *$(int* len) = im->size();
-  if (len <= 0) {
-    throw std::runtime_error("Invalid image size");
+  if (len > 0) {
+    *$(char** ptr) = static_cast<char*>(malloc(len));
+    memcpy(*$(char** ptr), im->data(), len);
+  } else {
+    *$(char** ptr) = &empty;
   }
-  *$(char** ptr) = static_cast<char*>(malloc(len));
-  if ( ! *$(char** ptr) ) {
-    throw std::runtime_error("Could not malloc");
-  }
-  memcpy(*$(char** ptr), im->data(), len);
-  |]
+  }|]
 {-# NOINLINE toRgba8 #-}
 
 fromRgba8 :: Int -> Int -> ByteString -> Maybe Image

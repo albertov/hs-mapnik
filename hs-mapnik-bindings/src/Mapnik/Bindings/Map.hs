@@ -95,7 +95,7 @@ unsafeNew = mkUnsafeNew Map destroyMap
 
 create :: Int -> Int -> IO Map
 create (fromIntegral -> width) (fromIntegral -> height) =
-  unsafeNew $ \p -> [C.catchBlock|*$(Map** p) = new Map($(int width), $(int height));|]
+  unsafeNew $ \p -> [C.block|void{*$(Map** p) = new Map($(int width), $(int height));}|]
 
 loadXmlFile :: Map -> FilePath -> IO ()
 loadXmlFile m (fromString -> path) =
@@ -209,16 +209,16 @@ resize m (fromIntegral -> width) (fromIntegral -> height) =
 
 zoom :: Map -> Double -> IO ()
 zoom m (realToFrac -> z) =
-  [C.catchBlock|$fptr-ptr:(Map *m)->zoom($(double z));|]
+  [C.block|void {$fptr-ptr:(Map *m)->zoom($(double z));}|]
 
 zoomAll :: Map -> IO ()
 zoomAll m = [C.catchBlock|$fptr-ptr:(Map *m)->zoom_all();|]
 
 zoomToBox :: Map -> Box -> IO ()
 zoomToBox m (Box (realToFrac -> x0) (realToFrac -> y0) (realToFrac -> x1) (realToFrac -> y1)) = 
-  [C.catchBlock|
+  [C.block|void {
   $fptr-ptr:(Map *m)->zoom_to_box(mapnik::box2d<double>($(double x0), $(double y0), $(double x1), $(double y1)));
-  |]
+  }|]
 
 render :: Map -> Double -> IO Image
 render m (realToFrac -> scale) = Image.unsafeNew $ \ptr ->

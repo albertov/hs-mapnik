@@ -33,12 +33,19 @@ spec :: Spec
 spec = beforeAll_ registerDefaults $ do
 
   describe "Map" $ do
-    it "renders map.xml as PNG" $ do
+    it "renders as PNG" $ do
       m <- Map.create 512 512
       loadFixture m
       img <- Map.render m 1
       -- BS.writeFile "map.webp" (Image.serialize "webp" img)
-      Image.serialize "png8" img `shouldSatisfy` isPng
+      let Just bs = Image.serialize "png8" img
+      bs `shouldSatisfy` isPng
+
+    it "doesnt render bad format" $ do
+      m <- Map.create 512 512
+      loadFixture m
+      img <- Map.render m 1
+      Image.serialize "bad" img `shouldSatisfy` isNothing
 
     it "throws on broken XML" $ do
       m <- Map.create 512 512
@@ -236,6 +243,20 @@ spec = beforeAll_ registerDefaults $ do
       BS.length rgba8  `shouldBe` (10*10*4)
       --BS.writeFile "map.webp" (Image.serialize "webp" img2)
       Image.serialize "png8" img `shouldBe` Image.serialize "png8" img2
+
+    it "cannot create empty image" $ do
+      Image.fromRgba8 0 0 "" `shouldBe` Nothing
+
+  describe "Expression" $ do
+    it "can parse good expression" $ do
+      let e = Expression.parse expr
+          expr = "([foo]='bar')"
+      e `shouldSatisfy` isRight
+
+    it "cannot parse bad expression" $ do
+      let e = Expression.parse expr
+          expr = "([foo"
+      e `shouldSatisfy` isLeft
 
 loadFixture :: Map -> IO ()
 loadFixture m = do
