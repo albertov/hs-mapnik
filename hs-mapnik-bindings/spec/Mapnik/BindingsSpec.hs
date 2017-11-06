@@ -145,6 +145,8 @@ spec = beforeAll_ registerDefaults $ do
     syms1 <- Rule.getSymbolizers r1
     length syms1 `shouldBe` 1
     [sym] <- Rule.getSymbolizers r2
+    Just f <- Rule.getFilter r2
+    show f `shouldBe` "([NOM_FR]='Québec')"
     mSym <- Symbolizer.unCreate sym
     mSym `shouldBe` Polygon [Fill ==> RGBA 217 235 203 255]
 
