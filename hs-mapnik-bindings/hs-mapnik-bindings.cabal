@@ -43,6 +43,7 @@ library
   ghc-options:         -Wall
   extra-libraries:     mapnik stdc++
   c-sources:           cbits/destructors.cpp
+  include-dirs:        cbits
 
 test-suite spec
   type:             exitcode-stdio-1.0

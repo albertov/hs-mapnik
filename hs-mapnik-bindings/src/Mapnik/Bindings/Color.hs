@@ -5,11 +5,13 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE RecordWildCards #-}
 module Mapnik.Bindings.Color (
   create
 , bsShowColor
 , unsafeNew
 , unsafeNewMaybe
+, unCreate
 ) where
 
 import qualified Mapnik
@@ -52,6 +54,14 @@ create col = unsafePerformIO $ case col of
       [C.catchBlock|*$(color** p) = new color(parse_color(std::string($bs-ptr:c, $bs-len:c)));|]
   where
     fromExc = either (const Nothing) Just
+
+unCreate :: Color -> IO Mapnik.Color
+unCreate c = do
+  red <- fromIntegral <$> [C.exp|unsigned char {$fptr-ptr:(color *c)->red()}|]
+  blue <- fromIntegral <$> [C.exp|unsigned char {$fptr-ptr:(color *c)->blue()}|]
+  green <- fromIntegral <$> [C.exp|unsigned char {$fptr-ptr:(color *c)->green()}|]
+  alpha <- fromIntegral <$> [C.exp|unsigned char {$fptr-ptr:(color *c)->alpha()}|]
+  return Mapnik.RGBA {..}
 
 instance Show Color where
   show = map (chr . fromIntegral) . unpack . bsShowColor

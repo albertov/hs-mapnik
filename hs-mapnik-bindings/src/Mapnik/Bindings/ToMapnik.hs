@@ -9,7 +9,7 @@ import qualified Mapnik
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Layer as Layer
 import           Mapnik.Bindings.Map as Map
-import           Mapnik.Bindings.Datasource as Datasource
+import qualified Mapnik.Bindings.Datasource as Datasource
 import           Mapnik.Bindings.Color as Color
 import           Mapnik.Bindings.Style as Style
 import           Mapnik.Bindings.Symbolizer as Symbolizer

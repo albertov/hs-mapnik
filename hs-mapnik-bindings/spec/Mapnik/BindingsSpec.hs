@@ -207,6 +207,21 @@ spec = beforeAll_ registerDefaults $ do
       name' <- Rule.getName r
       name' `shouldBe` name
 
+  describe "Parameters" $ do
+    it "toList/fromList = id" $ do
+      let params =
+            [ "type"     .= ("shape" :: String)
+            , "encoding" .= ("latin1" :: String)
+            , "aDouble"  .= (7.4 :: Double)
+            , "anInt"    .= (-45 :: Int)
+            , "aTrue"    .= True
+            , "aFalse"   .= False
+            , "aNull"    .= (Nothing :: Maybe Int)
+            , "aNullInt" .= (Just 5 :: Maybe Int)
+            , "file"     .= ("spec/data/popplaces" :: String)
+            ]
+      Datasource.toList (Datasource.fromList params) `shouldMatchList` params
+
 loadFixture :: Map -> IO ()
 loadFixture m = do
   loadFixtureFrom "spec/map.xml" m

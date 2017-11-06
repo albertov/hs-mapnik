@@ -1,4 +1,5 @@
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -19,6 +20,7 @@ module Mapnik.Bindings (
 , ProjTransform (..)
 , Color (..)
 , C.CppException (..)
+, MapnikInt
 , mapnikCtx
 ) where
 
@@ -59,6 +61,12 @@ newtype SymbolizerBase = SymbolizerBase (ForeignPtr SymbolizerBase)
 newtype Expression = Expression (ForeignPtr Expression)
   deriving (Eq)
 
+#ifdef BIGINT
+type MapnikInt = C.CLong
+#else
+type MapnikInt = C.CInt
+#endif
+
 mapnikCtx :: Context
 mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> ctx
   where ctx = mempty {
@@ -77,5 +85,7 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> ctx
       , (C.TypeName "symbolizer_base", [t| SymbolizerBase |])
       , (C.TypeName "expression_ptr", [t| Expression |])
       , (C.TypeName "keys", [t| C.CUChar |])
+      , (C.TypeName "param_type", [t| C.CInt |])
+      , (C.TypeName "value_integer", [t| MapnikInt |])
       ]
     }

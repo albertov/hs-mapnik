@@ -8,11 +8,13 @@ module Mapnik.Bindings.FromMapnik where
 
 import qualified Mapnik
 import           Mapnik.Bindings
+import           Mapnik.Bindings.Color as Color
 import           Mapnik.Bindings.Map as Map
 import           Mapnik.Bindings.Layer as Layer
 import           Mapnik.Bindings.Style as Style
 import           Mapnik.Bindings.Rule as Rule
 import           Mapnik.Bindings.Expression as Expression
+import           Control.Exception (throwIO)
 import qualified Data.HashMap.Strict as HM
 
 class FromMapnik a where
@@ -56,21 +58,13 @@ instance FromMapnik Map where
              <$> (mapM (\(k,v) -> (k,) <$> fromMapnik v) =<< Map.getStyles m)
     return Mapnik.Map{..}
 
-instance FromMapnik Datasource where
-  type HsType Datasource = Mapnik.Datasource
-  fromMapnik = undefined
-
 instance FromMapnik Color where
   type HsType Color = Mapnik.Color
-  fromMapnik = undefined
+  fromMapnik = Color.unCreate
 
 instance FromMapnik Expression where
   type HsType Expression = Mapnik.Expression
   fromMapnik = return . Mapnik.Expression . Expression.toText
-
-instance FromMapnik Symbolizer where
-  type HsType Symbolizer = Mapnik.Symbolizer
-  fromMapnik = undefined
 
 instance FromMapnik Rule where
   type HsType Rule = Mapnik.Rule
@@ -107,3 +101,12 @@ instance FromMapnik Style where
     _styleImageFiltersInflate <- Just <$> Style.getImageFiltersInflate s
     _styleRules               <- mapM fromMapnik =<< Style.getRules s
     return Mapnik.Style{..}
+
+instance FromMapnik Datasource where
+  type HsType Datasource = Mapnik.Datasource
+  fromMapnik = undefined
+
+instance FromMapnik Symbolizer where
+  type HsType Symbolizer = Mapnik.Symbolizer
+  fromMapnik = undefined
+
