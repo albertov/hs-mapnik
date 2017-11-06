@@ -22,175 +22,156 @@ import           Data.Text (Text)
 import           Data.Maybe (isJust, isNothing)
 import           Data.List (lookup)
 import           Data.Either (isLeft, isRight)
-import           Data.String (fromString)
 
 main :: IO ()
 main = hspec spec
 
 isPng :: BS.ByteString -> Bool
-isPng s = BS.take 6 s == fromString "\137PNG\r\n"
+isPng s = BS.take 6 s == "\137PNG\r\n"
 
 spec :: Spec
 spec = beforeAll_ registerDefaults $ do
 
-  it "renders map.xml as PNG" $ do
-    m <- Map.create 512 512
-    loadFixture m
-    img <- Map.render m 1
-    -- BS.writeFile "map.webp" (Image.serialize "webp" img)
-    Image.serialize "png8" img `shouldSatisfy` isPng
+  describe "Map" $ do
+    it "renders map.xml as PNG" $ do
+      m <- Map.create 512 512
+      loadFixture m
+      img <- Map.render m 1
+      -- BS.writeFile "map.webp" (Image.serialize "webp" img)
+      Image.serialize "png8" img `shouldSatisfy` isPng
 
-  it "throws on broken XML" $ do
-    m <- Map.create 512 512
-    loadFixtureFrom "spec/bad.xml" m `shouldThrow` cppStdException
+    it "throws on broken XML" $ do
+      m <- Map.create 512 512
+      loadFixtureFrom "spec/bad.xml" m `shouldThrow` cppStdException
 
-  it "can add layer and render" $ do
-    m <- Map.create 11 11
-    loadFixture m
+    it "can add layer and render" $ do
+      m <- Map.create 11 11
+      loadFixture m
 
-    l <- Layer.create "Populated places"
-    Layer.setSrs l "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
-    Layer.addStyle l "popplaces"
-    Layer.setDatasource l =<< Datasource.create
-      [ "type"     .= ("shape" :: String)
-      , "encoding" .= ("latin1" :: String)
-      , "file"     .= ("spec/data/popplaces" :: String)
-      ]
-    Map.addLayer m l
-    void $ Map.render m 1
+      l <- Layer.create "Populated places"
+      Layer.setSrs l "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
+      Layer.addStyle l "popplaces"
+      Layer.setDatasource l =<< Datasource.create
+        [ "type"     .= ("shape" :: String)
+        , "encoding" .= ("latin1" :: String)
+        , "file"     .= ("spec/data/popplaces" :: String)
+        ]
+      Map.addLayer m l
+      void $ Map.render m 1
 
-  it "throws on invalid datasource" $
-    Datasource.create ["type".= ("shapes" :: String)] `shouldThrow` cppStdException
+    it "can get styles" $ do
+      m <- Map.create 512 512
+      loadFixture m
+      sts <- map fst <$> Map.getStyles m
+      sts `shouldBe` ["drainage","highway-border","highway-fill","popplaces","provinces","provlines","road-border","road-fill","smallroads"]
 
-  it "can convert image to rgba8 data and read it back" $ do
-    m <- Map.create 10 10
-    loadFixture m
-    img <- Map.render m 1
-    let rgba8 = Image.toRgba8 img
-        Just img2  = Image.fromRgba8 10 10 rgba8
-    BS.length rgba8  `shouldBe` (10*10*4)
-    --BS.writeFile "map.webp" (Image.serialize "webp" img2)
-    Image.serialize "png8" img `shouldBe` Image.serialize "png8" img2
-
-  it "can resize" $ do
-    m <- Map.create 10 10
-    loadFixture m
-    img <- Map.render m 1
-    BS.length (toRgba8 img) `shouldBe` (10*10*4)
-    Map.resize m 300 200
-    img2 <- Map.render m 1
-    BS.length (toRgba8 img2) `shouldBe` (300*200*4)
-
-  it "throws on invalid size" $ do
-    m <- Map.create (-1) (-1)
-    loadFixture m
-    Map.render m 1 `shouldThrow` cppStdException
-
-  it "can create valid projection" $ do
-    fromProj4 merc `shouldSatisfy` isRight
-
-  it "can show valid projection" $ do
-    show (fromProj4 merc) `shouldBe` "Right +proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over"
+    it "can get layers" $ do
+      m <- Map.create 512 512
+      loadFixture m
+      layers <- Map.getLayers m
+      length layers `shouldBe` 5
 
 
-  it "cannot create invalid projection" $ do
-    fromProj4 "foo" `shouldSatisfy` isLeft
+    it "can get srs" $ do
+      m <- Map.create 512 512
+      loadFixture m
+      Map.setSrs m merc
+      srs <- Map.getSrs m
+      srs `shouldBe` merc
 
-  it "can trasform" $ do
-    let Right src = fromProj4 merc
-        Right dst = fromProj4 "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
-        trans = transform src dst
-        expected = Box { minx = 1372637.1001942465
-                       , miny = -247003.8133187965
-                       , maxx = 1746737.6177269476
-                       , maxy = -25098.59307479199
-                       }
-    forward trans box `shouldBe` expected
+    it "can get max extent when Nothing" $ do
+      m <- Map.create 512 512
+      e <- Map.getMaxExtent m
+      e `shouldBe` Nothing
 
-  it "can parse good color" $ do
-    Color.create "rgba(3,4,5,1)" `shouldSatisfy` isJust
-    Color.create "steelblue" `shouldSatisfy` isJust
+    it "can get max extent when Just" $ do
+      m <- Map.create 512 512
+      Map.setMaxExtent m box
+      e <- Map.getMaxExtent m
+      e `shouldBe` Just box
 
-  it "can show color" $ do
-    show (Color.create "rgb(3,4,5)") `shouldBe` "Just rgb(3,4,5)"
+    it "can resize" $ do
+      m <- Map.create 10 10
+      loadFixture m
+      img <- Map.render m 1
+      BS.length (toRgba8 img) `shouldBe` (10*10*4)
+      Map.resize m 300 200
+      img2 <- Map.render m 1
+      BS.length (toRgba8 img2) `shouldBe` (300*200*4)
 
-  it "cannot parse bad color" $ do
-    Color.create "rgba(3,4,5" `shouldSatisfy` isNothing
-    Color.create "steelblu" `shouldSatisfy` isNothing
+    it "throws on invalid size" $ do
+      m <- Map.create (-1) (-1)
+      loadFixture m
+      Map.render m 1 `shouldThrow` cppStdException
 
-  it "can get Map styles" $ do
-    m <- Map.create 512 512
-    loadFixture m
-    sts <- map fst <$> Map.getStyles m
-    sts `shouldBe` ["drainage","highway-border","highway-fill","popplaces","provinces","provlines","road-border","road-fill","smallroads"]
+  describe "Projection" $ do
+    it "can create valid" $ do
+      fromProj4 merc `shouldSatisfy` isRight
 
-  it "can get Map layers" $ do
-    m <- Map.create 512 512
-    loadFixture m
-    layers <- Map.getLayers m
-    length layers `shouldBe` 5
+    it "can show valid" $ do
+      show (fromProj4 merc) `shouldBe` "Right +proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over"
 
-  it "can get Style rules" $ do
-    m <- Map.create 512 512
-    loadFixture m
-    Just style <- lookup "provinces" <$> Map.getStyles m
-    rules <- Style.getRules style
-    length rules `shouldBe` 2
 
-  it "can get Rule symbolizers" $ do
-    m <- Map.create 512 512
-    loadFixture m
-    Just style <- lookup "provinces" <$> Map.getStyles m
-    [r1,r2] <- Style.getRules style
-    syms1 <- Rule.getSymbolizers r1
-    length syms1 `shouldBe` 1
-    [sym] <- Rule.getSymbolizers r2
-    Just f <- Rule.getFilter r2
-    show f `shouldBe` "([NOM_FR]='Québec')"
-    mSym <- Symbolizer.unCreate sym
-    mSym `shouldBe` Polygon [Fill ==> RGBA 217 235 203 255]
+    it "cannot create invalid" $ do
+      fromProj4 "foo" `shouldSatisfy` isLeft
 
-  it "can get Map srs" $ do
-    m <- Map.create 512 512
-    loadFixture m
-    Map.setSrs m merc
-    srs <- Map.getSrs m
-    srs `shouldBe` merc
+    it "can trasform" $ do
+      let Right src = fromProj4 merc
+          Right dst = fromProj4 "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
+          trans = transform src dst
+          expected = Box { minx = 1372637.1001942465
+                         , miny = -247003.8133187965
+                         , maxx = 1746737.6177269476
+                         , maxy = -25098.59307479199
+                         }
+      forward trans box `shouldBe` expected
 
-  it "can get max extent when Nothing" $ do
-    m <- Map.create 512 512
-    e <- Map.getMaxExtent m
-    e `shouldBe` Nothing
+  describe "Color" $ do
+    it "can parse good" $ do
+      Color.create "rgba(3,4,5,1)" `shouldSatisfy` isJust
+      Color.create "steelblue" `shouldSatisfy` isJust
 
-  it "can get max extent when Just" $ do
-    m <- Map.create 512 512
-    Map.setMaxExtent m box
-    e <- Map.getMaxExtent m
-    e `shouldBe` Just box
+    it "cannot parse bad" $ do
+      Color.create "rgba(3,4,5" `shouldSatisfy` isNothing
+      Color.create "steelblu" `shouldSatisfy` isNothing
 
-  it "getDatasource returns Nothing if no datasource" $ do
-    l <- Layer.create "fooo"
-    ds <- Layer.getDatasource l
-    ds `shouldBe` Nothing
+    it "can show" $ do
+      show (Color.create "rgb(3,4,5)") `shouldBe` "Just rgb(3,4,5)"
 
-  it "getDatasource returns Just if datasource" $ do
-    l <- Layer.create "fooo"
-    Layer.setDatasource l =<< Datasource.create
-      [ "type"     .= ("shape" :: String)
-      , "encoding" .= ("latin1" :: String)
-      , "file"     .= ("spec/data/popplaces" :: String)
-      ]
-    ds <- Layer.getDatasource l
-    ds `shouldSatisfy` isJust
 
-  it "can get Layer styles" $ do
-    l <- Layer.create "fooo"
-    sts <- Layer.getStyles l
-    sts `shouldBe` []
-    Layer.addStyle l "foo"
-    Layer.addStyle l "bar"
-    sts2 <- Layer.getStyles l
-    sts2 `shouldBe` ["foo", "bar"]
+
+  describe "Layer" $ do
+    it "getDatasource returns Nothing if no datasource" $ do
+      l <- Layer.create "fooo"
+      ds <- Layer.getDatasource l
+      ds `shouldBe` Nothing
+
+    it "getDatasource returns Just if datasource" $ do
+      l <- Layer.create "fooo"
+      Layer.setDatasource l =<< Datasource.create
+        [ "type"     .= ("shape" :: String)
+        , "encoding" .= ("latin1" :: String)
+        , "file"     .= ("spec/data/popplaces" :: String)
+        ]
+      ds <- Layer.getDatasource l
+      ds `shouldSatisfy` isJust
+
+    it "can get styles" $ do
+      l <- Layer.create "fooo"
+      sts <- Layer.getStyles l
+      sts `shouldBe` []
+      Layer.addStyle l "foo"
+      Layer.addStyle l "bar"
+      sts2 <- Layer.getStyles l
+      sts2 `shouldBe` ["foo", "bar"]
+
+  describe "Style" $ do
+    it "can get rules" $ do
+      m <- Map.create 512 512
+      loadFixture m
+      Just style <- lookup "provinces" <$> Map.getStyles m
+      rules <- Style.getRules style
+      length rules `shouldBe` 2
 
   describe "Rule" $ do
     it "no filter returns Nothing" $ do
@@ -213,6 +194,19 @@ spec = beforeAll_ registerDefaults $ do
       name' <- Rule.getName r
       name' `shouldBe` name
 
+    it "can get symbolizers" $ do
+      m <- Map.create 512 512
+      loadFixture m
+      Just style <- lookup "provinces" <$> Map.getStyles m
+      [r1,r2] <- Style.getRules style
+      syms1 <- Rule.getSymbolizers r1
+      length syms1 `shouldBe` 1
+      [sym] <- Rule.getSymbolizers r2
+      Just f <- Rule.getFilter r2
+      show f `shouldBe` "([NOM_FR]='Québec')"
+      mSym <- Symbolizer.unCreate sym
+      mSym `shouldBe` Polygon [Fill ==> RGBA 217 235 203 255]
+
   describe "Parameters" $ do
     it "toList/fromList = id" $ do
       let params =
@@ -227,6 +221,21 @@ spec = beforeAll_ registerDefaults $ do
             , "file"     .= ("spec/data/popplaces" :: String)
             ]
       Datasource.toList (Datasource.fromList params) `shouldMatchList` params
+
+  describe "Datasource" $ do
+    it "throws on invalid datasource" $
+      Datasource.create ["type".= ("shapes" :: String)] `shouldThrow` cppStdException
+
+  describe "Image" $ do
+    it "can convert to rgba8 data and read it back" $ do
+      m <- Map.create 10 10
+      loadFixture m
+      img <- Map.render m 1
+      let rgba8 = Image.toRgba8 img
+          Just img2  = Image.fromRgba8 10 10 rgba8
+      BS.length rgba8  `shouldBe` (10*10*4)
+      --BS.writeFile "map.webp" (Image.serialize "webp" img2)
+      Image.serialize "png8" img `shouldBe` Image.serialize "png8" img2
 
 loadFixture :: Map -> IO ()
 loadFixture m = do
