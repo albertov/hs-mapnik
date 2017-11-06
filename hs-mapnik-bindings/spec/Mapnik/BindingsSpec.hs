@@ -41,11 +41,6 @@ spec = beforeAll_ registerDefaults $ do
       let Just bs = Image.serialize "png8" img
       bs `shouldSatisfy` isPng
 
-    it "doesnt render bad format" $ do
-      m <- Map.create 512 512
-      loadFixture m
-      img <- Map.render m 1
-      Image.serialize "bad" img `shouldSatisfy` isNothing
 
     it "throws on broken XML" $ do
       m <- Map.create 512 512
@@ -81,7 +76,6 @@ spec = beforeAll_ registerDefaults $ do
 
     it "can get srs" $ do
       m <- Map.create 512 512
-      loadFixture m
       Map.setSrs m merc
       srs <- Map.getSrs m
       srs `shouldBe` merc
@@ -99,7 +93,6 @@ spec = beforeAll_ registerDefaults $ do
 
     it "can resize" $ do
       m <- Map.create 10 10
-      loadFixture m
       img <- Map.render m 1
       BS.length (toRgba8 img) `shouldBe` (10*10*4)
       Map.resize m 300 200
@@ -108,7 +101,6 @@ spec = beforeAll_ registerDefaults $ do
 
     it "throws on invalid size" $ do
       m <- Map.create (-1) (-1)
-      loadFixture m
       Map.render m 1 `shouldThrow` cppStdException
 
   describe "Projection" $ do
@@ -156,9 +148,9 @@ spec = beforeAll_ registerDefaults $ do
     it "getDatasource returns Just if datasource" $ do
       l <- Layer.create "fooo"
       Layer.setDatasource l =<< Datasource.create
-        [ "type"     .= ("shape" :: String)
-        , "encoding" .= ("latin1" :: String)
-        , "file"     .= ("spec/data/popplaces" :: String)
+        [ "type"     .= ("shape" :: Text)
+        , "encoding" .= ("latin1" :: Text)
+        , "file"     .= ("spec/data/popplaces" :: FilePath)
         ]
       ds <- Layer.getDatasource l
       ds `shouldSatisfy` isJust
@@ -236,7 +228,6 @@ spec = beforeAll_ registerDefaults $ do
   describe "Image" $ do
     it "can convert to rgba8 data and read it back" $ do
       m <- Map.create 10 10
-      loadFixture m
       img <- Map.render m 1
       let rgba8 = Image.toRgba8 img
           Just img2  = Image.fromRgba8 10 10 rgba8
@@ -244,8 +235,12 @@ spec = beforeAll_ registerDefaults $ do
       --BS.writeFile "map.webp" (Image.serialize "webp" img2)
       Image.serialize "png8" img `shouldBe` Image.serialize "png8" img2
 
-    it "cannot create empty image" $ do
+    it "cannot create empty image" $
       Image.fromRgba8 0 0 "" `shouldBe` Nothing
+
+    it "doesnt serialize bad format" $ do
+      let Just img = Image.fromRgba8 10 10 (BS.replicate (4*10*10) 0)
+      Image.serialize "bad" img `shouldSatisfy` isNothing
 
   describe "Expression" $ do
     it "can parse good expression" $ do

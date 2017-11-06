@@ -42,6 +42,8 @@ unsafeNew :: (Ptr (Ptr Image) -> IO ()) -> IO Image
 unsafeNew = fmap Image . newForeignPtr destroyImage <=< C.withPtr_
 
 
+--TODO: Format should not be stringly typed so we can change signature to:
+--      serialize :: Format -> Image -> ByteString
 serialize :: String -> Image -> Maybe ByteString
 serialize (fromString -> fmt) im = unsafePerformIO $ newByteStringMaybe $ \(ptr, len) ->
   [C.block|void {
