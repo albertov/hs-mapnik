@@ -13,6 +13,7 @@ module Mapnik.Bindings.Datasource (
 , Parameters
 , unsafeNew
 , unsafeNewMaybe
+, getParameters
 , create
 , fromList
 , toList
@@ -67,6 +68,16 @@ create params = unsafeNew $ \ ptr ->
   [C.catchBlock|
   datasource_ptr p = datasource_cache::instance().create(*$fptr-ptr:(parameters *params));
   *$(datasource_ptr** ptr) = new datasource_ptr(p);
+  |]
+
+unsafeNewParams :: (Ptr (Ptr Parameters) -> IO ()) -> IO Parameters
+unsafeNewParams = mkUnsafeNew Parameters destroyParameters
+
+
+getParameters :: Datasource -> IO Parameters
+getParameters ds = unsafeNewParams $ \ ptr ->
+  [C.catchBlock|
+  *$(parameters** ptr) = new parameters((*$fptr-ptr:(datasource_ptr *ds))->params());
   |]
 
 instance Exts.IsList Parameters where

@@ -8,13 +8,13 @@ module Mapnik.Bindings.FromMapnik where
 
 import qualified Mapnik
 import           Mapnik.Bindings
-import           Mapnik.Bindings.Color as Color
-import           Mapnik.Bindings.Map as Map
-import           Mapnik.Bindings.Layer as Layer
-import           Mapnik.Bindings.Style as Style
-import           Mapnik.Bindings.Rule as Rule
-import           Mapnik.Bindings.Expression as Expression
-import           Control.Exception (throwIO)
+import qualified Mapnik.Bindings.Color as Color
+import qualified Mapnik.Bindings.Map as Map
+import qualified Mapnik.Bindings.Layer as Layer
+import qualified Mapnik.Bindings.Style as Style
+import qualified Mapnik.Bindings.Rule as Rule
+import qualified Mapnik.Bindings.Expression as Expression
+import qualified Mapnik.Bindings.Datasource as Datasource
 import qualified Data.HashMap.Strict as HM
 
 class FromMapnik a where
@@ -45,15 +45,15 @@ fromMapnikId(Mapnik.Expression)
 instance FromMapnik Map where
   type HsType Map = Mapnik.Map
   fromMapnik m = do
-    _mapBackgroundColor <- fromMapnik =<< getBackground m
-    _mapBackgroundImage <- getBackgroundImage m
+    _mapBackgroundColor <- fromMapnik =<< Map.getBackground m
+    _mapBackgroundImage <- Map.getBackgroundImage m
     _mapBackgroundImageCompOp <- undefined
-    _mapBackgroundImageOpacity <- Just <$> getBackgroundImageOpacity m
+    _mapBackgroundImageOpacity <- Just <$> Map.getBackgroundImageOpacity m
     _mapSrs <- Just <$> Map.getSrs m
     _mapBufferSize <- Just <$> Map.getBufferSize m
     _mapMaximumExtent <- Map.getMaxExtent m
-    _mapFontDirectory <- getFontDirectory m
-    _mapLayers <- mapM fromMapnik =<< getLayers m
+    _mapFontDirectory <- Map.getFontDirectory m
+    _mapLayers <- mapM fromMapnik =<< Map.getLayers m
     _mapStyles <- HM.fromList
              <$> (mapM (\(k,v) -> (k,) <$> fromMapnik v) =<< Map.getStyles m)
     return Mapnik.Map{..}
@@ -104,7 +104,8 @@ instance FromMapnik Style where
 
 instance FromMapnik Datasource where
   type HsType Datasource = Mapnik.Datasource
-  fromMapnik = undefined
+  fromMapnik = fmap (Mapnik.Datasource . HM.fromList . Datasource.toList)
+             . Datasource.getParameters
 
 instance FromMapnik Symbolizer where
   type HsType Symbolizer = Mapnik.Symbolizer
