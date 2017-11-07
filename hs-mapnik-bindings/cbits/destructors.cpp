@@ -5,6 +5,7 @@
 #include <mapnik/expression.hpp>
 #include <mapnik/projection.hpp>
 #include <mapnik/proj_transform.hpp>
+#include <mapnik/transform_expression.hpp>
 #include <mapnik/feature_type_style.hpp>
 #include <mapnik/rule.hpp>
 #include <mapnik/symbolizer_base.hpp>
@@ -53,6 +54,10 @@ MAPNIK_DECL void hs_mapnik_destroy_Symbolizer(void *p) {
 
 MAPNIK_DECL void hs_mapnik_destroy_Expression(void *p) {
   delete static_cast<mapnik::expression_ptr*>(p);
+}
+
+MAPNIK_DECL void hs_mapnik_destroy_Transform(void *p) {
+  delete static_cast<mapnik::transform_type*>(p);
 }
 }
 

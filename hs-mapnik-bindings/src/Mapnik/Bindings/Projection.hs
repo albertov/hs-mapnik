@@ -7,8 +7,8 @@
 {-# LANGUAGE TypeApplications #-}
 module Mapnik.Bindings.Projection (
   fromProj4
-, transform
-, Transform (..)
+, projTransform
+, CanTransform (..)
 ) where
 
 import           Mapnik.Bindings
@@ -53,8 +53,8 @@ fromProj4 (encodeUtf8 -> s) =
 
 foreign import ccall "&hs_mapnik_destroy_ProjTransform" destroyProjTransform :: FinalizerPtr ProjTransform
 
-transform :: Projection -> Projection -> ProjTransform
-transform src dst = unsafePerformIO $ do
+projTransform :: Projection -> Projection -> ProjTransform
+projTransform src dst = unsafePerformIO $ do
   ptr <- [C.exp|proj_transform * {
     new proj_transform(*$fptr-ptr:(projection *src), *$fptr-ptr:(projection *dst))
     }|]
@@ -69,7 +69,7 @@ instance Show Projection where
     *$(int* len) = s.length();
     }|]
     
-class Transform p where
+class CanTransform p where
   forward :: ProjTransform -> p -> p
   backward :: ProjTransform -> p -> p
 
@@ -78,7 +78,7 @@ newBox fun = do
   (x0,y0,x1,y1) <- C.withPtrs_ fun
   return (Box (realToFrac x0) (realToFrac y0) (realToFrac x1) (realToFrac y1))
 
-instance Transform Box where
+instance CanTransform Box where
   forward p (Box (realToFrac->x0) (realToFrac->y0) (realToFrac->x1) (realToFrac->y1)) =
     unsafePerformIO $ newBox $ \(px0,py0,px1,py1) ->
       [C.block|void {

@@ -6,6 +6,7 @@
 module Mapnik.Map where
 
 import Mapnik.Imports
+import Mapnik.Common
 import Mapnik.Enums
 import Data.Monoid (mempty)
 import Mapnik.Style 

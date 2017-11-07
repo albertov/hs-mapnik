@@ -4,9 +4,8 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE RecordWildCards #-}
-module Mapnik.Bindings.Color (
+module Mapnik.Bindings.Orphans (
 ) where
 
 import qualified Mapnik

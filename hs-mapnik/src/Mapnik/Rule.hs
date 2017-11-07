@@ -6,8 +6,8 @@
 module Mapnik.Rule where
 
 import Mapnik.Imports
+import Mapnik.Common
 import Mapnik.Symbolizer
-import Mapnik.Expression
 import Data.Text (Text)
 
 

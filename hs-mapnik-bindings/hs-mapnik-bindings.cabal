@@ -19,7 +19,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     Mapnik.Bindings
                      , Mapnik.Bindings.Map
-                     , Mapnik.Bindings.Color
+                     , Mapnik.Bindings.Orphans
                      , Mapnik.Bindings.Image
                      , Mapnik.Bindings.Layer
                      , Mapnik.Bindings.Style
@@ -29,6 +29,7 @@ library
                      , Mapnik.Bindings.Rule
                      , Mapnik.Bindings.Symbolizer
                      , Mapnik.Bindings.Expression
+                     , Mapnik.Bindings.Transform
                      , Mapnik.Bindings.Util
                      , Mapnik.Bindings.ToMapnik
                      , Mapnik.Bindings.FromMapnik

@@ -1,10 +1,12 @@
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Mapnik.Common where
 
-import Mapnik.Util
+import Mapnik.Imports
 import Data.Aeson
 import Data.Word
 import GHC.Generics
@@ -24,6 +26,13 @@ deriveMapnikJSON 0 ''Color
 instance IsString Color where
   fromString = ColorName . fromString
 
+newtype Transform = Transform {unTransform :: Text}
+  deriving (Generic)
+  deriving newtype (Show, ToJSON, FromJSON, Eq, IsString)
+
+newtype Expression = Expression {unExpression :: Text}
+  deriving (Generic)
+  deriving newtype (Show, ToJSON, FromJSON, Eq, IsString)
 
 type Opacity = Double
 type Proj4 = Text

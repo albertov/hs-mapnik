@@ -18,11 +18,12 @@ module Mapnik.Bindings.Symbolizer (
 
 import qualified Mapnik
 import           Mapnik.Enums
-import           Mapnik (Property, DSum(..), Key(..), toProperties, PropValue(..))
+import           Mapnik (Property, DSum(..), Key(..), toProperties, PropValue(..), Transform(..))
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
-import           Mapnik.Bindings.Color ()
+import           Mapnik.Bindings.Orphans ()
 import qualified Mapnik.Bindings.Expression as Expression
+import qualified Mapnik.Bindings.Transform as Transform
 
 import           Control.Exception
 import           Data.Maybe (catMaybes)
@@ -45,6 +46,7 @@ C.include "<mapnik/symbolizer_utils.hpp>"
 C.include "<mapnik/symbolizer_keys.hpp>"
 C.include "<mapnik/expression_string.hpp>"
 C.include "<mapnik/expression_evaluator.hpp>"
+C.include "<mapnik/transform_processor.hpp>"
 C.include "symbolizer_util.hpp"
 
 C.using "namespace mapnik"
@@ -277,12 +279,33 @@ instance HasGetProp String where
     }|]
 
 instance HasSetProp String where
-  setProp (keyIndex -> k) ((fromString -> v)) s =
+  setProp (keyIndex -> k) (fromString -> v) s =
     [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = std::string($bs-ptr:v, $bs-len:v);}|]
 
 
 instance HasGetProp Mapnik.Expression where getProp = getPropExpression
 instance HasSetProp Mapnik.Expression where setProp = setPropExpression
+
+instance HasSetProp Mapnik.Transform where
+  setProp (keyIndex -> k) (Mapnik.Transform expr) s =
+    case Transform.parse expr of
+      Right v ->
+        [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = *$fptr-ptr:(transform_type *v);}|]
+      Left e -> throwIO (userError e)
+
+instance HasGetProp Mapnik.Transform where
+  getProp (keyIndex -> k) sym =
+    fmap (fmap Mapnik.Transform) $ newTextMaybe $ \(ptr, len) ->
+      [C.block|void {
+      auto expr = get_optional<transform_type>(*$(symbolizer_base *sym), $(keys k));
+      if (expr && *expr) {
+        std::string s = transform_processor_type::to_string(**expr);
+        *$(char** ptr) = strdup(s.c_str());
+        *$(int* len) = s.length();
+      } else {
+        *$(char** ptr) = NULL;
+      }
+      }|]
 
 #define HAS_GET_PROP_ENUM(HS,CPP) \
 instance HasGetProp HS where {\

@@ -5,7 +5,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-module Mapnik.Bindings.Expression (
+module Mapnik.Bindings.Transform (
   parse
 , unsafeNew
 , unsafeNewMaybe
@@ -29,37 +29,37 @@ import           System.IO.Unsafe (unsafePerformIO)
 C.context mapnikCtx
 
 C.include "<string>"
-C.include "<mapnik/expression.hpp>"
-C.include "<mapnik/expression_string.hpp>"
-C.include "<mapnik/expression_evaluator.hpp>"
+C.include "<mapnik/transform_expression.hpp>"
+C.include "<mapnik/parse_transform.hpp>"
+C.include "<mapnik/transform_processor.hpp>"
 
 C.using "namespace mapnik"
 
--- * Expression
+-- * Transform
 
 
-foreign import ccall "&hs_mapnik_destroy_Expression" destroyExpression :: FinalizerPtr Expression
+foreign import ccall "&hs_mapnik_destroy_Transform" destroyTransform :: FinalizerPtr Transform
 
-unsafeNew :: (Ptr (Ptr Expression) -> IO ()) -> IO Expression
-unsafeNew = mkUnsafeNew Expression destroyExpression
+unsafeNew :: (Ptr (Ptr Transform) -> IO ()) -> IO Transform
+unsafeNew = mkUnsafeNew Transform destroyTransform
 
-unsafeNewMaybe :: (Ptr (Ptr Expression) -> IO ()) -> IO (Maybe Expression)
-unsafeNewMaybe = mkUnsafeNewMaybe Expression destroyExpression
+unsafeNewMaybe :: (Ptr (Ptr Transform) -> IO ()) -> IO (Maybe Transform)
+unsafeNewMaybe = mkUnsafeNewMaybe Transform destroyTransform
 
-parse :: Text -> Either String Expression
+parse :: Text -> Either String Transform
 parse (encodeUtf8 -> s) =
   unsafePerformIO $ fmap showExc $ try $ unsafeNew $ \p ->
-    [C.catchBlock|*$(expression_ptr **p) = new expression_ptr(parse_expression(std::string($bs-ptr:s, $bs-len:s)));|]
+    [C.catchBlock|*$(transform_type **p) = new transform_type(parse_transform(std::string($bs-ptr:s, $bs-len:s)));|]
   where
     showExc = either (Left . show @C.CppException) Right
 
-instance Show Expression where show = unpack . toText
+instance Show Transform where show = unpack . toText
 
 
-toText :: Expression -> Text
-toText expr = unsafePerformIO $ newText $ \(ptr,len) ->
+toText :: Transform -> Text
+toText trans = unsafePerformIO $ newText $ \(ptr,len) ->
   [C.block|void {
-  std::string s = to_expression_string(**$fptr-ptr:(expression_ptr *expr));
+  std::string s = transform_processor_type::to_string(**$fptr-ptr:(transform_type *trans));
   *$(char** ptr) = strdup(s.c_str());
   *$(int* len) = s.length();
-    }|]
+  }|]

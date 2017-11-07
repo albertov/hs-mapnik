@@ -45,7 +45,7 @@ module Mapnik.Bindings.Map (
 import           Mapnik (StyleName, AspectFixMode(..), CompositeMode)
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
-import           Mapnik.Bindings.Color()
+import           Mapnik.Bindings.Orphans()
 import qualified Mapnik.Bindings.Image as Image
 import qualified Mapnik.Bindings.Layer as Layer
 import qualified Mapnik.Bindings.Style as Style

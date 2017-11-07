@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
-module Mapnik.Util (deriveMapnikJSON) where
+module Mapnik.TH (deriveMapnikJSON) where
 
 
 import Data.Char (toLower)

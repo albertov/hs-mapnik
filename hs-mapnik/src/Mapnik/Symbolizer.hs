@@ -19,7 +19,6 @@ module Mapnik.Symbolizer (
 import Mapnik.Imports
 import Mapnik.Enums
 import Mapnik.Common
-import Mapnik.Expression
 import Control.Applicative
 import Data.Aeson
 import Data.Aeson.Types
@@ -71,9 +70,9 @@ data Key a where
     StrokeDashoffset :: Key Double
     StrokeDasharray :: Key ()
     StrokeMiterlimit :: Key Double
-    GeometryTransform :: Key ()
+    GeometryTransform :: Key Transform
     LineRasterizer :: Key LineRasterizer
-    ImageTransform :: Key ()
+    ImageTransform :: Key Transform
     Spacing :: Key Double
     MaxError :: Key Double
     AllowOverlap :: Key Bool
@@ -99,7 +98,7 @@ data Key a where
     MarkersMultipolicy :: Key MarkerMultiPolicy
     PointPlacementType :: Key PointPlacement
     Colorizer :: Key ()
-    HaloTransform :: Key ()
+    HaloTransform :: Key Transform
     NumColumns :: Key Int
     StartColumn :: Key Int
     RepeatKey :: Key Expression

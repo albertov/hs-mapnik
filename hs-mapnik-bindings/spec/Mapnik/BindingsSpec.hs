@@ -14,6 +14,7 @@ import           Mapnik.Bindings.Layer as Layer
 import           Mapnik.Bindings.Projection as Projection
 import           Mapnik.Bindings.Rule as Rule
 import           Mapnik.Bindings.Style as Style
+import           Mapnik.Bindings.Transform as Transform
 import           Mapnik.Bindings.Expression as Expression
 import           Mapnik.Bindings.Datasource as Datasource
 import           Mapnik.Bindings.Symbolizer as Symbolizer
@@ -118,7 +119,7 @@ spec = beforeAll_ registerDefaults $ do
     it "can trasform" $ do
       let Right src = fromProj4 merc
           Right dst = fromProj4 "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
-          trans = transform src dst
+          trans = projTransform src dst
           expected = Box { minx = 1372637.1001942465
                          , miny = -247003.8133187965
                          , maxx = 1746737.6177269476
@@ -254,11 +255,22 @@ spec = beforeAll_ registerDefaults $ do
           expr = "([foo"
       e `shouldSatisfy` isLeft
 
+  describe "Transform" $ do
+    it "can parse good transform" $ do
+      let e = Transform.parse expr
+          expr = "translate(2.1,-2.7)"
+      e `shouldSatisfy` isRight
+
+    it "cannot parse bad transform" $ do
+      let e = Transform.parse expr
+          expr = "([foo"
+      e `shouldSatisfy` isLeft
+
   describe "fromMapnik" $ do
     it "works for Map" $ do
       m <- Map.create 512 512
       loadFixture m
-      m1 <- fromMapnik m
+      _ <- fromMapnik m
       return ()
 
 loadFixture :: Map -> IO ()
