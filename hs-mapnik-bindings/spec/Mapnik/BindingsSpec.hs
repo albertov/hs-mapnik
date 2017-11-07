@@ -246,24 +246,22 @@ spec = beforeAll_ registerDefaults $ do
 
   describe "Expression" $ do
     it "can parse good expression" $ do
-      let e = Expression.parse expr
+      let Right e = Expression.parse expr
           expr = "([foo]='bar')"
-      e `shouldSatisfy` isRight
+      Expression.toText e `shouldBe` expr
 
     it "cannot parse bad expression" $ do
-      let e = Expression.parse expr
-          expr = "([foo"
+      let e = Expression.parse "([foo"
       e `shouldSatisfy` isLeft
 
   describe "Transform" $ do
     it "can parse good transform" $ do
-      let e = Transform.parse expr
-          expr = "translate(2.1,-2.7)"
-      e `shouldSatisfy` isRight
+      let Right e = Transform.parse expr
+          expr = "translate(2.1, -2.7)"
+      Transform.toText e `shouldBe` expr
 
     it "cannot parse bad transform" $ do
-      let e = Transform.parse expr
-          expr = "([foo"
+      let e = Transform.parse "([foo"
       e `shouldSatisfy` isLeft
 
   describe "fromMapnik" $ do
