@@ -45,9 +45,9 @@ module Mapnik.Bindings.Map (
 import           Mapnik (StyleName, AspectFixMode(..), CompositeMode)
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
+import           Mapnik.Bindings.Color()
 import qualified Mapnik.Bindings.Image as Image
 import qualified Mapnik.Bindings.Layer as Layer
-import qualified Mapnik.Bindings.Color as Color
 import qualified Mapnik.Bindings.Style as Style
 
 import           Data.IORef
@@ -60,6 +60,7 @@ import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
 import           Foreign.C.String (CString)
 import           Foreign.Storable (poke)
+import           Foreign.Marshal.Utils (with)
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
@@ -102,16 +103,21 @@ loadXml m str =
   |]
 
 getBackground :: Map -> IO (Maybe Color)
-getBackground m = Color.unsafeNewMaybe $ \p ->
+getBackground m = newMaybe $ \(has,p) ->
   [C.block|void {
   auto mColor = $fptr-ptr:(Map *m)->background();
-  *$(color **p) = mColor ? new color(*mColor) : NULL;
+  if (mColor) {
+    *$(int *has) = 1;
+    *$(color *p) = *mColor;
+  } else {
+    *$(int *has) = 0;
+  }
   }|]
 
 setBackground :: Map -> Color -> IO ()
-setBackground m col =
+setBackground m col = with col $ \colPtr ->
   [C.block|void {
-  $fptr-ptr:(Map *m)->set_background(*$fptr-ptr:(color *col));
+  $fptr-ptr:(Map *m)->set_background(*$(color *colPtr));
   }|]
 
 setBackgroundImage :: Map -> FilePath -> IO ()

@@ -13,18 +13,18 @@ module Mapnik.Bindings (
 , Symbolizer (..)
 , SymbolizerBase (..)
 , Expression (..)
+, Color(..)
 , Box (..)
 , Datasource (..)
 , Parameters (..)
 , Projection (..)
 , ProjTransform (..)
-, Color (..)
 , C.CppException (..)
 , MapnikInt
 , mapnikCtx
 ) where
 
-import           Mapnik (Box(..))
+import           Mapnik (Box(..), Color(..))
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
@@ -48,8 +48,6 @@ newtype Projection = Projection (ForeignPtr Projection)
   deriving (Eq)
 newtype ProjTransform = ProjTransform (ForeignPtr ProjTransform)
   deriving (Eq, Show)
-newtype Color = Color (ForeignPtr Color)
-  deriving (Eq)
 newtype Style = Style (ForeignPtr Style)
   deriving (Eq, Show)
 newtype Rule = Rule (ForeignPtr Rule)
@@ -87,5 +85,6 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> ctx
       , (C.TypeName "keys", [t| C.CUChar |])
       , (C.TypeName "param_type", [t| C.CInt |])
       , (C.TypeName "value_integer", [t| MapnikInt |])
+      , (C.TypeName "color", [t| Mapnik.Color |])
       ]
     }

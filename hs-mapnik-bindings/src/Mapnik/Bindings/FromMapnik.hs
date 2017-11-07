@@ -8,7 +8,6 @@ module Mapnik.Bindings.FromMapnik where
 
 import qualified Mapnik
 import           Mapnik.Bindings
-import qualified Mapnik.Bindings.Color as Color
 import qualified Mapnik.Bindings.Map as Map
 import qualified Mapnik.Bindings.Layer as Layer
 import qualified Mapnik.Bindings.Style as Style
@@ -58,10 +57,6 @@ instance FromMapnik Map where
     _mapStyles <- HM.fromList
              <$> (mapM (\(k,v) -> (k,) <$> fromMapnik v) =<< Map.getStyles m)
     return Mapnik.Map{..}
-
-instance FromMapnik Color where
-  type HsType Color = Mapnik.Color
-  fromMapnik = Color.unCreate
 
 instance FromMapnik Expression where
   type HsType Expression = Mapnik.Expression

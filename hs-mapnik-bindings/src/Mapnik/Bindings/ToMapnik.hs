@@ -10,7 +10,6 @@ import           Mapnik.Bindings
 import           Mapnik.Bindings.Layer as Layer
 import           Mapnik.Bindings.Map as Map
 import qualified Mapnik.Bindings.Datasource as Datasource
-import           Mapnik.Bindings.Color as Color
 import           Mapnik.Bindings.Style as Style
 import           Mapnik.Bindings.Symbolizer as Symbolizer
 import           Mapnik.Bindings.Rule as Rule
@@ -106,11 +105,6 @@ instance ToMapnik Mapnik.Datasource where
 instance ToMapnik Mapnik.Parameters where
   type MapnikType Mapnik.Parameters = Parameters
   toMapnik = return . Exts.fromList . Exts.toList
-
-instance ToMapnik Mapnik.Color where
-  type MapnikType Mapnik.Color = Color
-  toMapnik = maybe (throwIO (userError "Invalid color")) return 
-           . Color.create
 
 instance ToMapnik Mapnik.Expression where
   type MapnikType Mapnik.Expression = Expression

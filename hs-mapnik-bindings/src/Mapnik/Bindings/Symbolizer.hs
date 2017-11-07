@@ -21,7 +21,7 @@ import           Mapnik.Enums
 import           Mapnik (Property, DSum(..), Key(..), toProperties, PropValue(..))
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
-import qualified Mapnik.Bindings.Color as Color
+import           Mapnik.Bindings.Color ()
 import qualified Mapnik.Bindings.Expression as Expression
 
 import           Control.Exception
@@ -31,6 +31,7 @@ import           Data.Text.Encoding (encodeUtf8)
 import           Data.String (fromString)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
+import           Foreign.Marshal.Utils (with)
 import           GHC.Exts (fromList)
 
 import qualified Language.C.Inline.Cpp as C
@@ -216,24 +217,20 @@ instance HasSetProp () where setProp _ _ _ = return ()
 instance HasGetProp () where getProp _ _ = return Nothing
 
 instance HasGetProp Mapnik.Color where
-  getProp (keyIndex -> k) sym = Color.mkCreateMaybe $ \(has,r,g,b,a) ->
+  getProp (keyIndex -> k) sym = newMaybe $ \(has,ret) ->
     [C.block|void {
     auto val = get_optional<color>(*$(symbolizer_base *sym), $(keys k));
     if (val) {
       *$(int *has) = 1;
-      *$(unsigned char *r) = val->red();
-      *$(unsigned char *g) = val->green();
-      *$(unsigned char *b) = val->blue();
-      *$(unsigned char *a) = val->alpha();
+      *$(color *ret) = *val;
     } else {
       *$(int *has) = 0;
     }
     }|]
 
 instance HasSetProp Mapnik.Color where
-  setProp (keyIndex -> k) (color) s = do
-    c <- createColor color
-    [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = *$fptr-ptr:(color *c);}|]
+  setProp (keyIndex -> k) c s = with c $ \cPtr ->
+    [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = *$(color *cPtr);}|]
 
 instance HasGetProp Bool where
   getProp (keyIndex -> k) sym = fmap (fmap (toEnum . fromIntegral)) <$> newMaybe $ \(has,p) ->
@@ -550,7 +547,3 @@ keyIndex Upright = [C.pure|keys{keys::upright}|]
 keyIndex Direction = [C.pure|keys{keys::direction}|]
 keyIndex AvoidEdges = [C.pure|keys{keys::avoid_edges}|]
 keyIndex FfSettings = [C.pure|keys{keys::ff_settings}|]
-
-createColor :: Mapnik.Color -> IO Color
-createColor = maybe (throwIO (userError "setProperty: Invalid Color")) return . Color.create
-

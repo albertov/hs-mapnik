@@ -17,7 +17,6 @@ import           Mapnik.Bindings.Style as Style
 import           Mapnik.Bindings.Expression as Expression
 import           Mapnik.Bindings.Datasource as Datasource
 import           Mapnik.Bindings.Symbolizer as Symbolizer
-import           Mapnik.Bindings.Color as Color
 import           Control.Monad (void)
 import           Data.Text (Text)
 import           Data.Maybe (isJust, isNothing)
@@ -127,17 +126,15 @@ spec = beforeAll_ registerDefaults $ do
       forward trans box `shouldBe` expected
 
   describe "Color" $ do
-    it "can parse good" $ do
-      Color.create "rgba(3,4,5,1)" `shouldSatisfy` isJust
-      Color.create "steelblue" `shouldSatisfy` isJust
+    it "can set good" $ do
+      m <- Map.create 10 10
+      Map.setBackground m "rgba(3,4,5,1)"
+      Just bg <- Map.getBackground m
+      bg `shouldBe` RGBA 3 4 5 255
 
     it "cannot parse bad" $ do
-      Color.create "rgba(3,4,5" `shouldSatisfy` isNothing
-      Color.create "steelblu" `shouldSatisfy` isNothing
-
-    it "can show" $
-      show (Color.create "rgb(3,4,5)") `shouldBe` "Just rgb(3,4,5)"
-
+      m <- Map.create 10 10
+      Map.setBackground m "rgba(3,4,5" `shouldThrow` cppStdException
 
 
   describe "Layer" $ do
