@@ -31,9 +31,12 @@ import           Data.Text (Text, unpack)
 import           Data.Text.Encoding (encodeUtf8)
 import           Data.String (fromString)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
-import           Foreign.Ptr (Ptr)
+import           Foreign.Ptr (Ptr, castPtr)
 import           Foreign.Marshal.Utils (with)
+import           Foreign.Marshal.Alloc (finalizerFree)
 import           GHC.Exts (fromList)
+import qualified Data.Vector.Storable.Mutable as VM
+import qualified Data.Vector.Storable         as V
 
 import qualified Language.C.Inline.Cpp as C
 
@@ -306,6 +309,33 @@ instance HasGetProp Mapnik.Transform where
         *$(char** ptr) = NULL;
       }
       }|]
+
+instance HasSetProp Mapnik.DashArray where
+  setProp (keyIndex -> k) dashes s = undefined
+
+instance HasGetProp Mapnik.DashArray where
+  getProp (keyIndex -> k) sym = do
+    (has, fromIntegral -> len, castPtr -> ptr) <- C.withPtrs_ $ \(has, len,ptr) ->
+      [C.block|void{
+      auto arr = get_optional<dash_array>(*$(symbolizer_base *sym), $(keys k));
+      if (arr) {
+        *$(int *has) = 1;
+        *$(size_t *len) = arr->size();
+        double *dashes = *$(double **ptr) =
+          static_cast<double *>(malloc(arr->size()*2*sizeof(double)));
+        int i=0;
+        for (dash_array::const_iterator it=arr->begin(); it!=arr->end(); ++it, ++i) {
+          dashes[i*2]   = it->first;
+          dashes[i*2+1] = it->second;
+        }
+      } else {
+        *$(int *has) = 0;
+      }
+      }|]
+    if has==1 then do
+      fp <- newForeignPtr finalizerFree ptr
+      Just <$> V.freeze (VM.unsafeFromForeignPtr0 fp len)
+    else return Nothing
 
 #define HAS_GET_PROP_ENUM(HS,CPP) \
 instance HasGetProp HS where {\

@@ -6,6 +6,7 @@
 module Mapnik.Style where
 
 import Mapnik.Imports
+import Mapnik.Symbolizer (HasOpacity(..))
 import Mapnik.Rule
 import Data.Text
 import qualified Data.HashMap.Strict as M

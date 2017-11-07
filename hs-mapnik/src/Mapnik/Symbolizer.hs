@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -20,6 +21,7 @@ import Mapnik.Imports
 import Mapnik.Enums
 import Mapnik.Common
 import Control.Applicative
+import Control.Lens
 import Data.Aeson
 import Data.Aeson.Types
 import Data.Text (Text)
@@ -68,7 +70,7 @@ data Key a where
     StrokeGamma :: Key Double
     StrokeGammaMethod :: Key GammaMethod
     StrokeDashoffset :: Key Double
-    StrokeDasharray :: Key ()
+    StrokeDasharray :: Key DashArray
     StrokeMiterlimit :: Key Double
     GeometryTransform :: Key Transform
     LineRasterizer :: Key LineRasterizer
@@ -450,3 +452,203 @@ parseProperty "direction" v = (Direction :=>) <$> parseJSON v
 parseProperty "avoidEdges" v = (AvoidEdges :=>) <$> parseJSON v
 parseProperty "ffSettings" v = (FfSettings :=>) <$> parseJSON v
 parseProperty _ _ = fail "Unknown symbolizer property"
+
+symbolizerLens :: Key a -> Lens' Symbolizer (Maybe (PropValue a))
+symbolizerLens k = properties . lens get' set' where
+  get' = DMap.lookup k
+  set' m Nothing = DMap.delete k m
+  set' m (Just v) = DMap.insert k v m
+{-# INLINE symbolizerLens #-}
+
+gamma :: Lens' Symbolizer (Maybe (PropValue Double))
+gamma = symbolizerLens Gamma
+
+gammaMethod :: Lens' Symbolizer (Maybe (PropValue GammaMethod))
+gammaMethod = symbolizerLens GammaMethod
+
+class HasOpacity o v | o->v where
+  opacity :: Lens' o v
+
+instance HasOpacity Symbolizer (Maybe (PropValue Double)) where
+  opacity = symbolizerLens Opacity
+
+alignment :: Lens' Symbolizer (Maybe (PropValue PatternAlignment))
+alignment = symbolizerLens Alignment
+
+offset :: Lens' Symbolizer (Maybe (PropValue Double))
+offset = symbolizerLens Offset
+
+compOp :: Lens' Symbolizer (Maybe (PropValue CompositeMode))
+compOp = symbolizerLens CompOp
+
+clip :: Lens' Symbolizer (Maybe (PropValue Bool))
+clip = symbolizerLens Clip
+
+fill :: Lens' Symbolizer (Maybe (PropValue Color))
+fill = symbolizerLens Fill
+
+fillOpacity :: Lens' Symbolizer (Maybe (PropValue Double))
+fillOpacity = symbolizerLens FillOpacity
+
+stroke :: Lens' Symbolizer (Maybe (PropValue Color))
+stroke = symbolizerLens Stroke
+
+strokeWidth :: Lens' Symbolizer (Maybe (PropValue Double))
+strokeWidth = symbolizerLens StrokeWidth
+
+strokeOpacity :: Lens' Symbolizer (Maybe (PropValue Double))
+strokeOpacity = symbolizerLens StrokeOpacity
+
+strokeLinejoin :: Lens' Symbolizer (Maybe (PropValue LineJoin))
+strokeLinejoin = symbolizerLens StrokeLinejoin
+
+strokeLinecap :: Lens' Symbolizer (Maybe (PropValue LineCap))
+strokeLinecap = symbolizerLens StrokeLinecap
+
+strokeGamma :: Lens' Symbolizer (Maybe (PropValue Double))
+strokeGamma = symbolizerLens StrokeGamma
+
+strokeGammaMethod :: Lens' Symbolizer (Maybe (PropValue GammaMethod))
+strokeGammaMethod = symbolizerLens StrokeGammaMethod
+
+strokeDashoffset :: Lens' Symbolizer (Maybe (PropValue Double))
+strokeDashoffset = symbolizerLens StrokeDashoffset
+
+strokeDasharray :: Lens' Symbolizer (Maybe (PropValue DashArray))
+strokeDasharray = symbolizerLens StrokeDasharray
+
+strokeMiterlimit :: Lens' Symbolizer (Maybe (PropValue Double))
+strokeMiterlimit = symbolizerLens StrokeMiterlimit
+
+geometryTransform :: Lens' Symbolizer (Maybe (PropValue Transform))
+geometryTransform = symbolizerLens GeometryTransform
+
+lineRasterizer :: Lens' Symbolizer (Maybe (PropValue LineRasterizer))
+lineRasterizer = symbolizerLens LineRasterizer
+
+imageTransform :: Lens' Symbolizer (Maybe (PropValue Transform))
+imageTransform = symbolizerLens ImageTransform
+
+spacing :: Lens' Symbolizer (Maybe (PropValue Double))
+spacing = symbolizerLens Spacing
+
+maxError :: Lens' Symbolizer (Maybe (PropValue Double))
+maxError = symbolizerLens MaxError
+
+allowOverlap :: Lens' Symbolizer (Maybe (PropValue Bool))
+allowOverlap = symbolizerLens AllowOverlap
+
+ignorePlacement :: Lens' Symbolizer (Maybe (PropValue Bool))
+ignorePlacement = symbolizerLens IgnorePlacement
+
+width :: Lens' Symbolizer (Maybe (PropValue Double))
+width = symbolizerLens Width
+
+height :: Lens' Symbolizer (Maybe (PropValue Double))
+height = symbolizerLens Height
+
+file :: Lens' Symbolizer (Maybe (PropValue FilePath))
+file = symbolizerLens File
+
+shieldDx :: Lens' Symbolizer (Maybe (PropValue Double))
+shieldDx = symbolizerLens ShieldDx
+
+shieldDy :: Lens' Symbolizer (Maybe (PropValue Double))
+shieldDy = symbolizerLens ShieldDy
+
+unlockImage :: Lens' Symbolizer (Maybe (PropValue Bool))
+unlockImage = symbolizerLens UnlockImage
+
+mode :: Lens' Symbolizer (Maybe (PropValue Text))
+mode = symbolizerLens Mode
+
+scaling :: Lens' Symbolizer (Maybe (PropValue ()))
+scaling = symbolizerLens Scaling
+
+filterFactor :: Lens' Symbolizer (Maybe (PropValue Double))
+filterFactor = symbolizerLens FilterFactor
+
+meshSize :: Lens' Symbolizer (Maybe (PropValue Int))
+meshSize = symbolizerLens MeshSize
+
+premultiplied :: Lens' Symbolizer (Maybe (PropValue Bool))
+premultiplied = symbolizerLens Premultiplied
+
+smooth :: Lens' Symbolizer (Maybe (PropValue Double))
+smooth = symbolizerLens Smooth
+
+simplifyAlgorithm :: Lens' Symbolizer (Maybe (PropValue ()))
+simplifyAlgorithm = symbolizerLens SimplifyAlgorithm
+
+simplifyTolerance :: Lens' Symbolizer (Maybe (PropValue Double))
+simplifyTolerance = symbolizerLens SimplifyTolerance
+
+haloRasterizer :: Lens' Symbolizer (Maybe (PropValue HaloRasterizer))
+haloRasterizer = symbolizerLens HaloRasterizer
+
+textPlacements_ :: Lens' Symbolizer (Maybe (PropValue ()))
+textPlacements_ = symbolizerLens TextPlacements_
+
+labelPlacement :: Lens' Symbolizer (Maybe (PropValue LabelPlacement))
+labelPlacement = symbolizerLens LabelPlacement
+
+markersPlacementType :: Lens' Symbolizer (Maybe (PropValue MarkerPlacement))
+markersPlacementType = symbolizerLens MarkersPlacementType
+
+markersMultipolicy :: Lens' Symbolizer (Maybe (PropValue MarkerMultiPolicy))
+markersMultipolicy = symbolizerLens MarkersMultipolicy
+
+pointPlacementType :: Lens' Symbolizer (Maybe (PropValue PointPlacement))
+pointPlacementType = symbolizerLens PointPlacementType
+
+colorizer :: Lens' Symbolizer (Maybe (PropValue ()))
+colorizer = symbolizerLens Colorizer
+
+haloTransform :: Lens' Symbolizer (Maybe (PropValue Transform))
+haloTransform = symbolizerLens HaloTransform
+
+numColumns :: Lens' Symbolizer (Maybe (PropValue Int))
+numColumns = symbolizerLens NumColumns
+
+startColumn :: Lens' Symbolizer (Maybe (PropValue Int))
+startColumn = symbolizerLens StartColumn
+
+repeatKey :: Lens' Symbolizer (Maybe (PropValue Expression))
+repeatKey = symbolizerLens RepeatKey
+
+groupProperties :: Lens' Symbolizer (Maybe (PropValue ()))
+groupProperties = symbolizerLens GroupProperties
+
+largestBoxOnly :: Lens' Symbolizer (Maybe (PropValue Bool))
+largestBoxOnly = symbolizerLens LargestBoxOnly
+
+minimumPathLength :: Lens' Symbolizer (Maybe (PropValue Double))
+minimumPathLength = symbolizerLens MinimumPathLength
+
+haloCompOp :: Lens' Symbolizer (Maybe (PropValue CompositeMode))
+haloCompOp = symbolizerLens HaloCompOp
+
+textTransform :: Lens' Symbolizer (Maybe (PropValue TextTransform))
+textTransform = symbolizerLens TextTransform
+
+horizontalAlignment :: Lens' Symbolizer (Maybe (PropValue HorizontalAlignment))
+horizontalAlignment = symbolizerLens HorizontalAlignment
+
+justifyAlignment :: Lens' Symbolizer (Maybe (PropValue JustifyAlignment))
+justifyAlignment = symbolizerLens JustifyAlignment
+
+verticalAlignment :: Lens' Symbolizer (Maybe (PropValue VerticalAlignment))
+verticalAlignment = symbolizerLens VerticalAlignment
+
+upright :: Lens' Symbolizer (Maybe (PropValue Upright))
+upright = symbolizerLens Upright
+
+direction :: Lens' Symbolizer (Maybe (PropValue Direction))
+direction = symbolizerLens Direction
+
+avoidEdges :: Lens' Symbolizer (Maybe (PropValue Bool))
+avoidEdges = symbolizerLens AvoidEdges
+
+ffSettings :: Lens' Symbolizer (Maybe (PropValue ()))
+ffSettings = symbolizerLens FfSettings
+

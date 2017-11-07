@@ -4,7 +4,10 @@ module Mapnik.BindingsSpec (main, spec) where
 
 import qualified Data.ByteString as BS
 import           Test.Hspec
-import           Mapnik (Symbolizer(..), Color(..), Key(..), (==>))
+import qualified Mapnik
+import           Mapnik ( Symbolizer(..), Color(..), Key(..), Dash(..)
+                        , PropValue (..), (==>), DashArray
+                        , styles, rules, symbolizers, strokeDasharray)
 import           Mapnik.Enums
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Registry (registerDefaults)
@@ -19,6 +22,7 @@ import           Mapnik.Bindings.Expression as Expression
 import           Mapnik.Bindings.Datasource as Datasource
 import           Mapnik.Bindings.Symbolizer as Symbolizer
 import           Mapnik.Bindings.FromMapnik
+import           Control.Lens hiding ((.=))
 import           Control.Monad (void)
 import           Data.Text (Text)
 import           Data.Maybe (isJust, isNothing)
@@ -169,8 +173,8 @@ spec = beforeAll_ registerDefaults $ do
       m <- Map.create 512 512
       loadFixture m
       Just style <- lookup "provinces" <$> Map.getStyles m
-      rules <- Style.getRules style
-      length rules `shouldBe` 2
+      rs <- Style.getRules style
+      length rs `shouldBe` 2
 
   describe "Rule" $ do
     it "no filter returns Nothing" $ do
@@ -266,10 +270,17 @@ spec = beforeAll_ registerDefaults $ do
 
   describe "fromMapnik" $ do
     it "works for Map" $ do
-      m <- Map.create 512 512
-      loadFixture m
-      _ <- fromMapnik m
-      return ()
+      m' <- Map.create 512 512
+      loadFixture m'
+      m <- fromMapnik m'
+      let lns :: Traversal' Mapnik.Map (PropValue DashArray)
+          lns = styles . at "provlines" . _Just
+              . rules . ix 0
+              . symbolizers . ix 0
+              . strokeDasharray . _Just
+      m^?lns `shouldBe` Just (PropValue [Dash 8 4, Dash 2 2, Dash 2 2])
+      let m2 = m & lns .~ PropValue []
+      m2^?lns `shouldBe` Just (PropValue [])
 
 loadFixture :: Map -> IO ()
 loadFixture m = do

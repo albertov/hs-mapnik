@@ -69,7 +69,7 @@ type MapnikInt = C.CInt
 #endif
 
 mapnikCtx :: Context
-mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> ctx
+mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCtx <> ctx
   where ctx = mempty {
     ctxTypesTable =
       [ (C.TypeName "Map", [t| Map |])
