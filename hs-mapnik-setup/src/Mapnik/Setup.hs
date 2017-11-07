@@ -20,7 +20,7 @@ configureWithMapnikConfig lbi flags = do
   myExtraLibs    <- getFlagValues 'l' <$> mapnikConfig ["--libs"]
   myExtraLibDirs <- getFlagValues 'L' <$> mapnikConfig ["--ldflags"]
   myIncludeDirs  <- getFlagValues 'I' <$> mapnikConfig ["--includes", "--dep-includes"]
-  myCppOptions    <- words <$> mapnikConfig ["--defines"]
+  myCppOptions   <- words <$> mapnikConfig ["--defines"]
   myCcOptions    <- words <$> mapnikConfig ["--defines", "--cxxflags"]
   myLdOptions    <- words <$> mapnikConfig ["--ldflags"]
   mapnikInputPluginDir <- (escapeWinPathSep . head . words) <$>
