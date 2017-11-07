@@ -10,12 +10,15 @@ let
     let myGhc = ghc.override {
       overrides = self: super:
         {
-          hs-mapnik = self.callPackage ./.  { inherit (pkgs) mapnik; };
+          hs-mapnik-setup = self.callCabal2nix "hs-mapnik-setup" ./hs-mapnik-setup {};
+          hs-mapnik = self.callCabal2nix "hs-mapnik" ./hs-mapnik {};
+          hs-mapnik-bindings = self.callPackage ./hs-mapnik-bindings  { inherit (pkgs) mapnik; };
           inline-c = super.inline-c_0_6_0_5;
           inline-c-cpp = super.inline-c-cpp_0_2_1_0;
         };
       };
     in myGhc.ghcWithPackages (haskellPackages: with haskellPackages; [
+      hs-mapnik-bindings
       hs-mapnik
       ]);
 in {

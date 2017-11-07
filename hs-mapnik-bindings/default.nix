@@ -7,6 +7,7 @@ mkDerivation {
   pname = "hs-mapnik-bindings";
   version = "0.1.0.0";
   src = ./.;
+  doHaddock = false;
   preConfigure = "export MAPNIK_CONFIG=${mapnik}/bin/mapnik-config";
   setupHaskellDepends = [ base Cabal directory filepath process ];
   libraryHaskellDepends = [ base bytestring inline-c-cpp inline-c hs-mapnik hs-mapnik-setup ];
