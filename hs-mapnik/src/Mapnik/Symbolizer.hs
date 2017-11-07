@@ -52,9 +52,9 @@ type Properties = DMap.DMap Key PropValue
 
 data Key a where
     Gamma :: Key Double
-    GammaMethod :: Key ()
+    GammaMethod :: Key GammaMethod
     Opacity :: Key Double
-    Alignment :: Key ()
+    Alignment :: Key PatternAlignment
     Offset :: Key Double
     CompOp :: Key CompositeMode
     Clip :: Key Bool
@@ -63,15 +63,15 @@ data Key a where
     Stroke :: Key Color
     StrokeWidth :: Key Double
     StrokeOpacity :: Key Double
-    StrokeLinejoin :: Key ()
-    StrokeLinecap :: Key ()
+    StrokeLinejoin :: Key LineJoin
+    StrokeLinecap :: Key LineCap
     StrokeGamma :: Key Double
-    StrokeGammaMethod :: Key ()
+    StrokeGammaMethod :: Key GammaMethod
     StrokeDashoffset :: Key Double
     StrokeDasharray :: Key ()
     StrokeMiterlimit :: Key Double
     GeometryTransform :: Key ()
-    LineRasterizer :: Key ()
+    LineRasterizer :: Key LineRasterizer
     ImageTransform :: Key ()
     Spacing :: Key Double
     MaxError :: Key Double
@@ -91,27 +91,27 @@ data Key a where
     Smooth :: Key Double
     SimplifyAlgorithm :: Key ()
     SimplifyTolerance :: Key Double
-    HaloRasterizer :: Key ()
+    HaloRasterizer :: Key HaloRasterizer
     TextPlacements_ :: Key ()
-    LabelPlacement :: Key ()
-    MarkersPlacementType :: Key ()
-    MarkersMultipolicy :: Key ()
-    PointPlacementType :: Key ()
+    LabelPlacement :: Key LabelPlacement
+    MarkersPlacementType :: Key MarkerPlacement
+    MarkersMultipolicy :: Key MarkerMultiPolicy
+    PointPlacementType :: Key PointPlacement
     Colorizer :: Key ()
     HaloTransform :: Key ()
     NumColumns :: Key Int
     StartColumn :: Key Int
-    RepeatKey :: Key ()
+    RepeatKey :: Key Expression
     GroupProperties :: Key ()
-    LargestBoxOnly :: Key ()
+    LargestBoxOnly :: Key Bool
     MinimumPathLength :: Key Double
-    HaloCompOp :: Key ()
-    TextTransform :: Key ()
-    HorizontalAlignment :: Key ()
-    JustifyAlignment :: Key ()
-    VerticalAlignment :: Key ()
-    Upright :: Key ()
-    Direction :: Key ()
+    HaloCompOp :: Key CompositeMode
+    TextTransform :: Key TextTransform
+    HorizontalAlignment :: Key HorizontalAlignment
+    JustifyAlignment :: Key JustifyAlignment
+    VerticalAlignment :: Key VerticalAlignment
+    Upright :: Key Upright
+    Direction :: Key Direction
     AvoidEdges :: Key Bool
     FfSettings :: Key ()
 

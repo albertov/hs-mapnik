@@ -1,4 +1,4 @@
-
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -232,22 +232,6 @@ instance HasSetProp Mapnik.Color where
   setProp (keyIndex -> k) c s = with c $ \cPtr ->
     [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = *$(color *cPtr);}|]
 
-instance HasGetProp Bool where
-  getProp (keyIndex -> k) sym = fmap (fmap (toEnum . fromIntegral)) <$> newMaybe $ \(has,p) ->
-    [C.block|void {
-    auto val = get_optional<bool>(*$(symbolizer_base *sym), $(keys k));
-    if (val) {
-      *$(int *has) = 1;
-      *$(int *p) = *val;
-    } else {
-      *$(int *has) = 0;
-    }
-    }|]
-
-instance HasSetProp Bool where
-  setProp (keyIndex -> k) ((fromIntegral . fromEnum -> v)) s =
-    [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = $(int v)?true:false;}|]
-
 instance HasGetProp Int where
   getProp (keyIndex -> k) sym = fmap (fmap fromIntegral) <$> newMaybe $ \(has,p) ->
     [C.block|void {
@@ -300,22 +284,42 @@ instance HasSetProp String where
 instance HasGetProp Mapnik.Expression where getProp = getPropExpression
 instance HasSetProp Mapnik.Expression where setProp = setPropExpression
 
-instance HasGetProp CompositeMode where
-  getProp (keyIndex -> k) sym = fmap (fmap (toEnum . fromIntegral)) <$> newMaybe $ \(has,p) ->
-    [C.block|void {
-    auto val = get_optional<composite_mode_e>(*$(symbolizer_base *sym), $(keys k));
-    if (val) {
-      *$(int *has) = 1;
-      *$(int *p) = static_cast<int>(*val);
-    } else {
-      *$(int *has) = 0;
-    }
-    }|]
+#define HAS_GET_PROP_ENUM(HS,CPP) \
+instance HasGetProp HS where {\
+  getProp (keyIndex -> k) sym = fmap (fmap (toEnum . fromIntegral)) <$> newMaybe $ \(has,p) -> \
+    [C.block|void { \
+    auto val = get_optional<CPP>(*$(symbolizer_base *sym), $(keys k)); \
+    if (val) { \
+      *$(int *has) = 1; \
+      *$(int *p) = static_cast<int>(*val); \
+    } else { \
+      *$(int *has) = 0; \
+    } \
+    }|] \
+};\
+instance HasSetProp HS where \
+  setProp (keyIndex -> k) (fromIntegral . fromEnum -> v) s = \
+    [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = enumeration_wrapper(static_cast<CPP>($(int v)));}|]
 
-instance HasSetProp CompositeMode where
-  setProp (keyIndex -> k) ((fromIntegral . fromEnum -> v)) s =
-    [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = enumeration_wrapper(static_cast<composite_mode_e>($(int v)));}|]
-
+HAS_GET_PROP_ENUM(Bool,bool)
+HAS_GET_PROP_ENUM(CompositeMode,composite_mode_e)
+HAS_GET_PROP_ENUM(LineCap,line_cap_enum)
+HAS_GET_PROP_ENUM(LineJoin,line_join_enum)
+HAS_GET_PROP_ENUM(LineRasterizer,line_rasterizer_enum)
+HAS_GET_PROP_ENUM(HaloRasterizer,halo_rasterizer_enum)
+HAS_GET_PROP_ENUM(PointPlacement,point_placement_enum)
+HAS_GET_PROP_ENUM(PatternAlignment,pattern_alignment_enum)
+HAS_GET_PROP_ENUM(DebugMode,debug_symbolizer_mode_enum)
+HAS_GET_PROP_ENUM(MarkerPlacement,marker_placement_enum)
+HAS_GET_PROP_ENUM(MarkerMultiPolicy,marker_multi_policy_enum)
+HAS_GET_PROP_ENUM(TextTransform,text_transform_enum)
+HAS_GET_PROP_ENUM(LabelPlacement,label_placement_enum)
+HAS_GET_PROP_ENUM(VerticalAlignment,vertical_alignment_enum)
+HAS_GET_PROP_ENUM(HorizontalAlignment,horizontal_alignment_enum)
+HAS_GET_PROP_ENUM(JustifyAlignment,justify_alignment_enum)
+HAS_GET_PROP_ENUM(Upright,text_upright_enum)
+HAS_GET_PROP_ENUM(Direction,direction_enum)
+HAS_GET_PROP_ENUM(GammaMethod,gamma_method_enum)
 
 setProp' :: HasSetProp a
          => Key a -> PropValue a -> Ptr SymbolizerBase -> IO ()
