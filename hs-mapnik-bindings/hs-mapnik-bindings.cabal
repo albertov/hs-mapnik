@@ -13,7 +13,7 @@ build-type:          Custom
 cabal-version:       >=1.10
 
 custom-setup
-  setup-depends: base, Cabal, directory, filepath, process
+  setup-depends: base, hs-mapnik-setup, Cabal
 
 library
   hs-source-dirs:      src
