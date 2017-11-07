@@ -1,22 +1,16 @@
 {-# LANGUAGE FlexibleContexts #-}
-module Mapnik.Util where
+module Mapnik.Util (deriveMapnikJSON) where
 
 
 import Data.Char (toLower)
 import Data.Aeson.Types
+import Data.Aeson.TH
 
-defaultMapnikOptions :: Options
-defaultMapnikOptions = defaultOptions {
-    omitNothingFields = True
-  , sumEncoding = ObjectWithSingleField
-  }
-
-mapnikJsonDecoder n = genericParseJSON defaultMapnikOptions {
-    fieldLabelModifier = dropAndUncapitalize n
-  }
-mapnikJsonEncoder n = genericToEncoding defaultMapnikOptions {
-    fieldLabelModifier = dropAndUncapitalize n
-  }
+deriveMapnikJSON n = deriveJSON defaultOptions
+  { sumEncoding = UntaggedValue
+  , fieldLabelModifier = dropAndUncapitalize n
+  , omitNothingFields = True
+  } 
 
 dropAndUncapitalize :: Int -> String -> String
 dropAndUncapitalize n = uncapitalize . drop n

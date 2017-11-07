@@ -28,9 +28,7 @@ data Layer = Layer
   } deriving (Eq, Show, Generic)
 makeClassy ''Layer
 makeFields ''Layer
-
-instance ToJSON Layer where toEncoding = mapnikJsonEncoder 6
-instance FromJSON Layer where parseJSON = mapnikJsonDecoder 6
+deriveMapnikJSON 6 ''Layer
 
 mkLayer :: Text -> Layer
 mkLayer n = Layer

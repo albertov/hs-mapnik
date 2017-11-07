@@ -17,7 +17,7 @@ data Rule = Rule
   , _ruleFilter                  :: !(Maybe Expression)
   , _ruleMinimumScaleDenominator :: !(Maybe Double)
   , _ruleMaximumScaleDenominator :: !(Maybe Double)
-  } deriving (Eq, Show, Generic, ToJSON, FromJSON)
-
+  } deriving (Eq, Show, Generic)
+deriveMapnikJSON 5 ''Rule
 makeClassy ''Rule
 makeFields ''Rule

@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric #-}
 module Mapnik.Enums where
 
@@ -45,8 +46,7 @@ data CompositeMode
   | LinearBurn
   | Divide
   deriving (Eq, Show, Enum, Bounded, Generic)
-instance ToJSON CompositeMode where toEncoding = mapnikJsonEncoder 0
-instance FromJSON CompositeMode where parseJSON = mapnikJsonDecoder 0
+deriveMapnikJSON 0 ''CompositeMode
 
 data AspectFixMode
   = GrowBox
@@ -59,16 +59,14 @@ data AspectFixMode
   | AdjustCanvasHeight
   | Respect
   deriving (Eq, Show, Bounded, Enum, Generic)
-instance ToJSON AspectFixMode where toEncoding = mapnikJsonEncoder 0
-instance FromJSON AspectFixMode where parseJSON = mapnikJsonDecoder 0
+deriveMapnikJSON 0 ''AspectFixMode
 
 data LineCap
   = ButtCap
   | SquareCap
   | RoundCap
   deriving (Eq, Show, Bounded, Enum, Generic)
-instance ToJSON LineCap where toEncoding = mapnikJsonEncoder 0
-instance FromJSON LineCap where parseJSON = mapnikJsonDecoder 0
+deriveMapnikJSON 0 ''LineCap
 
 data LineJoin
   = MiterJoin
@@ -76,45 +74,39 @@ data LineJoin
   | RoundJoin
   | BevelJoin
   deriving (Eq, Show, Bounded, Enum, Generic)
-instance ToJSON LineJoin where toEncoding = mapnikJsonEncoder 0
-instance FromJSON LineJoin where parseJSON = mapnikJsonDecoder 0
+deriveMapnikJSON 0 ''LineJoin
 
 data LineRasterizer
   = RasterizerFull
   | RasterizerFast
   deriving (Eq, Show, Bounded, Enum, Generic)
-instance ToJSON LineRasterizer where toEncoding = mapnikJsonEncoder 0
-instance FromJSON LineRasterizer where parseJSON = mapnikJsonDecoder 0
+deriveMapnikJSON 0 ''LineRasterizer
 
 data HaloRasterizer
   = HaloRasterizerFull
   | HaloRasterizerFast
   deriving (Eq, Show, Bounded, Enum, Generic)
-instance ToJSON HaloRasterizer where toEncoding = mapnikJsonEncoder 0
-instance FromJSON HaloRasterizer where parseJSON = mapnikJsonDecoder 0
+deriveMapnikJSON 0 ''HaloRasterizer
 
 data PointPlacement
   = CentroidPointPlacement
   | InteriorPointPlacement
   deriving (Eq, Show, Bounded, Enum, Generic)
-instance ToJSON PointPlacement where toEncoding = mapnikJsonEncoder 0
-instance FromJSON PointPlacement where parseJSON = mapnikJsonDecoder 0
+deriveMapnikJSON 0 ''PointPlacement
 
 
 data PatternAlignment
   = LocalAlignment
   | GlobalAlignment
   deriving (Eq, Show, Bounded, Enum, Generic)
-instance ToJSON PatternAlignment where toEncoding = mapnikJsonEncoder 0
-instance FromJSON PatternAlignment where parseJSON = mapnikJsonDecoder 0
+deriveMapnikJSON 0 ''PatternAlignment
 
 data DebugMode
   = DebugModeCollision
   | DebugModeVertex
   | DebugModeRings
   deriving (Eq, Show, Bounded, Enum, Generic)
-instance ToJSON DebugMode where toEncoding = mapnikJsonEncoder 0
-instance FromJSON DebugMode where parseJSON = mapnikJsonDecoder 0
+deriveMapnikJSON 0 ''DebugMode
 
 data MarkerPlacement
   = MarkerPointPlacement
@@ -123,16 +115,14 @@ data MarkerPlacement
   | MarkerVertexFirstPlacement
   | MarkerVertexLastPlacement
   deriving (Eq, Show, Bounded, Enum, Generic)
-instance ToJSON MarkerPlacement where toEncoding = mapnikJsonEncoder 0
-instance FromJSON MarkerPlacement where parseJSON = mapnikJsonDecoder 0
+deriveMapnikJSON 0 ''MarkerPlacement
 
 data MarkerMultiPolicy
   = MarkerEachMulti
   | MarkerWholeMulti
   | MarkerLargestMulti
   deriving (Eq, Show, Bounded, Enum, Generic)
-instance ToJSON MarkerMultiPolicy where toEncoding = mapnikJsonEncoder 0
-instance FromJSON MarkerMultiPolicy where parseJSON = mapnikJsonDecoder 0
+deriveMapnikJSON 0 ''MarkerMultiPolicy
 
 data TextTransform
   = None
@@ -141,8 +131,7 @@ data TextTransform
   | Capitalize
   | Reverse
   deriving (Eq, Show, Bounded, Enum, Generic)
-instance ToJSON TextTransform where toEncoding = mapnikJsonEncoder 0
-instance FromJSON TextTransform where parseJSON = mapnikJsonDecoder 0
+deriveMapnikJSON 0 ''TextTransform
 
 data LabelPlacement
   = PointPlacement
@@ -150,8 +139,7 @@ data LabelPlacement
   | VertexPlacement
   | InteriorPlacement
   deriving (Eq, Show, Bounded, Enum, Generic)
-instance ToJSON LabelPlacement where toEncoding = mapnikJsonEncoder 0
-instance FromJSON LabelPlacement where parseJSON = mapnikJsonDecoder 0
+deriveMapnikJSON 0 ''LabelPlacement
 
 data VerticalAlignment
   = VTop
@@ -159,8 +147,7 @@ data VerticalAlignment
   | VBottom
   | VAuto
   deriving (Eq, Show, Bounded, Enum, Generic)
-instance ToJSON VerticalAlignment where toEncoding = mapnikJsonEncoder 0
-instance FromJSON VerticalAlignment where parseJSON = mapnikJsonDecoder 0
+deriveMapnikJSON 0 ''VerticalAlignment
 
 data HorizontalAlignment
   = HLeft
@@ -169,8 +156,7 @@ data HorizontalAlignment
   | HAuto
   | HAdjust
   deriving (Eq, Show, Bounded, Enum, Generic)
-instance ToJSON HorizontalAlignment where toEncoding = mapnikJsonEncoder 0
-instance FromJSON HorizontalAlignment where parseJSON = mapnikJsonDecoder 0
+deriveMapnikJSON 0 ''HorizontalAlignment
 
 data JustifyAlignment
   = JLeft
@@ -178,8 +164,7 @@ data JustifyAlignment
   | JRight
   | JAuto
   deriving (Eq, Show, Bounded, Enum, Generic)
-instance ToJSON JustifyAlignment where toEncoding = mapnikJsonEncoder 0
-instance FromJSON JustifyAlignment where parseJSON = mapnikJsonDecoder 0
+deriveMapnikJSON 0 ''JustifyAlignment
 
 data Upright
   = UprightAuto
@@ -189,8 +174,7 @@ data Upright
   | UprightLeftOnly
   | UprightRightOnly
   deriving (Eq, Show, Bounded, Enum, Generic)
-instance ToJSON Upright where toEncoding = mapnikJsonEncoder 0
-instance FromJSON Upright where parseJSON = mapnikJsonDecoder 0
+deriveMapnikJSON 0 ''Upright
 
 data Direction
   = DirectionLeft
@@ -202,8 +186,7 @@ data Direction
   | DirectionUp
   | DirectionDown
   deriving (Eq, Show, Bounded, Enum, Generic)
-instance ToJSON Direction where toEncoding = mapnikJsonEncoder 0
-instance FromJSON Direction where parseJSON = mapnikJsonDecoder 0
+deriveMapnikJSON 0 ''Direction
 
 data GammaMethod
   = GammaPower
@@ -212,5 +195,4 @@ data GammaMethod
   | GammaThreshold
   | GammaMultiply
   deriving (Eq, Show, Bounded, Enum, Generic)
-instance ToJSON GammaMethod where toEncoding = mapnikJsonEncoder 0
-instance FromJSON GammaMethod where parseJSON = mapnikJsonDecoder 0
+deriveMapnikJSON 0 ''GammaMethod

@@ -1,3 +1,5 @@
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -9,4 +11,5 @@ import Mapnik.Imports
 import Data.Text (Text)
 
 newtype Expression = Expression {unExpression :: Text}
-  deriving (Eq, Show, Generic, ToJSON, FromJSON)
+  deriving (Eq, Generic)
+  deriving newtype (Show, ToJSON, FromJSON)

@@ -329,10 +329,10 @@ setProp' k (PropExpression v) = setPropExpression k v
 getProp' :: HasGetProp a
          => Key a -> Ptr SymbolizerBase -> IO (Maybe (PropValue a))
 getProp' k p = do
-  mVal <- getProp k p
-  case mVal of
-    Nothing -> fmap PropExpression <$> getPropExpression k p
-    Just a -> return (Just (PropValue a))
+  eVal <- getPropExpression k p
+  case eVal of
+    Nothing -> fmap PropValue <$> getProp k p
+    Just e -> return (Just (PropExpression e))
 
 setPropExpression :: Key a
                   -> Mapnik.Expression -> Ptr SymbolizerBase -> IO ()
@@ -348,7 +348,7 @@ getPropExpression (keyIndex -> k) sym =
   fmap (fmap Mapnik.Expression) $ newTextMaybe $ \(ptr, len) ->
     [C.block|void {
     boost::optional<expression_ptr> expr = get_optional<expression_ptr>(*$(symbolizer_base *sym), $(keys k));
-    if (expr) {
+    if (expr && *expr) {
       std::string s = to_expression_string(**expr);
       *$(char** ptr) = strdup(s.c_str());
       *$(int* len) = s.length();

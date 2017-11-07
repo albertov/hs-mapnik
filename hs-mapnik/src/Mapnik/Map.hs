@@ -26,9 +26,7 @@ data Map = Map
   , _mapStyles                 :: !Styles
   , _mapLayers                 :: ![Layer]
   } deriving (Eq, Show, Generic)
-
-instance ToJSON Map where toEncoding = mapnikJsonEncoder 4
-instance FromJSON Map where parseJSON = mapnikJsonDecoder 4
+deriveMapnikJSON 4 ''Map
 
 
 empty :: Map

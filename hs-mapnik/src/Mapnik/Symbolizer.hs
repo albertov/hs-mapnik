@@ -18,6 +18,7 @@ module Mapnik.Symbolizer (
 
 import Mapnik.Imports
 import Mapnik.Enums
+import Mapnik.Common
 import Mapnik.Expression
 import Control.Applicative
 import Data.Aeson

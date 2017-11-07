@@ -1,8 +1,10 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Mapnik.Common where
 
+import Mapnik.Util
 import Data.Aeson
 import Data.Word
 import GHC.Generics
@@ -15,7 +17,9 @@ data Box = Box { minx, miny, maxx, maxy :: {-# UNPACK #-}!Double }
 data Color
   = RGBA { red, green, blue, alpha :: {-# UNPACK #-} !Word8 }
   | ColorName Text
-  deriving (Eq, Show, Generic, ToJSON, FromJSON)
+  deriving (Eq, Show)
+
+deriveMapnikJSON 0 ''Color
 
 instance IsString Color where
   fromString = ColorName . fromString

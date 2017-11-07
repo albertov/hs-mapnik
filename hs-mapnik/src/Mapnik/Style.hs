@@ -18,7 +18,7 @@ data Style = Style
   { _styleOpacity             :: !(Maybe Double)
   , _styleImageFiltersInflate :: !(Maybe Bool)
   , _styleRules               :: ![Rule]
-  } deriving (Eq, Show, Generic, ToJSON, FromJSON)
-
+  } deriving (Eq, Show, Generic)
+deriveMapnikJSON 6 ''Style
 makeClassy ''Style
 makeFields ''Style

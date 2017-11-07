@@ -17,6 +17,7 @@ import           Mapnik.Bindings.Style as Style
 import           Mapnik.Bindings.Expression as Expression
 import           Mapnik.Bindings.Datasource as Datasource
 import           Mapnik.Bindings.Symbolizer as Symbolizer
+import           Mapnik.Bindings.FromMapnik
 import           Control.Monad (void)
 import           Data.Text (Text)
 import           Data.Maybe (isJust, isNothing)
@@ -252,6 +253,13 @@ spec = beforeAll_ registerDefaults $ do
       let e = Expression.parse expr
           expr = "([foo"
       e `shouldSatisfy` isLeft
+
+  describe "fromMapnik" $ do
+    it "works for Map" $ do
+      m <- Map.create 512 512
+      loadFixture m
+      m1 <- fromMapnik m
+      return ()
 
 loadFixture :: Map -> IO ()
 loadFixture m = do
