@@ -30,7 +30,7 @@
     </Rule>
     <Rule>
       <Filter>([NOM_FR]=&apos;Québec&apos;)</Filter>
-      <PolygonSymbolizer fill="rgb(217,235,203)"/>
+      <PolygonSymbolizer fill="rgb(217,235,203)" comp-op="src-over" />
     </Rule>
   </Style>
   <Style name="provlines">

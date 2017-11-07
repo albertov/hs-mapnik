@@ -17,6 +17,7 @@ module Mapnik.Bindings.Symbolizer (
 ) where
 
 import qualified Mapnik
+import           Mapnik.Enums
 import           Mapnik (Property, DSum(..), Key(..), toProperties, PropValue(..))
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
@@ -301,6 +302,22 @@ instance HasSetProp String where
 
 instance HasGetProp Mapnik.Expression where getProp = getPropExpression
 instance HasSetProp Mapnik.Expression where setProp = setPropExpression
+
+instance HasGetProp CompositeMode where
+  getProp (keyIndex -> k) sym = fmap (fmap (toEnum . fromIntegral)) <$> newMaybe $ \(has,p) ->
+    [C.block|void {
+    auto val = get_optional<composite_mode_e>(*$(symbolizer_base *sym), $(keys k));
+    if (val) {
+      *$(int *has) = 1;
+      *$(int *p) = static_cast<int>(*val);
+    } else {
+      *$(int *has) = 0;
+    }
+    }|]
+
+instance HasSetProp CompositeMode where
+  setProp (keyIndex -> k) ((fromIntegral . fromEnum -> v)) s =
+    [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = enumeration_wrapper(static_cast<composite_mode_e>($(int v)));}|]
 
 
 setProp' :: HasSetProp a

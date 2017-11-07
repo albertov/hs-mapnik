@@ -17,6 +17,7 @@ module Mapnik.Symbolizer (
 ) where
 
 import Mapnik.Imports
+import Mapnik.Enums
 import Mapnik.Expression
 import Control.Applicative
 import Data.Aeson
@@ -55,7 +56,7 @@ data Key a where
     Opacity :: Key Double
     Alignment :: Key ()
     Offset :: Key Double
-    CompOp :: Key ()
+    CompOp :: Key CompositeMode
     Clip :: Key Bool
     Fill :: Key Color
     FillOpacity :: Key Double

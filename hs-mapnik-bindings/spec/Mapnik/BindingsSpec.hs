@@ -5,6 +5,7 @@ module Mapnik.BindingsSpec (main, spec) where
 import qualified Data.ByteString as BS
 import           Test.Hspec
 import           Mapnik (Symbolizer(..), Color(..), Key(..), (==>))
+import           Mapnik.Enums
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Registry (registerDefaults)
 import           Mapnik.Bindings.Map as Map
@@ -204,7 +205,9 @@ spec = beforeAll_ registerDefaults $ do
       Just f <- Rule.getFilter r2
       show f `shouldBe` "([NOM_FR]='Québec')"
       mSym <- Symbolizer.unCreate sym
-      mSym `shouldBe` Polygon [Fill ==> RGBA 217 235 203 255]
+      mSym `shouldBe` Polygon [ Fill ==> RGBA 217 235 203 255
+                              , CompOp ==> SrcOver
+                              ]
 
   describe "Parameters" $ do
     it "toList/fromList = id" $ do
