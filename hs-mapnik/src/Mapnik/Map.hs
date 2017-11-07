@@ -6,6 +6,7 @@
 module Mapnik.Map where
 
 import Mapnik.Imports
+import Mapnik.Enums
 import Data.Monoid (mempty)
 import Mapnik.Style 
 import Mapnik.Layer
@@ -14,16 +15,16 @@ import Prelude hiding (map)
 
 
 data Map = Map
-  { _mapBackgroundColor        :: Maybe Color
-  , _mapBackgroundImage        :: Maybe FilePath
-  , _mapBackgroundImageCompOp  :: Maybe CompOp
-  , _mapBackgroundImageOpacity :: Maybe Opacity
-  , _mapSrs                    :: Maybe Proj4
-  , _mapBufferSize             :: Maybe Int
-  , _mapMaximumExtent          :: Maybe Box
-  , _mapFontDirectory          :: Maybe FilePath
-  , _mapStyles                 :: Styles
-  , _mapLayers                 :: [Layer]
+  { _mapBackgroundColor        :: !(Maybe Color)
+  , _mapBackgroundImage        :: !(Maybe FilePath)
+  , _mapBackgroundImageCompOp  :: !(Maybe CompositeMode)
+  , _mapBackgroundImageOpacity :: !(Maybe Opacity)
+  , _mapSrs                    :: !(Maybe Proj4)
+  , _mapBufferSize             :: !(Maybe Int)
+  , _mapMaximumExtent          :: !(Maybe Box)
+  , _mapFontDirectory          :: !(Maybe FilePath)
+  , _mapStyles                 :: !Styles
+  , _mapLayers                 :: ![Layer]
   } deriving (Eq, Show, Generic)
 
 instance ToJSON Map where toEncoding = mapnikJsonEncoder 4

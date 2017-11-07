@@ -48,7 +48,7 @@ instance FromMapnik Map where
   fromMapnik m = do
     _mapBackgroundColor <- fromMapnik =<< Map.getBackground m
     _mapBackgroundImage <- Map.getBackgroundImage m
-    _mapBackgroundImageCompOp <- undefined
+    _mapBackgroundImageCompOp <- Map.getBackgroundImageCompOp m
     _mapBackgroundImageOpacity <- Just <$> Map.getBackgroundImageOpacity m
     _mapSrs <- Just <$> Map.getSrs m
     _mapBufferSize <- Just <$> Map.getBufferSize m

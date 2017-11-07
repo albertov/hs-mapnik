@@ -22,6 +22,8 @@ module Mapnik.Bindings.Map (
 , getBackgroundImage
 , setBackgroundImageOpacity
 , getBackgroundImageOpacity
+, getBackgroundImageCompOp
+, setBackgroundImageCompOp
 , setFontDirectory
 , getFontDirectory
 , getSrs
@@ -40,7 +42,7 @@ module Mapnik.Bindings.Map (
 , removeAllLayers
 ) where
 
-import           Mapnik (StyleName)
+import           Mapnik (StyleName, AspectFixMode(..), CompositeMode)
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 import qualified Mapnik.Bindings.Image as Image
@@ -77,16 +79,6 @@ C.using "namespace mapnik"
 --
 -- * Map
 
-data AspectFixMode = GrowBox
-                   | GrowCanvas
-                   | ShrinkBox
-                   | ShrinkCanvas
-                   | AdjustBoxWidth
-                   | AdjustBoxHeight
-                   | AdjustCanvasWidth
-                   | AdjustCanvasHeight
-                   | Respect
-                   deriving (Eq, Show)
 
 foreign import ccall "&hs_mapnik_destroy_Map" destroyMap :: FinalizerPtr Map
 
@@ -141,6 +133,26 @@ getBackgroundImage m = fmap (fmap unpack) $ newTextMaybe $ \(p,len) ->
   }|]
 
 
+setBackgroundImageCompOp :: Map -> CompositeMode -> IO ()
+setBackgroundImageCompOp m (fromIntegral . fromEnum -> v) =
+  [C.block| void {
+  $fptr-ptr:(Map *m)->set_background_image_comp_op(static_cast<composite_mode_e>($(int v)));
+  }|]
+
+getBackgroundImageCompOp :: Map -> IO (Maybe CompositeMode)
+getBackgroundImageCompOp m =
+  fmap (fmap (toEnum . fromIntegral) ) $ newMaybe $ \(has, p) ->
+    [C.block| void {
+    composite_mode_e mode = $fptr-ptr:(Map *m)->background_image_comp_op();
+    Map def;
+    if (mode != def.background_image_comp_op()) {
+      *$(int *has) = 1;
+      *$(int *p) = static_cast<int>(mode);
+    } else {
+      *$(int *has) = 0;
+    }
+    }|]
+
 setBackgroundImageOpacity :: Map -> Double -> IO ()
 setBackgroundImageOpacity m (realToFrac -> opacity) =
   [C.block| void {
@@ -185,16 +197,10 @@ getSrs m = newText $ \(p,len) -> [C.block|void {
   *$(int *len) = srs.size();
   *$(char **p) = strdup (srs.c_str());
   }|]
+
 setAspectFixMode :: Map -> AspectFixMode -> IO ()
-setAspectFixMode m GrowBox = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::GROW_BBOX);}|]
-setAspectFixMode m GrowCanvas = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::GROW_CANVAS);}|]
-setAspectFixMode m ShrinkBox = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::SHRINK_BBOX);}|]
-setAspectFixMode m ShrinkCanvas = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::SHRINK_CANVAS);}|]
-setAspectFixMode m AdjustBoxWidth = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::ADJUST_BBOX_WIDTH);}|]
-setAspectFixMode m AdjustBoxHeight = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::ADJUST_BBOX_HEIGHT);}|]
-setAspectFixMode m AdjustCanvasWidth = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::ADJUST_CANVAS_WIDTH);}|]
-setAspectFixMode m AdjustCanvasHeight = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::ADJUST_CANVAS_HEIGHT);}|]
-setAspectFixMode m Respect = [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(Map::RESPECT);}|]
+setAspectFixMode m (fromIntegral . fromEnum  -> v) =
+  [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(static_cast<Map::aspect_fix_mode>($(int v)));}|]
 
 setBufferSize :: Map -> Int -> IO ()
 setBufferSize m (fromIntegral -> size) =

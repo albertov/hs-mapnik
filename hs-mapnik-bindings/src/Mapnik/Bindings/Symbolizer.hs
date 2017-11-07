@@ -30,7 +30,6 @@ import           Data.Text.Encoding (encodeUtf8)
 import           Data.String (fromString)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
-import           Foreign.Storable (Storable)
 import           GHC.Exts (fromList)
 
 import qualified Language.C.Inline.Cpp as C
@@ -195,13 +194,9 @@ class HasSetProp a where
 class HasGetProp a where
   getProp :: Key a -> Ptr SymbolizerBase -> IO (Maybe a)
 
-getMaybe :: Storable a => ((Ptr C.CInt, Ptr a) -> IO ()) -> IO (Maybe a)
-getMaybe fun = do
-  (has, p) <- C.withPtrs_ fun
-  return $ if has == 1 then Just p else Nothing
 
 instance HasGetProp Double where
-  getProp (keyIndex -> k) sym = fmap (fmap realToFrac) <$> getMaybe $ \(has,p) ->
+  getProp (keyIndex -> k) sym = fmap (fmap realToFrac) <$> newMaybe $ \(has,p) ->
     [C.block|void {
     auto val = get_optional<double>(*$(symbolizer_base *sym), $(keys k));
     if (val) {
@@ -240,7 +235,7 @@ instance HasSetProp Mapnik.Color where
     [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = *$fptr-ptr:(color *c);}|]
 
 instance HasGetProp Bool where
-  getProp (keyIndex -> k) sym = fmap (fmap (toEnum . fromIntegral)) <$> getMaybe $ \(has,p) ->
+  getProp (keyIndex -> k) sym = fmap (fmap (toEnum . fromIntegral)) <$> newMaybe $ \(has,p) ->
     [C.block|void {
     auto val = get_optional<bool>(*$(symbolizer_base *sym), $(keys k));
     if (val) {
@@ -256,7 +251,7 @@ instance HasSetProp Bool where
     [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = $(int v)?true:false;}|]
 
 instance HasGetProp Int where
-  getProp (keyIndex -> k) sym = fmap (fmap fromIntegral) <$> getMaybe $ \(has,p) ->
+  getProp (keyIndex -> k) sym = fmap (fmap fromIntegral) <$> newMaybe $ \(has,p) ->
     [C.block|void {
     auto val = get_optional<int>(*$(symbolizer_base *sym), $(keys k));
     if (val) {

@@ -9,6 +9,7 @@ import           Data.Text.Encoding (decodeUtf8)
 import           Foreign.Ptr (Ptr, nullPtr)
 import           Foreign.C.String (CString)
 import           Foreign.ForeignPtr (ForeignPtr, FinalizerPtr, newForeignPtr)
+import           Foreign.Storable (Storable)
 
 import qualified Language.C.Inline.Cpp as C
 
@@ -41,3 +42,8 @@ mkUnsafeNewMaybe ctor dtor fun = do
   ptr <- C.withPtr_ fun
   if ptr == nullPtr then return Nothing else 
     Just . ctor <$> newForeignPtr dtor ptr
+
+newMaybe :: Storable a => ((Ptr C.CInt, Ptr a) -> IO ()) -> IO (Maybe a)
+newMaybe fun = do
+  (has, p) <- C.withPtrs_ fun
+  return $ if has == 1 then Just p else Nothing

@@ -50,7 +50,7 @@ create :: Mapnik.Color -> Maybe Color
 create col = unsafePerformIO $ case col of
   Mapnik.RGBA (fromIntegral ->r) (fromIntegral -> g) (fromIntegral -> b) (fromIntegral -> a) -> fmap Just $ unsafeNew $ \p ->
     [C.block|void{*$(color** p) = new color($(unsigned char r), $(unsigned char g), $(unsigned char b), $(unsigned char a));}|]
-  Mapnik.Color (encodeUtf8 -> c) ->
+  Mapnik.ColorName (encodeUtf8 -> c) ->
     fmap fromExc $ try @C.CppException $ unsafeNew $ \p ->
       [C.catchBlock|*$(color** p) = new color(parse_color(std::string($bs-ptr:c, $bs-len:c)));|]
   where

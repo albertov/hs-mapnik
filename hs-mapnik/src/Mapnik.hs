@@ -9,3 +9,4 @@ import Mapnik.Rule as X
 import Mapnik.Symbolizer as X
 import Mapnik.Parameter as X
 import Mapnik.Datasource as X
+import Mapnik.Enums as X

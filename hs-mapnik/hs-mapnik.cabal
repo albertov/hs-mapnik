@@ -23,6 +23,7 @@ library
                      , Mapnik.Parameter
                      , Mapnik.Datasource
                      , Mapnik.Common
+                     , Mapnik.Enums
   other-modules:       Mapnik.Imports
                      , Mapnik.Util
   build-depends:       base                >= 4.7  && < 5

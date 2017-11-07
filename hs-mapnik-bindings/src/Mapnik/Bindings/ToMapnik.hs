@@ -48,7 +48,7 @@ instance ToMapnik Mapnik.Map where
     m <- Map.create 400 400
     forM_ _mapBackgroundColor        (setBackground m <=< toMapnik)
     forM_ _mapBackgroundImage        (setBackgroundImage m)
-  --forM_ _mapBackgroundImageCompOp  (setBackgroundImageCompOp m <=< toMapnik)
+    forM_ _mapBackgroundImageCompOp  (setBackgroundImageCompOp m)
     forM_ _mapBackgroundImageOpacity (setBackgroundImageOpacity m)
     forM_ _mapSrs                    (Map.setSrs m)
     forM_ _mapBufferSize             (Map.setBufferSize m)

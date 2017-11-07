@@ -19,7 +19,6 @@ module Mapnik.Symbolizer (
 import Mapnik.Imports
 import Mapnik.Expression
 import Control.Applicative
-import Data.Functor.Identity (Identity)
 import Data.Aeson
 import Data.Aeson.Types
 import Data.Text (Text)
@@ -28,7 +27,6 @@ import Data.GADT.Compare.TH
 import Data.GADT.Show.TH
 import Data.Dependent.Sum as DSum (DSum(..), ShowTag(..), EqTag(..))
 import qualified Data.Dependent.Map as DMap
-import Data.String (fromString)
 import GHC.Exts (IsList(..))
 
 instance IsList Properties where
