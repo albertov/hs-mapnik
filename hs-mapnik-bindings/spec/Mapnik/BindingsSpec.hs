@@ -94,24 +94,24 @@ spec = beforeAll_ registerDefaults $ do
     it "can resize" $ do
       m <- Map.create 10 10
       img <- Map.render m 1
-      BS.length (toRgba8 img) `shouldBe` (10*10*4)
+      BS.length (snd (toRgba8 img)) `shouldBe` (10*10*4)
       Map.resize m 300 200
       img2 <- Map.render m 1
-      BS.length (toRgba8 img2) `shouldBe` (300*200*4)
+      BS.length (snd (toRgba8 img2)) `shouldBe` (300*200*4)
 
     it "throws on invalid size" $ do
       m <- Map.create (-1) (-1)
       Map.render m 1 `shouldThrow` cppStdException
 
   describe "Projection" $ do
-    it "can create valid" $ do
+    it "can create valid" $
       fromProj4 merc `shouldSatisfy` isRight
 
-    it "can show valid" $ do
+    it "can show valid" $
       show (fromProj4 merc) `shouldBe` "Right +proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over"
 
 
-    it "cannot create invalid" $ do
+    it "cannot create invalid" $
       fromProj4 "foo" `shouldSatisfy` isLeft
 
     it "can trasform" $ do
@@ -134,7 +134,7 @@ spec = beforeAll_ registerDefaults $ do
       Color.create "rgba(3,4,5" `shouldSatisfy` isNothing
       Color.create "steelblu" `shouldSatisfy` isNothing
 
-    it "can show" $ do
+    it "can show" $
       show (Color.create "rgb(3,4,5)") `shouldBe` "Just rgb(3,4,5)"
 
 
@@ -230,16 +230,16 @@ spec = beforeAll_ registerDefaults $ do
       m <- Map.create 10 10
       img <- Map.render m 1
       let rgba8 = Image.toRgba8 img
-          Just img2  = Image.fromRgba8 10 10 rgba8
-      BS.length rgba8  `shouldBe` (10*10*4)
+          Just img2  = Image.fromRgba8 rgba8
+      BS.length (snd rgba8)  `shouldBe` (10*10*4)
       --BS.writeFile "map.webp" (Image.serialize "webp" img2)
       Image.serialize "png8" img `shouldBe` Image.serialize "png8" img2
 
     it "cannot create empty image" $
-      Image.fromRgba8 0 0 "" `shouldBe` Nothing
+      Image.fromRgba8 ((0,0), "") `shouldBe` Nothing
 
     it "doesnt serialize bad format" $ do
-      let Just img = Image.fromRgba8 10 10 (BS.replicate (4*10*10) 0)
+      let Just img = Image.fromRgba8 ((10, 10), (BS.replicate (4*10*10) 0))
       Image.serialize "bad" img `shouldSatisfy` isNothing
 
   describe "Expression" $ do

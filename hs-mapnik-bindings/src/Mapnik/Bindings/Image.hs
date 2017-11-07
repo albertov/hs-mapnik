@@ -61,28 +61,35 @@ serialize (fromString -> fmt) im = unsafePerformIO $ newByteStringMaybe $ \(ptr,
   }
   }|]
 
+type Size = (Int,Int)
 
-toRgba8 :: Image -> ByteString
-toRgba8 im = unsafePerformIO $ newByteString $ \(ptr, len) ->
-  [C.block|void {
-  static char empty='\0';
-  mapnik::image_rgba8 *im = $fptr-ptr:(image_rgba8 *im);
-  int len = *$(int* len) = im->size();
-  if (len > 0) {
-    *$(char** ptr) = static_cast<char*>(malloc(len));
-    memcpy(*$(char** ptr), im->data(), len);
-  } else {
-    *$(char** ptr) = &empty;
-  }
-  }|]
+
+toRgba8 :: Image -> (Size, ByteString)
+toRgba8 im = unsafePerformIO $ do
+  ((fromIntegral -> w, fromIntegral -> h), bs) <- C.withPtrs $ \(w,h) ->
+    newByteString $ \(ptr, len) ->
+      [C.block|void {
+      static char empty='\0';
+      mapnik::image_rgba8 *im = $fptr-ptr:(image_rgba8 *im);
+      int len = *$(int* len) = im->size();
+      *$(size_t *w) = im->width();
+      *$(size_t *h) = im->height();
+      if (len > 0) {
+        *$(char** ptr) = static_cast<char*>(malloc(len));
+        memcpy(*$(char** ptr), im->data(), len);
+      } else {
+        *$(char** ptr) = &empty;
+      }
+      }|]
+  return ((w,h), bs)
 {-# NOINLINE toRgba8 #-}
 
-fromRgba8 :: Int -> Int -> ByteString -> Maybe Image
-fromRgba8 width height rgba8
+fromRgba8 :: (Size, ByteString) -> Maybe Image
+fromRgba8 ((width, height), rgba8)
   | 0 == BS.length rgba8 = Nothing
   | height < 0 || width < 0 = Nothing
   | width*height*4 /= BS.length rgba8 = Nothing
-fromRgba8 (fromIntegral -> width) (fromIntegral -> height) rgba8 = unsafePerformIO $ fmap Just $ unsafeNew $ \ptr ->
+fromRgba8 ((fromIntegral -> width, fromIntegral -> height), rgba8) = unsafePerformIO $ fmap Just $ unsafeNew $ \ptr ->
   [C.block|void {
   *$(image_rgba8 **ptr) =
     new mapnik::image_rgba8($(int width), $(int height), reinterpret_cast<unsigned char*>($bs-ptr:rgba8));
@@ -90,5 +97,5 @@ fromRgba8 (fromIntegral -> width) (fromIntegral -> height) rgba8 = unsafePerform
 {-# NOINLINE fromRgba8 #-}
   
 {-# RULES
-"fromRgba8/toRgba8"  forall w h im. fromRgba8 w h (toRgba8 im) = Just im
+"fromRgba8/toRgba8"  forall im. fromRgba8 (toRgba8 im) = Just im
   #-}
