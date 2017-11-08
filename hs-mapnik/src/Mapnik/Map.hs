@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 module Mapnik.Map where
 
 import Mapnik.Imports
@@ -16,33 +17,30 @@ import Prelude hiding (map)
 
 
 data Map = Map
-  { _mapBackgroundColor        :: !(Maybe Color)
-  , _mapBackgroundImage        :: !(Maybe FilePath)
-  , _mapBackgroundImageCompOp  :: !(Maybe CompositeMode)
-  , _mapBackgroundImageOpacity :: !(Maybe Opacity)
-  , _mapSrs                    :: !(Maybe Proj4)
-  , _mapBufferSize             :: !(Maybe Int)
-  , _mapMaximumExtent          :: !(Maybe Box)
-  , _mapFontDirectory          :: !(Maybe FilePath)
-  , _mapStyles                 :: !Styles
-  , _mapLayers                 :: ![Layer]
+  { backgroundColor        :: !(Maybe Color)
+  , backgroundImage        :: !(Maybe FilePath)
+  , backgroundImageCompOp  :: !(Maybe CompositeMode)
+  , backgroundImageOpacity :: !(Maybe Double)
+  , srs                    :: !(Maybe Proj4)
+  , bufferSize             :: !(Maybe Int)
+  , maximumExtent          :: !(Maybe Box)
+  , fontDirectory          :: !(Maybe FilePath)
+  , styles                 :: !Styles
+  , layers                 :: ![Layer]
   } deriving (Eq, Show, Generic)
-deriveMapnikJSON 4 ''Map
+deriveMapnikJSON ''Map
 
 
 empty :: Map
 empty = Map
-  { _mapBackgroundColor        = Nothing
-  , _mapBackgroundImage        = Nothing
-  , _mapBackgroundImageCompOp  = Nothing
-  , _mapBackgroundImageOpacity = Nothing
-  , _mapSrs                    = Nothing
-  , _mapBufferSize             = Nothing
-  , _mapMaximumExtent          = Nothing
-  , _mapFontDirectory          = Nothing
-  , _mapStyles                 = mempty
-  , _mapLayers                 = mempty
+  { backgroundColor        = Nothing
+  , backgroundImage        = Nothing
+  , backgroundImageCompOp  = Nothing
+  , backgroundImageOpacity = Nothing
+  , srs                    = Nothing
+  , bufferSize             = Nothing
+  , maximumExtent          = Nothing
+  , fontDirectory          = Nothing
+  , styles                 = mempty
+  , layers                 = mempty
   }
-
-makeClassy ''Map
-makeFields ''Map

@@ -43,11 +43,14 @@ type Scaling = ()
 type TextPlacements = ()
 type Colorizer = ()
 
-data PropValue v = PropValue      v
-                 | PropExpression Expression
+data PropValue v = PropExpression Expression
+                 | PropValue      v
                  | PropDefault
   deriving (Eq, Show, Functor)
-makePrisms ''PropValue
+deriveMapnikJSON ''PropValue
+
+type Property = DSum Key PropValue
+type Properties = DMap.DMap Key PropValue
 
 instance IsList Properties where
   type Item Properties = Property
@@ -56,19 +59,6 @@ instance IsList Properties where
 
 
 instance Default (PropValue a) where def = PropDefault
-
-instance ToJSON v => ToJSON (PropValue v) where
-  toJSON (PropValue v)      = toJSON v
-  toJSON (PropExpression v) = toJSON v
-  toJSON PropDefault        = Null
-
-instance FromJSON v => FromJSON (PropValue v) where
-  parseJSON Null = return PropDefault
-  parseJSON o    = (PropValue <$> parseJSON o) <|> (PropExpression <$> parseJSON o)
-
-type Property = DSum Key PropValue
-
-type Properties = DMap.DMap Key PropValue
 
 data Key a where
     Gamma :: Key Double

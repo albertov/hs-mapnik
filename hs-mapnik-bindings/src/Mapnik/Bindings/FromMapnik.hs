@@ -15,7 +15,9 @@ import qualified Mapnik.Bindings.Rule as Rule
 import qualified Mapnik.Bindings.Expression as Expression
 import qualified Mapnik.Bindings.Datasource as Datasource
 import qualified Mapnik.Bindings.Symbolizer as Symbolizer
+
 import qualified Data.HashMap.Strict as HM
+import           Prelude hiding (filter)
 
 class FromMapnik a where
   type HsType a :: *
@@ -45,16 +47,16 @@ fromMapnikId(Mapnik.Expression)
 instance FromMapnik Map where
   type HsType Map = Mapnik.Map
   fromMapnik m = do
-    _mapBackgroundColor <- fromMapnik =<< Map.getBackground m
-    _mapBackgroundImage <- Map.getBackgroundImage m
-    _mapBackgroundImageCompOp <- Map.getBackgroundImageCompOp m
-    _mapBackgroundImageOpacity <- Just <$> Map.getBackgroundImageOpacity m
-    _mapSrs <- Just <$> Map.getSrs m
-    _mapBufferSize <- Just <$> Map.getBufferSize m
-    _mapMaximumExtent <- Map.getMaxExtent m
-    _mapFontDirectory <- Map.getFontDirectory m
-    _mapLayers <- mapM fromMapnik =<< Map.getLayers m
-    _mapStyles <- HM.fromList
+    backgroundColor <- fromMapnik =<< Map.getBackground m
+    backgroundImage <- Map.getBackgroundImage m
+    backgroundImageCompOp <- Map.getBackgroundImageCompOp m
+    backgroundImageOpacity <- Just <$> Map.getBackgroundImageOpacity m
+    srs <- Just <$> Map.getSrs m
+    bufferSize <- Just <$> Map.getBufferSize m
+    maximumExtent <- Map.getMaxExtent m
+    fontDirectory <- Map.getFontDirectory m
+    layers <- mapM fromMapnik =<< Map.getLayers m
+    styles <- HM.fromList
              <$> (mapM (\(k,v) -> (k,) <$> fromMapnik v) =<< Map.getStyles m)
     return Mapnik.Map{..}
 
@@ -65,37 +67,37 @@ instance FromMapnik Expression where
 instance FromMapnik Rule where
   type HsType Rule = Mapnik.Rule
   fromMapnik r = do
-    _ruleName                    <- Just <$> Rule.getName r
-    _ruleFilter                  <- fromMapnik =<< Rule.getFilter r
-    _ruleMinimumScaleDenominator <- Just <$> Rule.getMinScale r
-    _ruleMaximumScaleDenominator <- Just <$> Rule.getMaxScale r
-    _ruleSymbolizers             <- mapM fromMapnik =<< Rule.getSymbolizers r
+    name                    <- Just <$> Rule.getName r
+    filter                  <- fromMapnik =<< Rule.getFilter r
+    minimumScaleDenominator <- Just <$> Rule.getMinScale r
+    maximumScaleDenominator <- Just <$> Rule.getMaxScale r
+    symbolizers             <- mapM fromMapnik =<< Rule.getSymbolizers r
     return Mapnik.Rule {..}
 
 
 instance FromMapnik Layer where
   type HsType Layer = Mapnik.Layer
   fromMapnik l = do
-    _layerName                    <- Layer.getName l
-    _layerDataSource              <- fromMapnik =<< Layer.getDatasource l
-    _layerSrs                     <- Just <$> Layer.getSrs l
-    _layerMinimumScaleDenominator <- Just <$> Layer.getMinScaleDenominator l
-    _layerMaximumScaleDenominator <- Just <$> Layer.getMaxScaleDenominator l
-    _layerQueryable               <- Just <$> Layer.getQueryable l
-    _layerClearLabelCache         <- Just <$> Layer.getClearLabelCache l
-    _layerCacheFeatures           <- Just <$> Layer.getCacheFeatures l
-    _layerGroupBy                 <- Just <$> Layer.getGroupBy l
-    _layerBufferSize              <- Layer.getBufferSize l
-    _layerMaximumExtent           <- Layer.getMaxExtent l
-    _layerStyles                  <- Layer.getStyles l
+    name                    <- Layer.getName l
+    dataSource              <- fromMapnik =<< Layer.getDatasource l
+    srs                     <- Just <$> Layer.getSrs l
+    minimumScaleDenominator <- Just <$> Layer.getMinScaleDenominator l
+    maximumScaleDenominator <- Just <$> Layer.getMaxScaleDenominator l
+    queryable               <- Just <$> Layer.getQueryable l
+    clearLabelCache         <- Just <$> Layer.getClearLabelCache l
+    cacheFeatures           <- Just <$> Layer.getCacheFeatures l
+    groupBy                 <- Just <$> Layer.getGroupBy l
+    bufferSize              <- Layer.getBufferSize l
+    maximumExtent           <- Layer.getMaxExtent l
+    styles                  <- Layer.getStyles l
     return Mapnik.Layer{..}
 
 instance FromMapnik Style where
   type HsType Style = Mapnik.Style
   fromMapnik s = do
-    _styleOpacity             <- Just <$> Style.getOpacity s
-    _styleImageFiltersInflate <- Just <$> Style.getImageFiltersInflate s
-    _styleRules               <- mapM fromMapnik =<< Style.getRules s
+    opacity             <- Just <$> Style.getOpacity s
+    imageFiltersInflate <- Just <$> Style.getImageFiltersInflate s
+    rules               <- mapM fromMapnik =<< Style.getRules s
     return Mapnik.Style{..}
 
 instance FromMapnik Datasource where

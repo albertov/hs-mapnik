@@ -19,6 +19,7 @@ import           Control.Exception
 import           Control.Monad
 import           Data.HashMap.Strict (toList)
 import qualified GHC.Exts as Exts
+import           Prelude hiding (filter)
 
 class ToMapnik a where
   type MapnikType a :: *
@@ -45,36 +46,36 @@ instance ToMapnik Mapnik.Map where
   type MapnikType Mapnik.Map = Map
   toMapnik Mapnik.Map {..} = do
     m <- Map.create 400 400
-    forM_ _mapBackgroundColor        (setBackground m <=< toMapnik)
-    forM_ _mapBackgroundImage        (setBackgroundImage m)
-    forM_ _mapBackgroundImageCompOp  (setBackgroundImageCompOp m)
-    forM_ _mapBackgroundImageOpacity (setBackgroundImageOpacity m)
-    forM_ _mapSrs                    (Map.setSrs m)
-    forM_ _mapBufferSize             (Map.setBufferSize m)
-    forM_ _mapMaximumExtent          (Map.setMaxExtent m)
-    forM_ _mapFontDirectory          (Map.setFontDirectory m)
-    forM_ _mapLayers                 (addLayer m <=< toMapnik)
-    forM_ (toList _mapStyles)        (\(k,v) -> insertStyle m k =<< toMapnik v)
+    forM_ backgroundColor        (setBackground m <=< toMapnik)
+    forM_ backgroundImage        (setBackgroundImage m)
+    forM_ backgroundImageCompOp  (setBackgroundImageCompOp m)
+    forM_ backgroundImageOpacity (setBackgroundImageOpacity m)
+    forM_ srs                    (Map.setSrs m)
+    forM_ bufferSize             (Map.setBufferSize m)
+    forM_ maximumExtent          (Map.setMaxExtent m)
+    forM_ fontDirectory          (Map.setFontDirectory m)
+    forM_ layers                 (addLayer m <=< toMapnik)
+    forM_ (toList styles)        (\(k,v) -> insertStyle m k =<< toMapnik v)
     return m
 
 instance ToMapnik Mapnik.Style where
   type MapnikType Mapnik.Style = Style
   toMapnik Mapnik.Style {..} = do
     s <- Style.create
-    forM_ _styleOpacity             (Style.setOpacity s)
-    forM_ _styleImageFiltersInflate (Style.setImageFiltersInflate s)
-    forM_ _styleRules               (addRule s <=< toMapnik)
+    forM_ opacity             (Style.setOpacity s)
+    forM_ imageFiltersInflate (Style.setImageFiltersInflate s)
+    forM_ rules               (addRule s <=< toMapnik)
     return s
 
 instance ToMapnik Mapnik.Rule where
   type MapnikType Mapnik.Rule = Rule
   toMapnik Mapnik.Rule {..} = do
     r <- Rule.create
-    forM_ _ruleName                    (Rule.setName r)
-    forM_ _ruleFilter                  (Rule.setFilter r <=< toMapnik)
-    forM_ _ruleMinimumScaleDenominator (Rule.setMinScale r)
-    forM_ _ruleMaximumScaleDenominator (Rule.setMaxScale r)
-    forM_ _ruleSymbolizers             (appendSymbolizer r <=< toMapnik)
+    forM_ name                    (Rule.setName r)
+    forM_ filter                  (Rule.setFilter r <=< toMapnik)
+    forM_ minimumScaleDenominator (Rule.setMinScale r)
+    forM_ maximumScaleDenominator (Rule.setMaxScale r)
+    forM_ symbolizers             (appendSymbolizer r <=< toMapnik)
     return r
 
 instance ToMapnik Mapnik.Symbolizer where
@@ -84,18 +85,18 @@ instance ToMapnik Mapnik.Symbolizer where
 instance ToMapnik Mapnik.Layer where
   type MapnikType Mapnik.Layer = Layer
   toMapnik Mapnik.Layer {..} = do
-    l <- Layer.create _layerName
-    forM_ _layerDataSource              (Layer.setDatasource l <=< toMapnik)
-    forM_ _layerSrs                     (Layer.setSrs l)
-    forM_ _layerMinimumScaleDenominator (setMinScaleDenominator l)
-    forM_ _layerMaximumScaleDenominator (setMaxScaleDenominator l)
-    forM_ _layerQueryable               (setQueryable l)
-    forM_ _layerClearLabelCache         (setClearLabelCache l)
-    forM_ _layerCacheFeatures           (setCacheFeatures l)
-    forM_ _layerGroupBy                 (setGroupBy l)
-    forM_ _layerBufferSize              (Layer.setBufferSize l)
-    forM_ _layerMaximumExtent           (Layer.setMaxExtent l)
-    forM_ _layerStyles                  (addStyle l)
+    l <- Layer.create name
+    forM_ dataSource              (Layer.setDatasource l <=< toMapnik)
+    forM_ srs                     (Layer.setSrs l)
+    forM_ minimumScaleDenominator (setMinScaleDenominator l)
+    forM_ maximumScaleDenominator (setMaxScaleDenominator l)
+    forM_ queryable               (setQueryable l)
+    forM_ clearLabelCache         (setClearLabelCache l)
+    forM_ cacheFeatures           (setCacheFeatures l)
+    forM_ groupBy                 (setGroupBy l)
+    forM_ bufferSize              (Layer.setBufferSize l)
+    forM_ maximumExtent           (Layer.setMaxExtent l)
+    forM_ styles                  (addStyle l)
     return l
 
 instance ToMapnik Mapnik.Datasource where
@@ -109,4 +110,4 @@ instance ToMapnik Mapnik.Parameters where
 instance ToMapnik Mapnik.Expression where
   type MapnikType Mapnik.Expression = Expression
   toMapnik = either (throwIO . userError . ("Invalid expression: " ++)) return
-           . Expression.parse . Mapnik.unExpression
+           . Expression.parse . (\(Mapnik.Expression e) -> e)

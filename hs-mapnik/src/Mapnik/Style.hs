@@ -6,8 +6,8 @@
 module Mapnik.Style where
 
 import Mapnik.Imports
-import Mapnik.Symbolizer (HasOpacity(..))
 import Mapnik.Rule
+import Data.Default
 import Data.Text
 import qualified Data.HashMap.Strict as M
 
@@ -16,10 +16,8 @@ type StyleName = Text
 type Styles = M.HashMap StyleName Style
 
 data Style = Style
-  { _styleOpacity             :: !(Maybe Double)
-  , _styleImageFiltersInflate :: !(Maybe Bool)
-  , _styleRules               :: ![Rule]
-  } deriving (Eq, Show, Generic)
-deriveMapnikJSON 6 ''Style
-makeClassy ''Style
-makeFields ''Style
+  { opacity             :: !(Maybe Double)
+  , imageFiltersInflate :: !(Maybe Bool)
+  , rules               :: ![Rule]
+  } deriving (Eq, Show, Generic, Default)
+deriveMapnikJSON ''Style

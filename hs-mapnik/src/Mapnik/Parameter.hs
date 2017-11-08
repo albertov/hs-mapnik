@@ -7,11 +7,9 @@ module Mapnik.Parameter where
 
 import           Mapnik.Imports
 
-import           Data.Aeson
 import           Data.Text (Text)
 import qualified Data.HashMap.Strict as M
 import           Data.String(IsString(..))
-import           Data.Scientific (floatingOrInteger)
 
 
 data ParamValue = StringParam !Text
@@ -20,23 +18,7 @@ data ParamValue = StringParam !Text
                 | BoolParam   !Bool
                 | NullParam
   deriving (Show, Eq, Generic)
-makePrisms ''ParamValue
-
-instance ToJSON ParamValue where
-  toJSON (StringParam p) = toJSON p
-  toJSON (DoubleParam p) = toJSON p
-  toJSON (IntParam    p) = toJSON p
-  toJSON (BoolParam   p) = toJSON p
-  toJSON NullParam       = Null
-
-instance FromJSON ParamValue where
-  parseJSON (String s) = return (StringParam s)
-  parseJSON (Number s) = case floatingOrInteger s of
-                            Left v -> return (DoubleParam v)
-                            Right v -> return (IntParam v)
-  parseJSON (Bool s)   = return (BoolParam s)
-  parseJSON Null       = return NullParam
-  parseJSON _          = fail "parseJSON @ParamValue: Invalid type"
+deriveMapnikJSON ''ParamValue
 
 class ToParam p where
   toParam :: p -> ParamValue

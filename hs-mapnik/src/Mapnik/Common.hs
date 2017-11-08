@@ -9,13 +9,10 @@
 module Mapnik.Common where
 
 import Mapnik.Imports
-import Data.Aeson
 import Data.Word
-import GHC.Generics
 import Data.String (IsString(..))
 import Data.Text (Text)
 import Data.Vector.Storable (Vector)
-import qualified Data.Vector.Generic as G
 import Foreign.Storable
 import Foreign.Marshal.Array (advancePtr)
 import Foreign.Ptr
@@ -24,33 +21,23 @@ import Foreign.C.Types (CDouble)
 data Box = Box { minx, miny, maxx, maxy :: {-# UNPACK #-}!Double }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
-data Color
-  = RGBA { red, green, blue, alpha :: {-# UNPACK #-} !Word8 }
-  | ColorName Text
-  deriving (Eq, Show)
+data Color = RGBA !Word8 !Word8 !Word8 !Word8
+  deriving (Eq, Show, Generic)
 
-deriveMapnikJSON 0 ''Color
+deriveMapnikJSON ''Color
 
-instance IsString Color where
-  fromString = ColorName . fromString
-
-newtype Transform = Transform {unTransform :: Text}
+newtype Transform = Transform Text
   deriving (Generic)
-  deriving newtype (Show, ToJSON, FromJSON, Eq, IsString)
+  deriving newtype (Eq, Show, ToJSON, FromJSON, IsString)
 
-newtype Expression = Expression {unExpression :: Text}
+newtype Expression = Expression Text
   deriving (Generic)
-  deriving newtype (Show, ToJSON, FromJSON, Eq, IsString)
+  deriving newtype (Eq, Show, ToJSON, FromJSON, IsString)
 
 data Dash = Dash {-# UNPACK #-} !Double {-# UNPACK #-} !Double
   deriving (Eq, Show, Generic)
+deriveMapnikJSON ''Dash
 
-instance ToJSON Dash where toJSON (Dash a b) = toJSON [a,b]
-instance FromJSON Dash where
-  parseJSON = withArray "Dash" $ \a ->
-    if G.length a == 2
-       then Dash <$> parseJSON (a G.! 0)  <*> parseJSON (a G.! 1)
-       else fail "dash should have 2 elems"
 
 instance Storable Dash where
   sizeOf   _ = 2 * sizeOf (undefined :: CDouble)
@@ -62,6 +49,4 @@ instance Storable Dash where
     poke @CDouble (castPtr p `advancePtr` 1) b
 
 type DashArray = Vector Dash
-
-type Opacity = Double
 type Proj4 = Text

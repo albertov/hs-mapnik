@@ -46,7 +46,7 @@ data CompositeMode
   | LinearBurn
   | Divide
   deriving (Eq, Show, Enum, Bounded, Generic)
-deriveMapnikJSON 0 ''CompositeMode
+deriveMapnikJSON ''CompositeMode
 
 data AspectFixMode
   = GrowBox
@@ -59,14 +59,14 @@ data AspectFixMode
   | AdjustCanvasHeight
   | Respect
   deriving (Eq, Show, Bounded, Enum, Generic)
-deriveMapnikJSON 0 ''AspectFixMode
+deriveMapnikJSON ''AspectFixMode
 
 data LineCap
   = ButtCap
   | SquareCap
   | RoundCap
   deriving (Eq, Show, Bounded, Enum, Generic)
-deriveMapnikJSON 0 ''LineCap
+deriveMapnikJSON ''LineCap
 
 data LineJoin
   = MiterJoin
@@ -74,39 +74,39 @@ data LineJoin
   | RoundJoin
   | BevelJoin
   deriving (Eq, Show, Bounded, Enum, Generic)
-deriveMapnikJSON 0 ''LineJoin
+deriveMapnikJSON ''LineJoin
 
 data LineRasterizer
   = RasterizerFull
   | RasterizerFast
   deriving (Eq, Show, Bounded, Enum, Generic)
-deriveMapnikJSON 0 ''LineRasterizer
+deriveMapnikJSON ''LineRasterizer
 
 data HaloRasterizer
   = HaloRasterizerFull
   | HaloRasterizerFast
   deriving (Eq, Show, Bounded, Enum, Generic)
-deriveMapnikJSON 0 ''HaloRasterizer
+deriveMapnikJSON ''HaloRasterizer
 
 data PointPlacement
   = CentroidPointPlacement
   | InteriorPointPlacement
   deriving (Eq, Show, Bounded, Enum, Generic)
-deriveMapnikJSON 0 ''PointPlacement
+deriveMapnikJSON ''PointPlacement
 
 
 data PatternAlignment
   = LocalAlignment
   | GlobalAlignment
   deriving (Eq, Show, Bounded, Enum, Generic)
-deriveMapnikJSON 0 ''PatternAlignment
+deriveMapnikJSON ''PatternAlignment
 
 data DebugMode
   = DebugModeCollision
   | DebugModeVertex
   | DebugModeRings
   deriving (Eq, Show, Bounded, Enum, Generic)
-deriveMapnikJSON 0 ''DebugMode
+deriveMapnikJSON ''DebugMode
 
 data MarkerPlacement
   = MarkerPointPlacement
@@ -115,14 +115,14 @@ data MarkerPlacement
   | MarkerVertexFirstPlacement
   | MarkerVertexLastPlacement
   deriving (Eq, Show, Bounded, Enum, Generic)
-deriveMapnikJSON 0 ''MarkerPlacement
+deriveMapnikJSON ''MarkerPlacement
 
 data MarkerMultiPolicy
   = MarkerEachMulti
   | MarkerWholeMulti
   | MarkerLargestMulti
   deriving (Eq, Show, Bounded, Enum, Generic)
-deriveMapnikJSON 0 ''MarkerMultiPolicy
+deriveMapnikJSON ''MarkerMultiPolicy
 
 data TextTransform
   = None
@@ -131,7 +131,7 @@ data TextTransform
   | Capitalize
   | Reverse
   deriving (Eq, Show, Bounded, Enum, Generic)
-deriveMapnikJSON 0 ''TextTransform
+deriveMapnikJSON ''TextTransform
 
 data LabelPlacement
   = PointPlacement
@@ -139,7 +139,7 @@ data LabelPlacement
   | VertexPlacement
   | InteriorPlacement
   deriving (Eq, Show, Bounded, Enum, Generic)
-deriveMapnikJSON 0 ''LabelPlacement
+deriveMapnikJSON ''LabelPlacement
 
 data VerticalAlignment
   = VTop
@@ -147,7 +147,7 @@ data VerticalAlignment
   | VBottom
   | VAuto
   deriving (Eq, Show, Bounded, Enum, Generic)
-deriveMapnikJSON 0 ''VerticalAlignment
+deriveMapnikJSON ''VerticalAlignment
 
 data HorizontalAlignment
   = HLeft
@@ -156,7 +156,7 @@ data HorizontalAlignment
   | HAuto
   | HAdjust
   deriving (Eq, Show, Bounded, Enum, Generic)
-deriveMapnikJSON 0 ''HorizontalAlignment
+deriveMapnikJSON ''HorizontalAlignment
 
 data JustifyAlignment
   = JLeft
@@ -164,7 +164,7 @@ data JustifyAlignment
   | JRight
   | JAuto
   deriving (Eq, Show, Bounded, Enum, Generic)
-deriveMapnikJSON 0 ''JustifyAlignment
+deriveMapnikJSON ''JustifyAlignment
 
 data Upright
   = UprightAuto
@@ -174,7 +174,7 @@ data Upright
   | UprightLeftOnly
   | UprightRightOnly
   deriving (Eq, Show, Bounded, Enum, Generic)
-deriveMapnikJSON 0 ''Upright
+deriveMapnikJSON ''Upright
 
 data Direction
   = DirectionLeft
@@ -186,7 +186,7 @@ data Direction
   | DirectionUp
   | DirectionDown
   deriving (Eq, Show, Bounded, Enum, Generic)
-deriveMapnikJSON 0 ''Direction
+deriveMapnikJSON ''Direction
 
 data PlacementDirection
   = PlacementNorth
@@ -199,7 +199,7 @@ data PlacementDirection
   | PlacementSouthWest
   | PlacementExact
   deriving (Eq, Show, Bounded, Enum, Generic)
-deriveMapnikJSON 0 ''PlacementDirection
+deriveMapnikJSON ''PlacementDirection
 
 data GammaMethod
   = GammaPower
@@ -208,4 +208,4 @@ data GammaMethod
   | GammaThreshold
   | GammaMultiply
   deriving (Eq, Show, Bounded, Enum, Generic)
-deriveMapnikJSON 0 ''GammaMethod
+deriveMapnikJSON ''GammaMethod

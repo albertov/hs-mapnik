@@ -6,9 +6,8 @@ import qualified Data.ByteString as BS
 import           Test.Hspec
 import qualified Mapnik
 import           Mapnik ( Symbolizer(..), Color(..), Key(..), Dash(..)
-                        , (==>), DashArray
-                        , styles, rules, symbolizers, strokeDasharray
-                        , _PropValue)
+                        , (==>), DashArray)
+import qualified Mapnik.Lens as L
 import           Mapnik.Enums
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Registry (registerDefaults)
@@ -135,13 +134,10 @@ spec = beforeAll_ registerDefaults $ do
   describe "Color" $ do
     it "can set good" $ do
       m <- Map.create 10 10
-      Map.setBackground m "rgba(3,4,5,1)"
-      Just bg <- Map.getBackground m
-      bg `shouldBe` RGBA 3 4 5 255
-
-    it "cannot parse bad" $ do
-      m <- Map.create 10 10
-      Map.setBackground m "rgba(3,4,5" `shouldThrow` cppStdException
+      let bg = RGBA 3 4 5 255
+      Map.setBackground m bg
+      Just bg2 <- Map.getBackground m
+      bg2 `shouldBe` bg
 
 
   describe "Layer" $ do
@@ -275,11 +271,11 @@ spec = beforeAll_ registerDefaults $ do
       loadFixture m'
       m <- fromMapnik m'
       let lns :: Traversal' Mapnik.Map DashArray
-          lns = styles . at "provlines" . _Just
-              . rules . ix 0
-              . symbolizers . ix 0
-              . strokeDasharray
-              . _PropValue
+          lns = L.styles . at "provlines" . _Just
+              . L.rules . ix 0
+              . L.symbolizers . ix 0
+              . L.strokeDasharray
+              . L._PropValue
       m^?lns `shouldBe` Just [Dash 8 4, Dash 2 2, Dash 2 2]
 
 loadFixture :: Map -> IO ()

@@ -1,23 +1,30 @@
 {-# LANGUAGE FlexibleContexts #-}
-module Mapnik.TH (deriveMapnikJSON) where
+module Mapnik.TH (deriveMapnikJSON, makeMapnikFields) where
 
 
-import Data.Char (toLower)
 import Data.Aeson.Types
 import Data.Aeson.TH
+import Data.Char (toUpper)
+import Control.Lens
+import Language.Haskell.TH
 
-deriveMapnikJSON n = deriveJSON defaultOptions
+deriveMapnikJSON :: Name -> DecsQ
+deriveMapnikJSON = deriveJSON defaultOptions
   { sumEncoding = UntaggedValue
-  , fieldLabelModifier = dropAndUncapitalize n
   , omitNothingFields = True
-  } 
+  }
 
-dropAndUncapitalize :: Int -> String -> String
-dropAndUncapitalize n = uncapitalize . drop n
+makeMapnikFields :: Name -> DecsQ
+makeMapnikFields = makeLensesWith $ defaultFieldRules &
+  lensField .~ mapnikNameNamer
 
-uncapitalize :: String -> String
-uncapitalize s =
-  case s of
-    []     -> []
-    (x:xs) -> toLower x : xs
+mapnikNameNamer :: FieldNamer
+mapnikNameNamer _ _ field = [ MethodName (mkName cls) (mkName method) ]
+  where
+    fieldName = nameBase field
+    method = fieldName
+    cls = "Has" ++ capitalize fieldName
 
+capitalize :: String -> String
+capitalize [] = []
+capitalize (x:xs) = toUpper x:xs
