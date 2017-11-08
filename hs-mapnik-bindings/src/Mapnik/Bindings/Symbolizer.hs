@@ -19,7 +19,7 @@ module Mapnik.Bindings.Symbolizer (
 import qualified Mapnik
 import           Mapnik.Enums
 import           Mapnik (Property, DSum(..), Key(..), toProperties, PropValue(..), Transform(..))
-import           Mapnik.Bindings
+import           Mapnik.Bindings hiding (TextPlacements(..))
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()
 import qualified Mapnik.Bindings.Expression as Expression
@@ -115,7 +115,7 @@ unCreate sym' = bracket alloc dealloc $ \sym -> do
     , getProperty SimplifyAlgorithm sym
     , getProperty SimplifyTolerance sym
     , getProperty HaloRasterizer sym
-    , getProperty TextPlacements_ sym
+    , getProperty TextPlacements sym
     , getProperty LabelPlacement sym
     , getProperty MarkersPlacementType sym
     , getProperty MarkersMultipolicy sym
@@ -378,6 +378,7 @@ setProp' :: HasSetProp a
          => Key a -> PropValue a -> Ptr SymbolizerBase -> IO ()
 setProp' k (PropValue v) = setProp k v
 setProp' k (PropExpression v) = setPropExpression k v
+setProp' k PropDefault        = delProp k
 
 getProp' :: HasGetProp a
          => Key a -> Ptr SymbolizerBase -> IO (Maybe (PropValue a))
@@ -409,6 +410,10 @@ getPropExpression (keyIndex -> k) sym =
       *$(char** ptr) = NULL;
     }
     }|]
+
+delProp :: Key a -> Ptr SymbolizerBase -> IO ()
+delProp (keyIndex -> k) sym =
+  [C.block|void { $(symbolizer_base *sym)->properties.erase($(keys k)); }|]
 
 getProperty :: Key a -> Ptr SymbolizerBase -> IO (Maybe Property)
 getProperty Gamma = fmap (fmap (Gamma :=>)) . getProp' Gamma
@@ -452,7 +457,7 @@ getProperty Smooth = fmap (fmap (Smooth :=>)) . getProp' Smooth
 getProperty SimplifyAlgorithm = fmap (fmap (SimplifyAlgorithm :=>)) . getProp' SimplifyAlgorithm
 getProperty SimplifyTolerance = fmap (fmap (SimplifyTolerance :=>)) . getProp' SimplifyTolerance
 getProperty HaloRasterizer = fmap (fmap (HaloRasterizer :=>)) . getProp' HaloRasterizer
-getProperty TextPlacements_ = fmap (fmap (TextPlacements_ :=>)) . getProp' TextPlacements_
+getProperty TextPlacements = fmap (fmap (TextPlacements :=>)) . getProp' TextPlacements
 getProperty LabelPlacement = fmap (fmap (LabelPlacement :=>)) . getProp' LabelPlacement
 getProperty MarkersPlacementType = fmap (fmap (MarkersPlacementType :=>)) . getProp' MarkersPlacementType
 getProperty MarkersMultipolicy = fmap (fmap (MarkersMultipolicy :=>)) . getProp' MarkersMultipolicy
@@ -517,7 +522,7 @@ setProperty (Smooth :=> v) = setProp' Smooth v
 setProperty (SimplifyAlgorithm :=> v) = setProp' SimplifyAlgorithm v
 setProperty (SimplifyTolerance :=> v) = setProp' SimplifyTolerance v
 setProperty (HaloRasterizer :=> v) = setProp' HaloRasterizer v
-setProperty (TextPlacements_ :=> v) = setProp' TextPlacements_ v
+setProperty (TextPlacements :=> v) = setProp' TextPlacements v
 setProperty (LabelPlacement :=> v) = setProp' LabelPlacement v
 setProperty (MarkersPlacementType :=> v) = setProp' MarkersPlacementType v
 setProperty (MarkersMultipolicy :=> v) = setProp' MarkersMultipolicy v
@@ -582,7 +587,7 @@ keyIndex Smooth = [C.pure|keys{keys::smooth}|]
 keyIndex SimplifyAlgorithm = [C.pure|keys{keys::simplify_algorithm}|]
 keyIndex SimplifyTolerance = [C.pure|keys{keys::simplify_tolerance}|]
 keyIndex HaloRasterizer = [C.pure|keys{keys::halo_rasterizer}|]
-keyIndex TextPlacements_ = [C.pure|keys{keys::text_placements_}|]
+keyIndex TextPlacements = [C.pure|keys{keys::text_placements_}|]
 keyIndex LabelPlacement = [C.pure|keys{keys::label_placement}|]
 keyIndex MarkersPlacementType = [C.pure|keys{keys::markers_placement_type}|]
 keyIndex MarkersMultipolicy = [C.pure|keys{keys::markers_multipolicy}|]

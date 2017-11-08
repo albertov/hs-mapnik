@@ -17,12 +17,14 @@ library
                      , Mapnik.Map
                      , Mapnik.Style
                      , Mapnik.Rule
-                     , Mapnik.Symbolizer
                      , Mapnik.Layer
                      , Mapnik.Parameter
                      , Mapnik.Datasource
                      , Mapnik.Common
                      , Mapnik.Enums
+                     , Mapnik.Symbolizer
+                     , Mapnik.Symbolizer.Property
+                     , Mapnik.Symbolizer.TextProperties
   other-modules:       Mapnik.Imports
                      , Mapnik.TH
   build-depends:       base                >= 4.7  && < 5
@@ -35,6 +37,7 @@ library
                      , dependent-sum
                      , dependent-sum-template
                      , vector
+                     , data-default
   default-language:    Haskell2010
   ghc-options:         -Wall
 

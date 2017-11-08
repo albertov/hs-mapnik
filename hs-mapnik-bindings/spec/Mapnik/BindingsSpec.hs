@@ -6,8 +6,9 @@ import qualified Data.ByteString as BS
 import           Test.Hspec
 import qualified Mapnik
 import           Mapnik ( Symbolizer(..), Color(..), Key(..), Dash(..)
-                        , PropValue (..), (==>), DashArray
-                        , styles, rules, symbolizers, strokeDasharray)
+                        , (==>), DashArray
+                        , styles, rules, symbolizers, strokeDasharray
+                        , _PropValue)
 import           Mapnik.Enums
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Registry (registerDefaults)
@@ -273,14 +274,13 @@ spec = beforeAll_ registerDefaults $ do
       m' <- Map.create 512 512
       loadFixture m'
       m <- fromMapnik m'
-      let lns :: Traversal' Mapnik.Map (PropValue DashArray)
+      let lns :: Traversal' Mapnik.Map DashArray
           lns = styles . at "provlines" . _Just
               . rules . ix 0
               . symbolizers . ix 0
-              . strokeDasharray . _Just
-      m^?lns `shouldBe` Just (PropValue [Dash 8 4, Dash 2 2, Dash 2 2])
-      let m2 = m & lns .~ PropValue []
-      m2^?lns `shouldBe` Just (PropValue [])
+              . strokeDasharray
+              . _PropValue
+      m^?lns `shouldBe` Just [Dash 8 4, Dash 2 2, Dash 2 2]
 
 loadFixture :: Map -> IO ()
 loadFixture m = do

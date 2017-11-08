@@ -14,6 +14,7 @@ module Mapnik.Bindings (
 , SymbolizerBase (..)
 , Expression (..)
 , Transform (..)
+, TextPlacements (..)
 , Color(..)
 , Box (..)
 , Datasource (..)
@@ -61,6 +62,8 @@ newtype Expression = Expression (ForeignPtr Expression)
   deriving (Eq)
 newtype Transform = Transform (ForeignPtr Transform)
   deriving (Eq)
+newtype TextPlacements = TextPlacements (ForeignPtr TextPlacements)
+  deriving (Eq)
 
 #ifdef BIGINT
 type MapnikInt = C.CLong
@@ -90,5 +93,6 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "param_type", [t| C.CInt |])
       , (C.TypeName "value_integer", [t| MapnikInt |])
       , (C.TypeName "color", [t| Mapnik.Color |])
+      , (C.TypeName "text_placements_ptr", [t| TextPlacements |])
       ]
     }

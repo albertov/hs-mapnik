@@ -188,6 +188,19 @@ data Direction
   deriving (Eq, Show, Bounded, Enum, Generic)
 deriveMapnikJSON 0 ''Direction
 
+data PlacementDirection
+  = PlacementNorth
+  | PlacementEast
+  | PlacementSouth
+  | PlacementWest
+  | PlacementNorthEast
+  | PlacementSouthEast
+  | PlacementNorthWest
+  | PlacementSouthWest
+  | PlacementExact
+  deriving (Eq, Show, Bounded, Enum, Generic)
+deriveMapnikJSON 0 ''PlacementDirection
+
 data GammaMethod
   = GammaPower
   | GammaLinear

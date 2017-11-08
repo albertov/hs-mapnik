@@ -14,251 +14,23 @@
 {-# LANGUAGE TypeFamilies #-}
 module Mapnik.Symbolizer (
   module Mapnik.Symbolizer
+, module Mapnik.Symbolizer.Property
+, module Mapnik.Symbolizer.TextProperties
 , DSum (..)
 ) where
 
 import Mapnik.Imports
 import Mapnik.Enums
 import Mapnik.Common
-import Control.Applicative
+import Mapnik.Symbolizer.TextProperties
+import Mapnik.Symbolizer.Property
+
 import Control.Lens
 import Data.Aeson
-import Data.Aeson.Types
 import Data.Text (Text)
-import qualified Data.HashMap.Strict as HM
-import Data.GADT.Compare.TH
-import Data.GADT.Show.TH
-import Data.Dependent.Sum as DSum (DSum(..), ShowTag(..), EqTag(..))
+import Data.Maybe (fromMaybe)
 import qualified Data.Dependent.Map as DMap
-import GHC.Exts (IsList(..))
-
-instance IsList Properties where
-  type Item Properties = Property
-  fromList = DMap.fromList
-  toList = DMap.toList
-
-data PropValue v = PropValue      v
-                 | PropExpression Expression
-  deriving (Eq, Show, Functor)
-
-instance ToJSON v => ToJSON (PropValue v) where
-  toJSON (PropValue v)      = toJSON v
-  toJSON (PropExpression v) = toJSON v
-
-instance FromJSON v => FromJSON (PropValue v) where
-  parseJSON o = (PropValue <$> parseJSON o) <|> (PropExpression <$> parseJSON o)
-
-type Property = DSum Key PropValue
-
-type Properties = DMap.DMap Key PropValue
-
-data Key a where
-    Gamma :: Key Double
-    GammaMethod :: Key GammaMethod
-    Opacity :: Key Double
-    Alignment :: Key PatternAlignment
-    Offset :: Key Double
-    CompOp :: Key CompositeMode
-    Clip :: Key Bool
-    Fill :: Key Color
-    FillOpacity :: Key Double
-    Stroke :: Key Color
-    StrokeWidth :: Key Double
-    StrokeOpacity :: Key Double
-    StrokeLinejoin :: Key LineJoin
-    StrokeLinecap :: Key LineCap
-    StrokeGamma :: Key Double
-    StrokeGammaMethod :: Key GammaMethod
-    StrokeDashoffset :: Key Double
-    StrokeDasharray :: Key DashArray
-    StrokeMiterlimit :: Key Double
-    GeometryTransform :: Key Transform
-    LineRasterizer :: Key LineRasterizer
-    ImageTransform :: Key Transform
-    Spacing :: Key Double
-    MaxError :: Key Double
-    AllowOverlap :: Key Bool
-    IgnorePlacement :: Key Bool
-    Width :: Key Double
-    Height :: Key Double
-    File :: Key FilePath
-    ShieldDx :: Key Double
-    ShieldDy :: Key Double
-    UnlockImage :: Key Bool
-    Mode :: Key Text
-    Scaling :: Key ()
-    FilterFactor :: Key Double
-    MeshSize :: Key Int
-    Premultiplied :: Key Bool
-    Smooth :: Key Double
-    SimplifyAlgorithm :: Key ()
-    SimplifyTolerance :: Key Double
-    HaloRasterizer :: Key HaloRasterizer
-    TextPlacements_ :: Key ()
-    LabelPlacement :: Key LabelPlacement
-    MarkersPlacementType :: Key MarkerPlacement
-    MarkersMultipolicy :: Key MarkerMultiPolicy
-    PointPlacementType :: Key PointPlacement
-    Colorizer :: Key ()
-    HaloTransform :: Key Transform
-    NumColumns :: Key Int
-    StartColumn :: Key Int
-    RepeatKey :: Key Expression
-    GroupProperties :: Key ()
-    LargestBoxOnly :: Key Bool
-    MinimumPathLength :: Key Double
-    HaloCompOp :: Key CompositeMode
-    TextTransform :: Key TextTransform
-    HorizontalAlignment :: Key HorizontalAlignment
-    JustifyAlignment :: Key JustifyAlignment
-    VerticalAlignment :: Key VerticalAlignment
-    Upright :: Key Upright
-    Direction :: Key Direction
-    AvoidEdges :: Key Bool
-    FfSettings :: Key ()
-
-deriveGCompare ''Key
-deriveGEq ''Key
-deriveGShow ''Key
-deriving instance Show (Key a)
-deriving instance Eq (Key a)
-
-(==>) :: Key v -> v -> Property
-k ==> v = k :=> PropValue v
-
-(=~>) :: Key v -> Expression -> Property
-k =~> v = k :=> PropExpression v
-
-instance ShowTag Key PropValue where
-  showTaggedPrec Gamma = showsPrec
-  showTaggedPrec GammaMethod = showsPrec
-  showTaggedPrec Opacity = showsPrec
-  showTaggedPrec Alignment = showsPrec
-  showTaggedPrec Offset = showsPrec
-  showTaggedPrec CompOp = showsPrec
-  showTaggedPrec Clip = showsPrec
-  showTaggedPrec Fill = showsPrec
-  showTaggedPrec FillOpacity = showsPrec
-  showTaggedPrec Stroke = showsPrec
-  showTaggedPrec StrokeWidth = showsPrec
-  showTaggedPrec StrokeOpacity = showsPrec
-  showTaggedPrec StrokeLinejoin = showsPrec
-  showTaggedPrec StrokeLinecap = showsPrec
-  showTaggedPrec StrokeGamma = showsPrec
-  showTaggedPrec StrokeGammaMethod = showsPrec
-  showTaggedPrec StrokeDashoffset = showsPrec
-  showTaggedPrec StrokeDasharray = showsPrec
-  showTaggedPrec StrokeMiterlimit = showsPrec
-  showTaggedPrec GeometryTransform = showsPrec
-  showTaggedPrec LineRasterizer = showsPrec
-  showTaggedPrec ImageTransform = showsPrec
-  showTaggedPrec Spacing = showsPrec
-  showTaggedPrec MaxError = showsPrec
-  showTaggedPrec AllowOverlap = showsPrec
-  showTaggedPrec IgnorePlacement = showsPrec
-  showTaggedPrec Width = showsPrec
-  showTaggedPrec Height = showsPrec
-  showTaggedPrec File = showsPrec
-  showTaggedPrec ShieldDx = showsPrec
-  showTaggedPrec ShieldDy = showsPrec
-  showTaggedPrec UnlockImage = showsPrec
-  showTaggedPrec Mode = showsPrec
-  showTaggedPrec Scaling = showsPrec
-  showTaggedPrec FilterFactor = showsPrec
-  showTaggedPrec MeshSize = showsPrec
-  showTaggedPrec Premultiplied = showsPrec
-  showTaggedPrec Smooth = showsPrec
-  showTaggedPrec SimplifyAlgorithm = showsPrec
-  showTaggedPrec SimplifyTolerance = showsPrec
-  showTaggedPrec HaloRasterizer = showsPrec
-  showTaggedPrec TextPlacements_ = showsPrec
-  showTaggedPrec LabelPlacement = showsPrec
-  showTaggedPrec MarkersPlacementType = showsPrec
-  showTaggedPrec MarkersMultipolicy = showsPrec
-  showTaggedPrec PointPlacementType = showsPrec
-  showTaggedPrec Colorizer = showsPrec
-  showTaggedPrec HaloTransform = showsPrec
-  showTaggedPrec NumColumns = showsPrec
-  showTaggedPrec StartColumn = showsPrec
-  showTaggedPrec RepeatKey = showsPrec
-  showTaggedPrec GroupProperties = showsPrec
-  showTaggedPrec LargestBoxOnly = showsPrec
-  showTaggedPrec MinimumPathLength = showsPrec
-  showTaggedPrec HaloCompOp = showsPrec
-  showTaggedPrec TextTransform = showsPrec
-  showTaggedPrec HorizontalAlignment = showsPrec
-  showTaggedPrec JustifyAlignment = showsPrec
-  showTaggedPrec VerticalAlignment = showsPrec
-  showTaggedPrec Upright = showsPrec
-  showTaggedPrec Direction = showsPrec
-  showTaggedPrec AvoidEdges = showsPrec
-  showTaggedPrec FfSettings = showsPrec
-
-instance EqTag Key PropValue where
-  eqTagged Gamma Gamma = (==)
-  eqTagged GammaMethod GammaMethod = (==)
-  eqTagged Opacity Opacity = (==)
-  eqTagged Alignment Alignment = (==)
-  eqTagged Offset Offset = (==)
-  eqTagged CompOp CompOp = (==)
-  eqTagged Clip Clip = (==)
-  eqTagged Fill Fill = (==)
-  eqTagged FillOpacity FillOpacity = (==)
-  eqTagged Stroke Stroke = (==)
-  eqTagged StrokeWidth StrokeWidth = (==)
-  eqTagged StrokeOpacity StrokeOpacity = (==)
-  eqTagged StrokeLinejoin StrokeLinejoin = (==)
-  eqTagged StrokeLinecap StrokeLinecap = (==)
-  eqTagged StrokeGamma StrokeGamma = (==)
-  eqTagged StrokeGammaMethod StrokeGammaMethod = (==)
-  eqTagged StrokeDashoffset StrokeDashoffset = (==)
-  eqTagged StrokeDasharray StrokeDasharray = (==)
-  eqTagged StrokeMiterlimit StrokeMiterlimit = (==)
-  eqTagged GeometryTransform GeometryTransform = (==)
-  eqTagged LineRasterizer LineRasterizer = (==)
-  eqTagged ImageTransform ImageTransform = (==)
-  eqTagged Spacing Spacing = (==)
-  eqTagged MaxError MaxError = (==)
-  eqTagged AllowOverlap AllowOverlap = (==)
-  eqTagged IgnorePlacement IgnorePlacement = (==)
-  eqTagged Width Width = (==)
-  eqTagged Height Height = (==)
-  eqTagged File File = (==)
-  eqTagged ShieldDx ShieldDx = (==)
-  eqTagged ShieldDy ShieldDy = (==)
-  eqTagged UnlockImage UnlockImage = (==)
-  eqTagged Mode Mode = (==)
-  eqTagged Scaling Scaling = (==)
-  eqTagged FilterFactor FilterFactor = (==)
-  eqTagged MeshSize MeshSize = (==)
-  eqTagged Premultiplied Premultiplied = (==)
-  eqTagged Smooth Smooth = (==)
-  eqTagged SimplifyAlgorithm SimplifyAlgorithm = (==)
-  eqTagged SimplifyTolerance SimplifyTolerance = (==)
-  eqTagged HaloRasterizer HaloRasterizer = (==)
-  eqTagged TextPlacements_ TextPlacements_ = (==)
-  eqTagged LabelPlacement LabelPlacement = (==)
-  eqTagged MarkersPlacementType MarkersPlacementType = (==)
-  eqTagged MarkersMultipolicy MarkersMultipolicy = (==)
-  eqTagged PointPlacementType PointPlacementType = (==)
-  eqTagged Colorizer Colorizer = (==)
-  eqTagged HaloTransform HaloTransform = (==)
-  eqTagged NumColumns NumColumns = (==)
-  eqTagged StartColumn StartColumn = (==)
-  eqTagged RepeatKey RepeatKey = (==)
-  eqTagged GroupProperties GroupProperties = (==)
-  eqTagged LargestBoxOnly LargestBoxOnly = (==)
-  eqTagged MinimumPathLength MinimumPathLength = (==)
-  eqTagged HaloCompOp HaloCompOp = (==)
-  eqTagged TextTransform TextTransform = (==)
-  eqTagged HorizontalAlignment HorizontalAlignment = (==)
-  eqTagged JustifyAlignment JustifyAlignment = (==)
-  eqTagged VerticalAlignment VerticalAlignment = (==)
-  eqTagged Upright Upright = (==)
-  eqTagged Direction Direction = (==)
-  eqTagged AvoidEdges AvoidEdges = (==)
-  eqTagged FfSettings FfSettings = (==)
-  eqTagged _ _ = \_ _ -> False
+import qualified Data.HashMap.Strict as HM
 
 
 
@@ -277,7 +49,6 @@ data Symbolizer
   | Debug          { _symbolizerProperties :: Properties }
   | Dot            { _symbolizerProperties :: Properties }
   deriving (Eq, Show, Generic)
-makeClassy ''Symbolizer
 makeFields ''Symbolizer
 makePrisms ''Symbolizer
 
@@ -300,77 +71,13 @@ toProperties :: Symbolizer -> [DSum Key PropValue]
 toProperties = DMap.toList . _symbolizerProperties
 
 instance ToJSON Symbolizer where
-  toJSON sym = object (("type",toJSON (symType sym)):map go  (toProperties sym))
-    where
-      go :: Property -> (Text,Value)
-      go (Gamma :=> v) = ("gamma", toJSON v)
-      go (GammaMethod :=> v) = ("gammaMethod", toJSON v)
-      go (Opacity :=> v) = ("opacity", toJSON v)
-      go (Alignment :=> v) = ("alignment", toJSON v)
-      go (Offset :=> v) = ("offset", toJSON v)
-      go (CompOp :=> v) = ("compOp", toJSON v)
-      go (Clip :=> v) = ("clip", toJSON v)
-      go (Fill :=> v) = ("fill", toJSON v)
-      go (FillOpacity :=> v) = ("fillOpacity", toJSON v)
-      go (Stroke :=> v) = ("stroke", toJSON v)
-      go (StrokeWidth :=> v) = ("strokeWidth", toJSON v)
-      go (StrokeOpacity :=> v) = ("strokeOpacity", toJSON v)
-      go (StrokeLinejoin :=> v) = ("strokeLinejoin", toJSON v)
-      go (StrokeLinecap :=> v) = ("strokeLinecap", toJSON v)
-      go (StrokeGamma :=> v) = ("strokeGamma", toJSON v)
-      go (StrokeGammaMethod :=> v) = ("strokeGammaMethod", toJSON v)
-      go (StrokeDashoffset :=> v) = ("strokeDashoffset", toJSON v)
-      go (StrokeDasharray :=> v) = ("strokeDasharray", toJSON v)
-      go (StrokeMiterlimit :=> v) = ("strokeMiterlimit", toJSON v)
-      go (GeometryTransform :=> v) = ("geometryTransform", toJSON v)
-      go (LineRasterizer :=> v) = ("lineRasterizer", toJSON v)
-      go (ImageTransform :=> v) = ("imageTransform", toJSON v)
-      go (Spacing :=> v) = ("spacing", toJSON v)
-      go (MaxError :=> v) = ("maxError", toJSON v)
-      go (AllowOverlap :=> v) = ("allowOverlap", toJSON v)
-      go (IgnorePlacement :=> v) = ("ignorePlacement", toJSON v)
-      go (Width :=> v) = ("width", toJSON v)
-      go (Height :=> v) = ("height", toJSON v)
-      go (File :=> v) = ("file", toJSON v)
-      go (ShieldDx :=> v) = ("shieldDx", toJSON v)
-      go (ShieldDy :=> v) = ("shieldDy", toJSON v)
-      go (UnlockImage :=> v) = ("unlockImage", toJSON v)
-      go (Mode :=> v) = ("mode", toJSON v)
-      go (Scaling :=> v) = ("scaling", toJSON v)
-      go (FilterFactor :=> v) = ("filterFactor", toJSON v)
-      go (MeshSize :=> v) = ("meshSize", toJSON v)
-      go (Premultiplied :=> v) = ("premultiplied", toJSON v)
-      go (Smooth :=> v) = ("smooth", toJSON v)
-      go (SimplifyAlgorithm :=> v) = ("simplifyAlgorithm", toJSON v)
-      go (SimplifyTolerance :=> v) = ("simplifyTolerance", toJSON v)
-      go (HaloRasterizer :=> v) = ("haloRasterizer", toJSON v)
-      go (TextPlacements_ :=> v) = ("textPlacements_", toJSON v)
-      go (LabelPlacement :=> v) = ("labelPlacement", toJSON v)
-      go (MarkersPlacementType :=> v) = ("markersPlacementType", toJSON v)
-      go (MarkersMultipolicy :=> v) = ("markersMultipolicy", toJSON v)
-      go (PointPlacementType :=> v) = ("pointPlacementType", toJSON v)
-      go (Colorizer :=> v) = ("colorizer", toJSON v)
-      go (HaloTransform :=> v) = ("haloTransform", toJSON v)
-      go (NumColumns :=> v) = ("numColumns", toJSON v)
-      go (StartColumn :=> v) = ("startColumn", toJSON v)
-      go (RepeatKey :=> v) = ("repeatKey", toJSON v)
-      go (GroupProperties :=> v) = ("groupProperties", toJSON v)
-      go (LargestBoxOnly :=> v) = ("largestBoxOnly", toJSON v)
-      go (MinimumPathLength :=> v) = ("minimumPathLength", toJSON v)
-      go (HaloCompOp :=> v) = ("haloCompOp", toJSON v)
-      go (TextTransform :=> v) = ("textTransform", toJSON v)
-      go (HorizontalAlignment :=> v) = ("horizontalAlignment", toJSON v)
-      go (JustifyAlignment :=> v) = ("justifyAlignment", toJSON v)
-      go (VerticalAlignment :=> v) = ("verticalAlignment", toJSON v)
-      go (Upright :=> v) = ("upright", toJSON v)
-      go (Direction :=> v) = ("direction", toJSON v)
-      go (AvoidEdges :=> v) = ("avoidEdges", toJSON v)
-      go (FfSettings :=> v) = ("ffSettings", toJSON v)
+  toJSON sym = object (("type",toJSON (symType sym)):props)
+    where props = map serializeProperty  (toProperties sym)
 
 instance FromJSON Symbolizer where
   parseJSON = withObject "Symbolizer" $ \o -> do
     type_ :: Text <- o .: "type" 
-    props <- DMap.fromList <$> mapM (uncurry parseProperty) (HM.toList (HM.delete "type" o))
+    props <- parseProperties (HM.delete "type" o)
     case type_ of
       "point" -> return (Point props)
       "line" -> return (Line props)
@@ -387,268 +94,203 @@ instance FromJSON Symbolizer where
       "dot" -> return (Dot props)
       _     -> fail "Unknown symbolizer type"
 
-parseProperty :: Text -> Value -> Parser Property
-parseProperty "gamma" v = (Gamma :=>) <$> parseJSON v
-parseProperty "gammaMethod" v = (GammaMethod :=>) <$> parseJSON v
-parseProperty "opacity" v = (Opacity :=>) <$> parseJSON v
-parseProperty "alignment" v = (Alignment :=>) <$> parseJSON v
-parseProperty "offset" v = (Offset :=>) <$> parseJSON v
-parseProperty "compOp" v = (CompOp :=>) <$> parseJSON v
-parseProperty "clip" v = (Clip :=>) <$> parseJSON v
-parseProperty "fill" v = (Fill :=>) <$> parseJSON v
-parseProperty "fillOpacity" v = (FillOpacity :=>) <$> parseJSON v
-parseProperty "stroke" v = (Stroke :=>) <$> parseJSON v
-parseProperty "strokeWidth" v = (StrokeWidth :=>) <$> parseJSON v
-parseProperty "strokeOpacity" v = (StrokeOpacity :=>) <$> parseJSON v
-parseProperty "strokeLinejoin" v = (StrokeLinejoin :=>) <$> parseJSON v
-parseProperty "strokeLinecap" v = (StrokeLinecap :=>) <$> parseJSON v
-parseProperty "strokeGamma" v = (StrokeGamma :=>) <$> parseJSON v
-parseProperty "strokeGammaMethod" v = (StrokeGammaMethod :=>) <$> parseJSON v
-parseProperty "strokeDashoffset" v = (StrokeDashoffset :=>) <$> parseJSON v
-parseProperty "strokeDasharray" v = (StrokeDasharray :=>) <$> parseJSON v
-parseProperty "strokeMiterlimit" v = (StrokeMiterlimit :=>) <$> parseJSON v
-parseProperty "geometryTransform" v = (GeometryTransform :=>) <$> parseJSON v
-parseProperty "lineRasterizer" v = (LineRasterizer :=>) <$> parseJSON v
-parseProperty "imageTransform" v = (ImageTransform :=>) <$> parseJSON v
-parseProperty "spacing" v = (Spacing :=>) <$> parseJSON v
-parseProperty "maxError" v = (MaxError :=>) <$> parseJSON v
-parseProperty "allowOverlap" v = (AllowOverlap :=>) <$> parseJSON v
-parseProperty "ignorePlacement" v = (IgnorePlacement :=>) <$> parseJSON v
-parseProperty "width" v = (Width :=>) <$> parseJSON v
-parseProperty "height" v = (Height :=>) <$> parseJSON v
-parseProperty "file" v = (File :=>) <$> parseJSON v
-parseProperty "shieldDx" v = (ShieldDx :=>) <$> parseJSON v
-parseProperty "shieldDy" v = (ShieldDy :=>) <$> parseJSON v
-parseProperty "unlockImage" v = (UnlockImage :=>) <$> parseJSON v
-parseProperty "mode" v = (Mode :=>) <$> parseJSON v
-parseProperty "scaling" v = (Scaling :=>) <$> parseJSON v
-parseProperty "filterFactor" v = (FilterFactor :=>) <$> parseJSON v
-parseProperty "meshSize" v = (MeshSize :=>) <$> parseJSON v
-parseProperty "premultiplied" v = (Premultiplied :=>) <$> parseJSON v
-parseProperty "smooth" v = (Smooth :=>) <$> parseJSON v
-parseProperty "simplifyAlgorithm" v = (SimplifyAlgorithm :=>) <$> parseJSON v
-parseProperty "simplifyTolerance" v = (SimplifyTolerance :=>) <$> parseJSON v
-parseProperty "haloRasterizer" v = (HaloRasterizer :=>) <$> parseJSON v
-parseProperty "textPlacements_" v = (TextPlacements_ :=>) <$> parseJSON v
-parseProperty "labelPlacement" v = (LabelPlacement :=>) <$> parseJSON v
-parseProperty "markersPlacementType" v = (MarkersPlacementType :=>) <$> parseJSON v
-parseProperty "markersMultipolicy" v = (MarkersMultipolicy :=>) <$> parseJSON v
-parseProperty "pointPlacementType" v = (PointPlacementType :=>) <$> parseJSON v
-parseProperty "colorizer" v = (Colorizer :=>) <$> parseJSON v
-parseProperty "haloTransform" v = (HaloTransform :=>) <$> parseJSON v
-parseProperty "numColumns" v = (NumColumns :=>) <$> parseJSON v
-parseProperty "startColumn" v = (StartColumn :=>) <$> parseJSON v
-parseProperty "repeatKey" v = (RepeatKey :=>) <$> parseJSON v
-parseProperty "groupProperties" v = (GroupProperties :=>) <$> parseJSON v
-parseProperty "largestBoxOnly" v = (LargestBoxOnly :=>) <$> parseJSON v
-parseProperty "minimumPathLength" v = (MinimumPathLength :=>) <$> parseJSON v
-parseProperty "haloCompOp" v = (HaloCompOp :=>) <$> parseJSON v
-parseProperty "textTransform" v = (TextTransform :=>) <$> parseJSON v
-parseProperty "horizontalAlignment" v = (HorizontalAlignment :=>) <$> parseJSON v
-parseProperty "justifyAlignment" v = (JustifyAlignment :=>) <$> parseJSON v
-parseProperty "verticalAlignment" v = (VerticalAlignment :=>) <$> parseJSON v
-parseProperty "upright" v = (Upright :=>) <$> parseJSON v
-parseProperty "direction" v = (Direction :=>) <$> parseJSON v
-parseProperty "avoidEdges" v = (AvoidEdges :=>) <$> parseJSON v
-parseProperty "ffSettings" v = (FfSettings :=>) <$> parseJSON v
-parseProperty _ _ = fail "Unknown symbolizer property"
 
-symbolizerLens :: Key a -> Lens' Symbolizer (Maybe (PropValue a))
-symbolizerLens k = properties . lens get' set' where
-  get' = DMap.lookup k
-  set' m Nothing = DMap.delete k m
-  set' m (Just v) = DMap.insert k v m
+symbolizerLens :: Key a -> Lens' Symbolizer (PropValue a)
+symbolizerLens k = properties . lens get_ set_ where
+  get_ = fromMaybe PropDefault . DMap.lookup k
+  set_ m PropDefault = DMap.delete k m
+  set_ m v           = DMap.insert k v m
 {-# INLINE symbolizerLens #-}
 
-gamma :: Lens' Symbolizer (Maybe (PropValue Double))
+gamma :: Lens' Symbolizer (PropValue Double)
 gamma = symbolizerLens Gamma
 
-gammaMethod :: Lens' Symbolizer (Maybe (PropValue GammaMethod))
+gammaMethod :: Lens' Symbolizer (PropValue GammaMethod)
 gammaMethod = symbolizerLens GammaMethod
 
 class HasOpacity o v | o->v where
   opacity :: Lens' o v
 
-instance HasOpacity Symbolizer (Maybe (PropValue Double)) where
+instance HasOpacity Symbolizer (PropValue Double) where
   opacity = symbolizerLens Opacity
 
-alignment :: Lens' Symbolizer (Maybe (PropValue PatternAlignment))
+alignment :: Lens' Symbolizer (PropValue PatternAlignment)
 alignment = symbolizerLens Alignment
 
-offset :: Lens' Symbolizer (Maybe (PropValue Double))
+offset :: Lens' Symbolizer (PropValue Double)
 offset = symbolizerLens Offset
 
-compOp :: Lens' Symbolizer (Maybe (PropValue CompositeMode))
+compOp :: Lens' Symbolizer (PropValue CompositeMode)
 compOp = symbolizerLens CompOp
 
-clip :: Lens' Symbolizer (Maybe (PropValue Bool))
+clip :: Lens' Symbolizer (PropValue Bool)
 clip = symbolizerLens Clip
 
-fill :: Lens' Symbolizer (Maybe (PropValue Color))
-fill = symbolizerLens Fill
+instance HasFill Symbolizer (PropValue Color) where
+  fill = symbolizerLens Fill
 
-fillOpacity :: Lens' Symbolizer (Maybe (PropValue Double))
+fillOpacity :: Lens' Symbolizer (PropValue Double)
 fillOpacity = symbolizerLens FillOpacity
 
-stroke :: Lens' Symbolizer (Maybe (PropValue Color))
+stroke :: Lens' Symbolizer (PropValue Color)
 stroke = symbolizerLens Stroke
 
-strokeWidth :: Lens' Symbolizer (Maybe (PropValue Double))
+strokeWidth :: Lens' Symbolizer (PropValue Double)
 strokeWidth = symbolizerLens StrokeWidth
 
-strokeOpacity :: Lens' Symbolizer (Maybe (PropValue Double))
+strokeOpacity :: Lens' Symbolizer (PropValue Double)
 strokeOpacity = symbolizerLens StrokeOpacity
 
-strokeLinejoin :: Lens' Symbolizer (Maybe (PropValue LineJoin))
+strokeLinejoin :: Lens' Symbolizer (PropValue LineJoin)
 strokeLinejoin = symbolizerLens StrokeLinejoin
 
-strokeLinecap :: Lens' Symbolizer (Maybe (PropValue LineCap))
+strokeLinecap :: Lens' Symbolizer (PropValue LineCap)
 strokeLinecap = symbolizerLens StrokeLinecap
 
-strokeGamma :: Lens' Symbolizer (Maybe (PropValue Double))
+strokeGamma :: Lens' Symbolizer (PropValue Double)
 strokeGamma = symbolizerLens StrokeGamma
 
-strokeGammaMethod :: Lens' Symbolizer (Maybe (PropValue GammaMethod))
+strokeGammaMethod :: Lens' Symbolizer (PropValue GammaMethod)
 strokeGammaMethod = symbolizerLens StrokeGammaMethod
 
-strokeDashoffset :: Lens' Symbolizer (Maybe (PropValue Double))
+strokeDashoffset :: Lens' Symbolizer (PropValue Double)
 strokeDashoffset = symbolizerLens StrokeDashoffset
 
-strokeDasharray :: Lens' Symbolizer (Maybe (PropValue DashArray))
+strokeDasharray :: Lens' Symbolizer (PropValue DashArray)
 strokeDasharray = symbolizerLens StrokeDasharray
 
-strokeMiterlimit :: Lens' Symbolizer (Maybe (PropValue Double))
+strokeMiterlimit :: Lens' Symbolizer (PropValue Double)
 strokeMiterlimit = symbolizerLens StrokeMiterlimit
 
-geometryTransform :: Lens' Symbolizer (Maybe (PropValue Transform))
+geometryTransform :: Lens' Symbolizer (PropValue Transform)
 geometryTransform = symbolizerLens GeometryTransform
 
-lineRasterizer :: Lens' Symbolizer (Maybe (PropValue LineRasterizer))
+lineRasterizer :: Lens' Symbolizer (PropValue LineRasterizer)
 lineRasterizer = symbolizerLens LineRasterizer
 
-imageTransform :: Lens' Symbolizer (Maybe (PropValue Transform))
+imageTransform :: Lens' Symbolizer (PropValue Transform)
 imageTransform = symbolizerLens ImageTransform
 
-spacing :: Lens' Symbolizer (Maybe (PropValue Double))
+spacing :: Lens' Symbolizer (PropValue Double)
 spacing = symbolizerLens Spacing
 
-maxError :: Lens' Symbolizer (Maybe (PropValue Double))
+maxError :: Lens' Symbolizer (PropValue Double)
 maxError = symbolizerLens MaxError
 
-allowOverlap :: Lens' Symbolizer (Maybe (PropValue Bool))
-allowOverlap = symbolizerLens AllowOverlap
+instance HasAllowOverlap Symbolizer (PropValue Bool)
+  where allowOverlap = symbolizerLens AllowOverlap
 
-ignorePlacement :: Lens' Symbolizer (Maybe (PropValue Bool))
+ignorePlacement :: Lens' Symbolizer (PropValue Bool)
 ignorePlacement = symbolizerLens IgnorePlacement
 
-width :: Lens' Symbolizer (Maybe (PropValue Double))
+width :: Lens' Symbolizer (PropValue Double)
 width = symbolizerLens Width
 
-height :: Lens' Symbolizer (Maybe (PropValue Double))
+height :: Lens' Symbolizer (PropValue Double)
 height = symbolizerLens Height
 
-file :: Lens' Symbolizer (Maybe (PropValue FilePath))
+file :: Lens' Symbolizer (PropValue FilePath)
 file = symbolizerLens File
 
-shieldDx :: Lens' Symbolizer (Maybe (PropValue Double))
+shieldDx :: Lens' Symbolizer (PropValue Double)
 shieldDx = symbolizerLens ShieldDx
 
-shieldDy :: Lens' Symbolizer (Maybe (PropValue Double))
+shieldDy :: Lens' Symbolizer (PropValue Double)
 shieldDy = symbolizerLens ShieldDy
 
-unlockImage :: Lens' Symbolizer (Maybe (PropValue Bool))
+unlockImage :: Lens' Symbolizer (PropValue Bool)
 unlockImage = symbolizerLens UnlockImage
 
-mode :: Lens' Symbolizer (Maybe (PropValue Text))
+mode :: Lens' Symbolizer (PropValue Text)
 mode = symbolizerLens Mode
 
-scaling :: Lens' Symbolizer (Maybe (PropValue ()))
+scaling :: Lens' Symbolizer (PropValue Scaling)
 scaling = symbolizerLens Scaling
 
-filterFactor :: Lens' Symbolizer (Maybe (PropValue Double))
+filterFactor :: Lens' Symbolizer (PropValue Double)
 filterFactor = symbolizerLens FilterFactor
 
-meshSize :: Lens' Symbolizer (Maybe (PropValue Int))
+meshSize :: Lens' Symbolizer (PropValue Int)
 meshSize = symbolizerLens MeshSize
 
-premultiplied :: Lens' Symbolizer (Maybe (PropValue Bool))
+premultiplied :: Lens' Symbolizer (PropValue Bool)
 premultiplied = symbolizerLens Premultiplied
 
-smooth :: Lens' Symbolizer (Maybe (PropValue Double))
+smooth :: Lens' Symbolizer (PropValue Double)
 smooth = symbolizerLens Smooth
 
-simplifyAlgorithm :: Lens' Symbolizer (Maybe (PropValue ()))
+simplifyAlgorithm :: Lens' Symbolizer (PropValue SimplifyAlgorithm)
 simplifyAlgorithm = symbolizerLens SimplifyAlgorithm
 
-simplifyTolerance :: Lens' Symbolizer (Maybe (PropValue Double))
+simplifyTolerance :: Lens' Symbolizer (PropValue Double)
 simplifyTolerance = symbolizerLens SimplifyTolerance
 
-haloRasterizer :: Lens' Symbolizer (Maybe (PropValue HaloRasterizer))
+haloRasterizer :: Lens' Symbolizer (PropValue HaloRasterizer)
 haloRasterizer = symbolizerLens HaloRasterizer
 
-textPlacements_ :: Lens' Symbolizer (Maybe (PropValue ()))
-textPlacements_ = symbolizerLens TextPlacements_
+textPlacements :: Lens' Symbolizer (PropValue TextPlacements)
+textPlacements = symbolizerLens TextPlacements
 
-labelPlacement :: Lens' Symbolizer (Maybe (PropValue LabelPlacement))
-labelPlacement = symbolizerLens LabelPlacement
+instance HasLabelPlacement Symbolizer (PropValue LabelPlacement) where
+  labelPlacement = symbolizerLens LabelPlacement
 
-markersPlacementType :: Lens' Symbolizer (Maybe (PropValue MarkerPlacement))
+markersPlacementType :: Lens' Symbolizer (PropValue MarkerPlacement)
 markersPlacementType = symbolizerLens MarkersPlacementType
 
-markersMultipolicy :: Lens' Symbolizer (Maybe (PropValue MarkerMultiPolicy))
+markersMultipolicy :: Lens' Symbolizer (PropValue MarkerMultiPolicy)
 markersMultipolicy = symbolizerLens MarkersMultipolicy
 
-pointPlacementType :: Lens' Symbolizer (Maybe (PropValue PointPlacement))
+pointPlacementType :: Lens' Symbolizer (PropValue PointPlacement)
 pointPlacementType = symbolizerLens PointPlacementType
 
-colorizer :: Lens' Symbolizer (Maybe (PropValue ()))
+colorizer :: Lens' Symbolizer (PropValue Colorizer)
 colorizer = symbolizerLens Colorizer
 
-haloTransform :: Lens' Symbolizer (Maybe (PropValue Transform))
+haloTransform :: Lens' Symbolizer (PropValue Transform)
 haloTransform = symbolizerLens HaloTransform
 
-numColumns :: Lens' Symbolizer (Maybe (PropValue Int))
+numColumns :: Lens' Symbolizer (PropValue Int)
 numColumns = symbolizerLens NumColumns
 
-startColumn :: Lens' Symbolizer (Maybe (PropValue Int))
+startColumn :: Lens' Symbolizer (PropValue Int)
 startColumn = symbolizerLens StartColumn
 
-repeatKey :: Lens' Symbolizer (Maybe (PropValue Expression))
+repeatKey :: Lens' Symbolizer (PropValue Expression)
 repeatKey = symbolizerLens RepeatKey
 
-groupProperties :: Lens' Symbolizer (Maybe (PropValue ()))
+groupProperties :: Lens' Symbolizer (PropValue GroupProperties)
 groupProperties = symbolizerLens GroupProperties
 
-largestBoxOnly :: Lens' Symbolizer (Maybe (PropValue Bool))
-largestBoxOnly = symbolizerLens LargestBoxOnly
+instance HasLargestBoxOnly Symbolizer (PropValue Bool) where
+  largestBoxOnly = symbolizerLens LargestBoxOnly
 
-minimumPathLength :: Lens' Symbolizer (Maybe (PropValue Double))
-minimumPathLength = symbolizerLens MinimumPathLength
+instance HasMinimumPathLength Symbolizer (PropValue Double) where
+  minimumPathLength = symbolizerLens MinimumPathLength
 
-haloCompOp :: Lens' Symbolizer (Maybe (PropValue CompositeMode))
+haloCompOp :: Lens' Symbolizer (PropValue CompositeMode)
 haloCompOp = symbolizerLens HaloCompOp
 
-textTransform :: Lens' Symbolizer (Maybe (PropValue TextTransform))
-textTransform = symbolizerLens TextTransform
+instance HasTextTransform Symbolizer (PropValue TextTransform) where
+  textTransform = symbolizerLens TextTransform
 
-horizontalAlignment :: Lens' Symbolizer (Maybe (PropValue HorizontalAlignment))
-horizontalAlignment = symbolizerLens HorizontalAlignment
+instance HasHorizontalAlignment Symbolizer (PropValue HorizontalAlignment) where
+  horizontalAlignment = symbolizerLens HorizontalAlignment
 
-justifyAlignment :: Lens' Symbolizer (Maybe (PropValue JustifyAlignment))
-justifyAlignment = symbolizerLens JustifyAlignment
+instance HasJustifyAlignment Symbolizer (PropValue JustifyAlignment) where
+  justifyAlignment = symbolizerLens JustifyAlignment
 
-verticalAlignment :: Lens' Symbolizer (Maybe (PropValue VerticalAlignment))
-verticalAlignment = symbolizerLens VerticalAlignment
+instance HasVerticalAlignment Symbolizer (PropValue VerticalAlignment) where
+  verticalAlignment = symbolizerLens VerticalAlignment
 
-upright :: Lens' Symbolizer (Maybe (PropValue Upright))
-upright = symbolizerLens Upright
+instance HasUpright Symbolizer (PropValue Upright) where
+  upright = symbolizerLens Upright
 
-direction :: Lens' Symbolizer (Maybe (PropValue Direction))
-direction = symbolizerLens Direction
+instance HasDirection Symbolizer (PropValue Direction) where
+  direction = symbolizerLens Direction
 
-avoidEdges :: Lens' Symbolizer (Maybe (PropValue Bool))
-avoidEdges = symbolizerLens AvoidEdges
+instance HasAvoidEdges Symbolizer (PropValue Bool) where
+  avoidEdges = symbolizerLens AvoidEdges
 
-ffSettings :: Lens' Symbolizer (Maybe (PropValue ()))
-ffSettings = symbolizerLens FfSettings
+instance HasFfSettings Symbolizer (PropValue FontFeatureSettings) where
+  ffSettings = symbolizerLens FfSettings
 
