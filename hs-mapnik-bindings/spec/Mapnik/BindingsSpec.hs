@@ -5,8 +5,7 @@ module Mapnik.BindingsSpec (main, spec) where
 import qualified Data.ByteString as BS
 import           Test.Hspec
 import qualified Mapnik
-import           Mapnik ( Symbolizer(..), Color(..), Key(..), Dash(..)
-                        , (==>), DashArray)
+import           Mapnik ( Color(..), Dash(..), DashArray, Prop(..))
 import qualified Mapnik.Lens as L
 import           Mapnik.Enums
 import           Mapnik.Bindings
@@ -205,9 +204,10 @@ spec = beforeAll_ registerDefaults $ do
       Just f <- Rule.getFilter r2
       show f `shouldBe` "([NOM_FR]='Québec')"
       mSym <- Symbolizer.unCreate sym
-      mSym `shouldBe` Polygon [ Fill ==> RGBA 217 235 203 255
-                              , CompOp ==> SrcOver
-                              ]
+      let expected = Mapnik.polygon
+                       & L.fill   ?~ Val (RGBA 217 235 203 255)
+                       & L.compOp ?~ Val SrcOver
+      mSym `shouldBe` expected
 
   describe "Parameters" $ do
     it "toList/fromList = id" $ do
@@ -274,8 +274,8 @@ spec = beforeAll_ registerDefaults $ do
           lns = L.styles . at "provlines" . _Just
               . L.rules . ix 0
               . L.symbolizers . ix 0
-              . L.strokeDasharray
-              . L._PropValue
+              . L.strokeDashArray
+              . _Just . L._Val
       m^?lns `shouldBe` Just [Dash 8 4, Dash 2 2, Dash 2 2]
 
 loadFixture :: Map -> IO ()

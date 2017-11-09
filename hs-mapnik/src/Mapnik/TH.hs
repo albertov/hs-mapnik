@@ -1,5 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
-module Mapnik.TH (deriveMapnikJSON, makeMapnikFields) where
+module Mapnik.TH (
+    deriveMapnikJSON
+  , makeMapnikFields
+  , mapnikOptions
+  ) where
 
 
 import Data.Aeson.Types
@@ -9,7 +13,13 @@ import Control.Lens
 import Language.Haskell.TH
 
 deriveMapnikJSON :: Name -> DecsQ
-deriveMapnikJSON = deriveJSON defaultOptions
+deriveMapnikJSON = deriveJSON mapnikOptions
+
+mapnikOptions :: Options
+mapnikOptions = defaultOptions
+  { omitNothingFields = True
+  , sumEncoding = TaggedObject "type" "value"
+  }
 
 makeMapnikFields :: Name -> DecsQ
 makeMapnikFields = makeLensesWith $ defaultFieldRules

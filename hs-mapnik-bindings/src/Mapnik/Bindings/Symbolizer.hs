@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -18,7 +19,8 @@ module Mapnik.Bindings.Symbolizer (
 
 import qualified Mapnik
 import           Mapnik.Enums
-import           Mapnik (Property, DSum(..), Key(..), toProperties, PropValue(..), Transform(..))
+import           Mapnik ( Property(..), Key(..), toProperties, Transform(..)
+                        , Prop (..), properties, pattern PropExpression)
 import           Mapnik.Bindings hiding (TextPlacements(..))
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()
@@ -26,6 +28,7 @@ import qualified Mapnik.Bindings.Expression as Expression
 import qualified Mapnik.Bindings.Transform as Transform
 
 import           Control.Exception
+import           Control.Lens ((&), (.~))
 import           Data.Maybe (catMaybes)
 import           Data.Text (Text, unpack)
 import           Data.Text.Encoding (encodeUtf8)
@@ -34,7 +37,6 @@ import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr, castPtr)
 import           Foreign.Marshal.Utils (with)
 import           Foreign.Marshal.Alloc (finalizerFree)
-import           GHC.Exts (fromList)
 import qualified Data.Vector.Storable.Mutable as VM
 import qualified Data.Vector.Storable         as V
 
@@ -73,7 +75,7 @@ create sym = bracket alloc dealloc $ \p -> do
 
 unCreate :: Symbolizer -> IO Mapnik.Symbolizer
 unCreate sym' = bracket alloc dealloc $ \sym -> do
-  props <- fmap (fromList . catMaybes) $ sequence
+  props <- fmap catMaybes $ sequence
     [ getProperty Gamma sym
     , getProperty GammaMethod sym
     , getProperty Opacity sym
@@ -140,19 +142,19 @@ unCreate sym' = bracket alloc dealloc $ \sym -> do
     ]
   name <- getName sym'
   case name of
-    "PointSymbolizer" -> return (Mapnik.Point props)
-    "LineSymbolizer" -> return (Mapnik.Line props)
-    "LinePatternSymbolizer" -> return (Mapnik.LinePattern props)
-    "PolygonSymbolizer" -> return (Mapnik.Polygon props)
-    "PolygonPatternSymbolizer" -> return (Mapnik.PolygonPattern props)
-    "RasterSymbolizer" -> return (Mapnik.Raster props)
-    "ShieldSymbolizer" -> return (Mapnik.Shield props)
-    "TextSymbolizer" -> return (Mapnik.Text props)
-    "BuildingSymbolizer" -> return (Mapnik.Building props)
-    "MarkersSymbolizer" -> return (Mapnik.Marker props)
-    "GroupSymbolizer" -> return (Mapnik.Group props)
-    "DebugSymbolizer" -> return (Mapnik.Debug props)
-    "DotSymbolizer" -> return (Mapnik.Dot props)
+    "PointSymbolizer" -> return (Mapnik.point & properties .~ props)
+    "LineSymbolizer" -> return (Mapnik.line & properties .~ props)
+    "LinePatternSymbolizer" -> return (Mapnik.linePattern & properties .~ props)
+    "PolygonSymbolizer" -> return (Mapnik.polygon & properties .~ props)
+    "PolygonPatternSymbolizer" -> return (Mapnik.polygonPattern & properties .~ props)
+    "RasterSymbolizer" -> return (Mapnik.raster & properties .~ props)
+    "ShieldSymbolizer" -> return (Mapnik.shield & properties .~ props)
+    "TextSymbolizer" -> return (Mapnik.text & properties .~ props)
+    "BuildingSymbolizer" -> return (Mapnik.building & properties .~ props)
+    "MarkersSymbolizer" -> return (Mapnik.markers & properties .~ props)
+    "GroupSymbolizer" -> return (Mapnik.group & properties .~ props)
+    "DebugSymbolizer" -> return (Mapnik.debug & properties .~ props)
+    "DotSymbolizer" -> return (Mapnik.dot & properties .~ props)
     _ -> throwIO (userError "Unexpected symbolizer name")
   where
     alloc = [C.exp|symbolizer_base * { get_symbolizer_base(*$fptr-ptr:(symbolizer *sym')) }|]
@@ -186,7 +188,7 @@ castSym Mapnik.Text{} p =
   [C.block|symbolizer *{ new symbolizer(*static_cast<text_symbolizer*>($(symbolizer_base *p)));}|]
 castSym Mapnik.Building{} p =
   [C.block|symbolizer *{ new symbolizer(*static_cast<building_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.Marker{} p =
+castSym Mapnik.Markers{} p =
   [C.block|symbolizer *{ new symbolizer(*static_cast<markers_symbolizer*>($(symbolizer_base *p)));}|]
 castSym Mapnik.Group{} p =
   [C.block|symbolizer *{ new symbolizer(*static_cast<group_symbolizer*>($(symbolizer_base *p)));}|]
@@ -337,6 +339,9 @@ instance HasGetProp Mapnik.DashArray where
       Just <$> V.freeze (VM.unsafeFromForeignPtr0 fp len)
     else return Nothing
 
+instance HasGetProp (Either DebugMode RasterMode) where getProp key sym = return Nothing --TODO
+instance HasSetProp (Either DebugMode RasterMode) where setProp key val sym = undefined
+
 #define HAS_GET_PROP_ENUM(HS,CPP) \
 instance HasGetProp HS where {\
   getProp (keyIndex -> k) sym = fmap (fmap (toEnum . fromIntegral)) <$> newMaybe $ \(has,p) -> \
@@ -375,18 +380,17 @@ HAS_GET_PROP_ENUM(Direction,direction_enum)
 HAS_GET_PROP_ENUM(GammaMethod,gamma_method_enum)
 
 setProp' :: HasSetProp a
-         => Key a -> PropValue a -> Ptr SymbolizerBase -> IO ()
-setProp' k (PropValue v) = setProp k v
-setProp' k (PropExpression v) = setPropExpression k v
-setProp' k PropDefault        = delProp k
+         => Key a -> Prop a -> Ptr SymbolizerBase -> IO ()
+setProp' k (Val v) = setProp k v
+setProp' k (Exp v) = setPropExpression k v
 
 getProp' :: HasGetProp a
-         => Key a -> Ptr SymbolizerBase -> IO (Maybe (PropValue a))
+         => Key a -> Ptr SymbolizerBase -> IO (Maybe (Prop a))
 getProp' k p = do
   eVal <- getPropExpression k p
   case eVal of
-    Nothing -> fmap PropValue <$> getProp k p
-    Just e -> return (Just (PropExpression e))
+    Nothing -> fmap Val <$> getProp k p
+    Just e -> return (PropExpression e)
 
 setPropExpression :: Key a
                   -> Mapnik.Expression -> Ptr SymbolizerBase -> IO ()
@@ -411,9 +415,11 @@ getPropExpression (keyIndex -> k) sym =
     }
     }|]
 
+{-
 delProp :: Key a -> Ptr SymbolizerBase -> IO ()
 delProp (keyIndex -> k) sym =
   [C.block|void { $(symbolizer_base *sym)->properties.erase($(keys k)); }|]
+-}
 
 getProperty :: Key a -> Ptr SymbolizerBase -> IO (Maybe Property)
 getProperty Gamma = fmap (fmap (Gamma :=>)) . getProp' Gamma

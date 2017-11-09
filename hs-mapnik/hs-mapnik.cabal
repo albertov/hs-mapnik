@@ -35,9 +35,6 @@ library
                      , scientific
                      , unordered-containers
                      , lens
-                     , dependent-map
-                     , dependent-sum
-                     , dependent-sum-template
                      , vector
                      , data-default
                      , template-haskell

@@ -42,6 +42,7 @@ library
                      , hs-mapnik
                      , unordered-containers
                      , vector
+                     , lens
   default-language:    Haskell2010
   ghc-options:         -Wall -optc-g
   extra-libraries:     mapnik stdc++
