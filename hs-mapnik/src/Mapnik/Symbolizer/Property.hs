@@ -10,6 +10,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -43,23 +44,26 @@ type Scaling = ()
 type TextPlacements = ()
 type Colorizer = ()
 
-data PropValue v = PropExpression Expression
-                 | PropValue      v
-                 | PropDefault
+data Prop a = Exp Expression
+            | Val a
   deriving (Eq, Show, Functor)
-deriveMapnikJSON ''PropValue
+deriveMapnikJSON ''Prop
+
+type PropValue a = Maybe (Prop a)
+
+pattern PropDefault = Nothing
+pattern PropExpression e = Just (Exp e)
+pattern PropValue e = Just (Val e)
 
 
-type Property = DSum Key PropValue
-type Properties = DMap.DMap Key PropValue
+type Property   = DSum Key Prop
+type Properties = DMap.DMap Key Prop
 
 instance IsList Properties where
   type Item Properties = Property
   fromList = DMap.fromList
   toList = DMap.toList
 
-
-instance Default (PropValue a) where def = PropDefault
 
 data Key a where
     Gamma :: Key Double
@@ -133,12 +137,12 @@ deriving instance Show (Key a)
 deriving instance Eq (Key a)
 
 (==>) :: Key v -> v -> Property
-k ==> v = k :=> PropValue v
+k ==> v = k :=> Val v
 
 (=~>) :: Key v -> Expression -> Property
-k =~> v = k :=> PropExpression v
+k =~> v = k :=> Exp v
 
-instance ShowTag Key PropValue where
+instance ShowTag Key Prop where
   showTaggedPrec Gamma = showsPrec
   showTaggedPrec GammaMethod = showsPrec
   showTaggedPrec Opacity = showsPrec
@@ -203,7 +207,7 @@ instance ShowTag Key PropValue where
   showTaggedPrec AvoidEdges = showsPrec
   showTaggedPrec FfSettings = showsPrec
 
-instance EqTag Key PropValue where
+instance EqTag Key Prop where
   eqTagged Gamma Gamma = (==)
   eqTagged GammaMethod GammaMethod = (==)
   eqTagged Opacity Opacity = (==)

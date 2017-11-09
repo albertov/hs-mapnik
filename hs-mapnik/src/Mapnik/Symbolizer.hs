@@ -112,15 +112,14 @@ data Symbolizer
     , alignment       :: !(PropValue PatternAlignment)
     , BASE_PROPS
     }
-  -- FIXME: Redesign PropValue since RasterSymbolizer props does not admit expressions
   | Raster
-    { rasterMode    :: !(PropValue RasterMode)
-    , scaling       :: !(PropValue Scaling)
-    , opacity       :: !(PropValue Double)
-    , filterFactor  :: !(PropValue Double)
-    , meshSize      :: !(PropValue Int)
-    , preMultiplied :: !(PropValue Bool)
-    , colorizer     :: !(PropValue Colorizer)
+    { rasterMode    :: !(Maybe RasterMode)
+    , scaling       :: !(Maybe Scaling)
+    , rasterOpacity :: !(Maybe Double)
+    , filterFactor  :: !(Maybe Double)
+    , meshSize      :: !(Maybe Int)
+    , preMultiplied :: !(Maybe Bool)
+    , colorizer     :: !(Maybe Colorizer)
     , BASE_PROPS
     }
   | Shield
@@ -194,128 +193,130 @@ class HasProperties s a | s -> a where
 instance HasProperties Symbolizer Properties where
   properties = lens getProps setProps where
     setProps sym@Point{} = DMap.foldlWithKey step sym  where
-      step :: Symbolizer -> Key v -> PropValue v -> Symbolizer
-      step !s File               v = s { file = v }
-      step !s Opacity            v = s { opacity = v }
-      step !s AllowOverlap       v = s { allowOverlap = v }
-      step !s IgnorePlacement    v = s { ignorePlacement = v }
-      step !s PointPlacementType v = s { pointPlacement = v }
-      step !s ImageTransform     v = s { imageTransform = v }
+      step :: Symbolizer -> Key v -> Prop v -> Symbolizer
+      step !s File               v = s { file = Just v }
+      step !s Opacity            v = s { opacity = Just v }
+      step !s AllowOverlap       v = s { allowOverlap = Just v }
+      step !s IgnorePlacement    v = s { ignorePlacement = Just v }
+      step !s PointPlacementType v = s { pointPlacement = Just v }
+      step !s ImageTransform     v = s { imageTransform = Just v }
       step !s k                  v = stepBase s k v
 
     setProps sym@Line{} = DMap.foldlWithKey step sym  where
-      step :: Symbolizer -> Key v -> PropValue v -> Symbolizer
-      step !s Opacity v = s { opacity = v }
-      step !s Offset  v = s { offset = v }
+      step :: Symbolizer -> Key v -> Prop v -> Symbolizer
+      step !s Opacity v = s { opacity = Just v }
+      step !s Offset  v = s { offset = Just v }
       step !s k       v = stepStroke s k v
 
     setProps sym@LinePattern{} = DMap.foldlWithKey step sym  where
-      step :: Symbolizer -> Key v -> PropValue v -> Symbolizer
-      step !s File            v = s { file = v }
-      step !s Opacity         v = s { opacity = v }
-      step !s Offset          v = s { offset = v }
-      step !s ImageTransform  v = s { imageTransform = v }
+      step :: Symbolizer -> Key v -> Prop v -> Symbolizer
+      step !s File            v = s { file = Just v }
+      step !s Opacity         v = s { opacity = Just v }
+      step !s Offset          v = s { offset = Just v }
+      step !s ImageTransform  v = s { imageTransform = Just v }
       step !s k               v = stepBase s k v
 
     setProps sym@Polygon{} = DMap.foldlWithKey step sym  where
-      step :: Symbolizer -> Key v -> PropValue v -> Symbolizer
-      step !s Fill        v = s { fill = v }
-      step !s FillOpacity v = s { fillOpacity = v }
-      step !s Gamma       v = s { gamma = v }
-      step !s GammaMethod v = s { gammaMethod = v }
+      step :: Symbolizer -> Key v -> Prop v -> Symbolizer
+      step !s Fill        v = s { fill = Just v }
+      step !s FillOpacity v = s { fillOpacity = Just v }
+      step !s Gamma       v = s { gamma = Just v }
+      step !s GammaMethod v = s { gammaMethod = Just v }
       step !s k           v = stepBase s k v
 
     setProps sym@PolygonPattern{} = DMap.foldlWithKey step sym  where
-      step :: Symbolizer -> Key v -> PropValue v -> Symbolizer
-      step !s File           v = s { file = v }
-      step !s Opacity        v = s { opacity = v }
-      step !s Gamma          v = s { gamma = v }
-      step !s GammaMethod    v = s { gammaMethod = v }
-      step !s ImageTransform v = s { imageTransform = v }
-      step !s Alignment      v = s { alignment = v }
+      step :: Symbolizer -> Key v -> Prop v -> Symbolizer
+      step !s File           v = s { file = Just v }
+      step !s Opacity        v = s { opacity = Just v }
+      step !s Gamma          v = s { gamma = Just v }
+      step !s GammaMethod    v = s { gammaMethod = Just v }
+      step !s ImageTransform v = s { imageTransform = Just v }
+      step !s Alignment      v = s { alignment = Just v }
       step !s k              v = stepBase s k v
 
     setProps sym@Raster{} = DMap.foldlWithKey step sym  where
-      step :: Symbolizer -> Key v -> PropValue v -> Symbolizer
-      step !s Mode          (PropValue (Right v)) = s { rasterMode = PropValue v }
-      step !s Scaling       v                     = s { scaling = v }
-      step !s Opacity       v                     = s { opacity = v }
-      step !s FilterFactor  v                     = s { filterFactor = v }
-      step !s MeshSize      v                     = s { meshSize = v }
-      step !s Premultiplied v                     = s { preMultiplied = v }
-      step !s Colorizer     v                     = s { colorizer = v }
-      step !s k             v                     = stepBase s k v
+      step :: Symbolizer -> Key v -> Prop v -> Symbolizer
+      step !s Mode          (Val (Right v)) = s { rasterMode = Just v }
+      step !s Scaling       (Val v) = s { scaling = Just v }
+      step !s Opacity       (Val v) = s { rasterOpacity = Just v }
+      step !s FilterFactor  (Val v) = s { filterFactor = Just v }
+      step !s MeshSize      (Val v) = s { meshSize = Just v }
+      step !s Premultiplied (Val v) = s { preMultiplied = Just v }
+      step !s Colorizer     (Val v) = s { colorizer = Just v }
+      step !s k                   v = stepBase s k v
 
     setProps sym@Shield{} = DMap.foldlWithKey step sym  where
-      step :: Symbolizer -> Key v -> PropValue v -> Symbolizer
-      step !s TextPlacements v = s { placements = v }
-      step !s ImageTransform v = s { imageTransform = v }
-      step !s ShieldDx       v = s { dx = v }
-      step !s ShieldDy       v = s { dy = v }
-      step !s Opacity        v = s { opacity = v }
-      step !s UnlockImage    v = s { unlockImage = v }
-      step !s File           v = s { file = v }
-      step !s HaloRasterizer v = s { haloRasterizer = v }
+      step :: Symbolizer -> Key v -> Prop v -> Symbolizer
+      step !s TextPlacements v = s { placements = Just v }
+      step !s ImageTransform v = s { imageTransform = Just v }
+      step !s ShieldDx       v = s { dx = Just v }
+      step !s ShieldDy       v = s { dy = Just v }
+      step !s Opacity        v = s { opacity = Just v }
+      step !s UnlockImage    v = s { unlockImage = Just v }
+      step !s File           v = s { file = Just v }
+      step !s HaloRasterizer v = s { haloRasterizer = Just v }
       step !s k              v = stepBase s k v
 
     setProps sym@Text{} = DMap.foldlWithKey step sym  where
-      step :: Symbolizer -> Key v -> PropValue v -> Symbolizer
-      step !s TextPlacements v = s { placements = v }
-      step !s HaloCompOp     v = s { haloCompOp = v }
-      step !s HaloRasterizer v = s { haloRasterizer = v }
-      step !s HaloTransform  v = s { haloTransform = v }
+      step :: Symbolizer -> Key v -> Prop v -> Symbolizer
+      step !s TextPlacements v = s { placements = Just v }
+      step !s HaloCompOp     v = s { haloCompOp = Just v }
+      step !s HaloRasterizer v = s { haloRasterizer = Just v }
+      step !s HaloTransform  v = s { haloTransform = Just v }
       step !s k              v = stepBase s k v
 
     setProps sym@Building{} = DMap.foldlWithKey step sym  where
-      step :: Symbolizer -> Key v -> PropValue v -> Symbolizer
-      step !s Fill        v = s { fill = v }
-      step !s FillOpacity v = s { fillOpacity = v }
-      step !s Height      v = s { height = v }
+      step :: Symbolizer -> Key v -> Prop v -> Symbolizer
+      step !s Fill        v = s { fill = Just v }
+      step !s FillOpacity v = s { fillOpacity = Just v }
+      step !s Height      v = s { height = Just v }
       step !s k           v = stepBase s k v
 
     setProps sym@Markers{} = DMap.foldlWithKey step sym  where
-      step :: Symbolizer -> Key v -> PropValue v -> Symbolizer
-      step !s File                  v = s { file = v }
-      step !s Opacity               v = s { opacity = v }
-      step !s Fill                  v = s { fill = v }
-      step !s FillOpacity           v = s { fillOpacity = v }
-      step !s Spacing               v = s { spacing = v }
-      step !s MaxError              v = s { maxError = v }
-      step !s Offset                v = s { offset = v }
-      step !s Width                 v = s { width = v }
-      step !s Height                v = s { height = v }
-      step !s AllowOverlap          v = s { allowOverlap = v }
-      step !s AvoidEdges            v = s { avoidEdges = v }
-      step !s IgnorePlacement       v = s { ignorePlacement = v }
-      step !s ImageTransform        v = s { imageTransform = v }
-      step !s MarkersPlacementType  v = s { placement = v }
-      step !s MarkersMultipolicy    v = s { multiPolicy = v }
-      step !s Direction             v = s { direction = v }
+      step :: Symbolizer -> Key v -> Prop v -> Symbolizer
+      step !s File                  v = s { file = Just v }
+      step !s Opacity               v = s { opacity = Just v }
+      step !s Fill                  v = s { fill = Just v }
+      step !s FillOpacity           v = s { fillOpacity = Just v }
+      step !s Spacing               v = s { spacing = Just v }
+      step !s MaxError              v = s { maxError = Just v }
+      step !s Offset                v = s { offset = Just v }
+      step !s Width                 v = s { width = Just v }
+      step !s Height                v = s { height = Just v }
+      step !s AllowOverlap          v = s { allowOverlap = Just v }
+      step !s AvoidEdges            v = s { avoidEdges = Just v }
+      step !s IgnorePlacement       v = s { ignorePlacement = Just v }
+      step !s ImageTransform        v = s { imageTransform = Just v }
+      step !s MarkersPlacementType  v = s { placement = Just v }
+      step !s MarkersMultipolicy    v = s { multiPolicy = Just v }
+      step !s Direction             v = s { direction = Just v }
       step !s k                     v = stepStroke s k v
 
     setProps sym@Group{} = DMap.foldlWithKey step sym  where
-      step :: Symbolizer -> Key v -> PropValue v -> Symbolizer
-      step !s GroupProperties       v = s { groupProperties = v }
-      step !s NumColumns            v = s { numColumns = v }
-      step !s StartColumn           v = s { startColumn = v }
-      step !s RepeatKey             v = s { repeatKey = v }
-      step !s TextPlacements        v = s { placements = v }
+      step :: Symbolizer -> Key v -> Prop v -> Symbolizer
+      step !s GroupProperties       v = s { groupProperties = Just v }
+      step !s NumColumns            v = s { numColumns = Just v }
+      step !s StartColumn           v = s { startColumn = Just v }
+      step !s RepeatKey             v = s { repeatKey = Just v }
+      step !s TextPlacements        v = s { placements = Just v }
       step !s k                     v = stepBase s k v
 
     setProps sym@Debug{} = DMap.foldlWithKey step sym  where
-      step :: Symbolizer -> Key v -> PropValue v -> Symbolizer
-      step !s Mode (PropValue (Left v)) = s { debugMode = PropValue v }
-      step !s k                       v = stepBase s k v
+      step :: Symbolizer -> Key v -> Prop v -> Symbolizer
+      step !s Mode (Val (Left v)) = s { debugMode = PropValue v }
+      step !s k                   v = stepBase s k v
 
     setProps sym@Dot{} = DMap.foldlWithKey step sym  where
-      step :: Symbolizer -> Key v -> PropValue v -> Symbolizer
-      step !s Fill    v = s { fill = v }
-      step !s Opacity v = s { opacity = v }
-      step !s Width   v = s { width = v }
-      step !s Height  v = s { height = v }
-      step !s CompOp  v = s { compOp = v }
+      step :: Symbolizer -> Key v -> Prop v -> Symbolizer
+      step !s Fill    v = s { fill = Just v }
+      step !s Opacity v = s { opacity = Just v }
+      step !s Width   v = s { width = Just v }
+      step !s Height  v = s { height = Just v }
+      step !s CompOp  v = s { compOp = Just v }
       step !s _       _ = s
 
+    getProps = undefined
+    {-
     getProps sym = DMap.fromList . filter (not . isDefault) $ case sym of
       Point{..} ->
         [ File               :=> file
@@ -342,28 +343,29 @@ instance HasProperties Symbolizer Properties where
     isDefault :: Property -> Bool
     isDefault (_ :=> PropDefault) = True
     isDefault _                   = False
+        -}
 
-    stepBase, stepStroke :: Symbolizer -> Key v -> PropValue v -> Symbolizer
-    stepBase !s SimplifyTolerance v = s { simplifyTolerance = v }
-    stepBase !s Smooth            v = s { smooth = v }
-    stepBase !s Clip              v = s { clip = v }
-    stepBase !s CompOp            v = s { compOp = v }
-    stepBase !s GeometryTransform v = s { geometryTransform = v }
-    stepBase !s SimplifyAlgorithm v = s { simplifyAlgorithm = v }
+    stepBase, stepStroke :: Symbolizer -> Key v -> Prop v -> Symbolizer
+    stepBase !s SimplifyTolerance v = s { simplifyTolerance = Just v }
+    stepBase !s Smooth            v = s { smooth = Just v }
+    stepBase !s Clip              v = s { clip = Just v }
+    stepBase !s CompOp            v = s { compOp = Just v }
+    stepBase !s GeometryTransform v = s { geometryTransform = Just v }
+    stepBase !s SimplifyAlgorithm v = s { simplifyAlgorithm = Just v }
     stepBase !s _                 _ = s
 
-    stepStroke !s StrokeGamma       v = s { gamma = v }
-    stepStroke !s StrokeGammaMethod v = s { gammaMethod = v }
-    stepStroke !s StrokeDasharray   v = s { dashArray = v }
-    stepStroke !s StrokeDashoffset  v = s { dashOffset = v }
-    stepStroke !s StrokeMiterlimit  v = s { miterLimit = v }
-    stepStroke !s StrokeWidth       v = s { width = v }
-    stepStroke !s StrokeOpacity     v = s { opacity = v }
-    stepStroke !s Stroke            v = s { stroke = v }
-    stepStroke !s StrokeLinejoin    v = s { lineJoin = v }
-    stepStroke !s StrokeLinecap     v = s { lineCap = v }
+    stepStroke !s StrokeGamma       v = s { gamma = Just v }
+    stepStroke !s StrokeGammaMethod v = s { gammaMethod = Just v }
+    stepStroke !s StrokeDasharray   v = s { dashArray = Just v }
+    stepStroke !s StrokeDashoffset  v = s { dashOffset = Just v }
+    stepStroke !s StrokeMiterlimit  v = s { miterLimit = Just v }
+    stepStroke !s StrokeWidth       v = s { width = Just v }
+    stepStroke !s StrokeOpacity     v = s { opacity = Just v }
+    stepStroke !s Stroke            v = s { stroke = Just v }
+    stepStroke !s StrokeLinejoin    v = s { lineJoin = Just v }
+    stepStroke !s StrokeLinecap     v = s { lineCap = Just v }
     stepStroke !s k                 v = stepBase s k v
 
 
-toProperties :: Symbolizer -> [DSum Key PropValue]
+toProperties :: Symbolizer -> [DSum Key Prop]
 toProperties = view (properties . to DMap.toList)

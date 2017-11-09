@@ -24,7 +24,7 @@ makeMapnikFields ''FormatProperties
 makeMapnikFields ''TextLayoutProperties
 makeMapnikFields ''Symbolizer
 makePrisms ''Symbolizer
-makePrisms ''PropValue
+makePrisms ''Prop
 
 {-
 symbolizerLens :: Key a -> Lens' Symbolizer (PropValue a)
