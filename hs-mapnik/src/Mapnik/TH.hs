@@ -10,13 +10,10 @@ import Language.Haskell.TH
 
 deriveMapnikJSON :: Name -> DecsQ
 deriveMapnikJSON = deriveJSON defaultOptions
-  { sumEncoding = UntaggedValue
-  , omitNothingFields = True
-  }
 
 makeMapnikFields :: Name -> DecsQ
-makeMapnikFields = makeLensesWith $ defaultFieldRules &
-  lensField .~ mapnikNameNamer
+makeMapnikFields = makeLensesWith $ defaultFieldRules
+  & lensField .~ mapnikNameNamer
 
 mapnikNameNamer :: FieldNamer
 mapnikNameNamer _ _ field = [ MethodName (mkName cls) (mkName method) ]

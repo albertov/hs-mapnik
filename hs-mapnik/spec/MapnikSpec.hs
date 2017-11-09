@@ -1,7 +1,7 @@
 module MapnikSpec (main, spec) where
 
 import Mapnik
-import Mapnik.Map
+import Mapnik.Lens
 
 import           Test.Hspec
 

@@ -49,6 +49,7 @@ data PropValue v = PropExpression Expression
   deriving (Eq, Show, Functor)
 deriveMapnikJSON ''PropValue
 
+
 type Property = DSum Key PropValue
 type Properties = DMap.DMap Key PropValue
 
@@ -93,7 +94,7 @@ data Key a where
     ShieldDx :: Key Double
     ShieldDy :: Key Double
     UnlockImage :: Key Bool
-    Mode :: Key Text
+    Mode :: Key (Either DebugMode RasterMode)
     Scaling :: Key Scaling
     FilterFactor :: Key Double
     MeshSize :: Key Int

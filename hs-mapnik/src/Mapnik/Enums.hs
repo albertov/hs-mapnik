@@ -209,3 +209,9 @@ data GammaMethod
   | GammaMultiply
   deriving (Eq, Show, Bounded, Enum, Generic)
 deriveMapnikJSON ''GammaMethod
+
+data RasterMode
+  = RasterFoo
+  | RasterBar
+  deriving (Eq, Show, Bounded, Enum, Generic)
+deriveMapnikJSON ''RasterMode

@@ -6,14 +6,18 @@
 module Mapnik.Symbolizer.Lens where
 
 import Mapnik.TH
-import Mapnik.Enums
-import Mapnik.Common
-import Mapnik.Symbolizer hiding (properties)
+import Mapnik.Symbolizer
 
 import Control.Lens
-import qualified Data.Dependent.Map as DMap
-import Data.Maybe (fromMaybe)
-import Data.Text
+
+type ApLens' s a = forall f . Applicative f => (a -> f a) -> s -> f s
+
+class HasAllowOverlap s a | s -> a where allowOverlap :: ApLens' s a
+class HasFill s a | s -> a where fill :: ApLens' s a
+class HasAvoidEdges s a | s -> a where avoidEdges :: ApLens' s a
+class HasDirection s a | s -> a where direction :: ApLens' s a
+class HasDx s a | s -> a where dx :: ApLens' s a
+class HasDy s a | s -> a where dy :: ApLens' s a
 
 makeMapnikFields ''TextProperties
 makeMapnikFields ''FormatProperties
@@ -22,7 +26,7 @@ makeMapnikFields ''Symbolizer
 makePrisms ''Symbolizer
 makePrisms ''PropValue
 
-
+{-
 symbolizerLens :: Key a -> Lens' Symbolizer (PropValue a)
 symbolizerLens k = properties . lens get_ set_ where
   get_ = fromMaybe PropDefault . DMap.lookup k
@@ -221,4 +225,4 @@ instance HasAvoidEdges Symbolizer (PropValue Bool) where
 
 instance HasFfSettings Symbolizer (PropValue FontFeatureSettings) where
   ffSettings = symbolizerLens FfSettings
-
+-}
