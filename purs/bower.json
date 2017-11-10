@@ -9,7 +9,11 @@
     "dependencies": {
       "purescript-profunctor-lenses": "*",
       "purescript-generics": "*",
+      "purescript-foreign": "*",
+      "purescript-foreign-generic": "*",
       "purescript-maybe": "*",
-      "purescript-prelude": "*"
+      "purescript-maps": "*",
+      "purescript-prelude": "*",
+      "purescript-arrays": "*"
     }
 }

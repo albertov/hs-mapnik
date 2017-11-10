@@ -37,10 +37,10 @@ generatePS frontEndRoot = writePSTypes frontEndRoot (buildBridge myBridge) myTyp
 
 
 myBridge :: BridgePart
-myBridge = defaultBridge <|> vectorBridge <|> wordBridge <|> hashMapBridge
+myBridge = defaultBridge <|> vectorBridge <|> wordBridge <|> stringMapBridge
 
-hashMapBridge :: BridgePart
-hashMapBridge = do
+stringMapBridge :: BridgePart
+stringMapBridge = do
   typeName ^== "HashMap"
   doCheck typeParameters isStringMap
   [_,x] <- psTypeParameters
@@ -58,11 +58,12 @@ isStringMap _     = False
 vectorBridge :: BridgePart
 vectorBridge = do
   typeName ^== "Vector"
+  ps <- psTypeParameters
   return TypeInfo
-    { _typePackage = "purescript-arrays"
-    , _typeModule = "Data.Array"
+    { _typePackage = "purescript-prelude"
+    , _typeModule = "Prim"
     , _typeName = "Array"
-    , _typeParameters = []
+    , _typeParameters = ps
     }
 
 wordBridge :: BridgePart
