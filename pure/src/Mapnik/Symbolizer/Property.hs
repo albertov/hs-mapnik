@@ -29,7 +29,7 @@ type Colorizer = ()
 
 data Prop a = Exp Expression
             | Val a
-  deriving (Eq, Show, Functor)
+  deriving (Eq, Show, Functor, Generic)
 deriveMapnikJSON ''Prop
 
 type PropValue a = Maybe (Prop a)
