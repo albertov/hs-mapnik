@@ -1,7 +1,8 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -10,6 +11,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 module Mapnik.Bindings.Symbolizer (
   Symbolizer
 , create
@@ -17,18 +19,19 @@ module Mapnik.Bindings.Symbolizer (
 , unsafeNew
 ) where
 
+import           Mapnik.Lens
 import qualified Mapnik
 import           Mapnik.Enums
+import           Mapnik.Symbolizer.Property
 import           Mapnik ( Transform(..), Prop (..) )
 import           Mapnik.Bindings hiding (TextPlacements(..))
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()
-import           Mapnik.Bindings.Symbolizer.Property
 import qualified Mapnik.Bindings.Expression as Expression
 import qualified Mapnik.Bindings.Transform as Transform
 
 import           Control.Exception
-import           Control.Lens ((&), (.~), (^.))
+import           Control.Lens hiding (has)
 import           Data.Maybe (catMaybes)
 import           Data.Text (Text, unpack)
 import           Data.Text.Encoding (encodeUtf8)
@@ -75,7 +78,7 @@ create sym = bracket alloc dealloc $ \p -> do
 
 unCreate :: Symbolizer -> IO Mapnik.Symbolizer
 unCreate sym' = bracket alloc dealloc $ \sym -> do
-  props <- fmap catMaybes $ sequence
+  props <- catMaybes <$> sequence
     [ getProperty Gamma sym
     , getProperty GammaMethod sym
     , getProperty Opacity sym
@@ -140,22 +143,10 @@ unCreate sym' = bracket alloc dealloc $ \sym -> do
     , getProperty AvoidEdges sym
     , getProperty FfSettings sym
     ]
-  name <- getName sym'
-  case name of
-    "PointSymbolizer" -> return (Mapnik.point & properties .~ props)
-    "LineSymbolizer" -> return (Mapnik.line & properties .~ props)
-    "LinePatternSymbolizer" -> return (Mapnik.linePattern & properties .~ props)
-    "PolygonSymbolizer" -> return (Mapnik.polygon & properties .~ props)
-    "PolygonPatternSymbolizer" -> return (Mapnik.polygonPattern & properties .~ props)
-    "RasterSymbolizer" -> return (Mapnik.raster & properties .~ props)
-    "ShieldSymbolizer" -> return (Mapnik.shield & properties .~ props)
-    "TextSymbolizer" -> return (Mapnik.text & properties .~ props)
-    "BuildingSymbolizer" -> return (Mapnik.building & properties .~ props)
-    "MarkersSymbolizer" -> return (Mapnik.markers & properties .~ props)
-    "GroupSymbolizer" -> return (Mapnik.group & properties .~ props)
-    "DebugSymbolizer" -> return (Mapnik.debug & properties .~ props)
-    "DotSymbolizer" -> return (Mapnik.dot & properties .~ props)
-    _ -> throwIO (userError "Unexpected symbolizer name")
+  symName <- getName sym'
+  case defFromName symName of
+    Just s -> return (s & properties .~ props)
+    Nothing -> throwIO (userError ("Unexpected symbolizer name: " ++ unpack symName))
   where
     alloc = [C.exp|symbolizer_base * { get_symbolizer_base(*$fptr-ptr:(symbolizer *sym')) }|]
     dealloc p = [C.block|void { delete $(symbolizer_base *p);}|]
@@ -167,6 +158,22 @@ getName s = newText $ \(ptr, len) ->
   *$(char** ptr)= strdup(s.c_str());
   *$(int* len) = s.length();
   }|]
+
+defFromName :: Text -> Maybe Mapnik.Symbolizer
+defFromName "PointSymbolizer"          = Just Mapnik.point
+defFromName "LineSymbolizer"           = Just Mapnik.line
+defFromName "LinePatternSymbolizer"    = Just Mapnik.linePattern
+defFromName "PolygonSymbolizer"        = Just Mapnik.polygon
+defFromName "PolygonPatternSymbolizer" = Just Mapnik.polygonPattern
+defFromName "RasterSymbolizer"         = Just Mapnik.raster
+defFromName "ShieldSymbolizer"         = Just Mapnik.shield
+defFromName "TextSymbolizer"           = Just Mapnik.text
+defFromName "BuildingSymbolizer"       = Just Mapnik.building
+defFromName "MarkersSymbolizer"        = Just Mapnik.markers
+defFromName "GroupSymbolizer"          = Just Mapnik.group
+defFromName "DebugSymbolizer"          = Just Mapnik.debug
+defFromName "DotSymbolizer"            = Just Mapnik.dot
+defFromName _                          = Nothing
 
 castSym :: Mapnik.Symbolizer
         -> Ptr SymbolizerBase -> IO (Ptr Symbolizer)
@@ -197,11 +204,365 @@ castSym Mapnik.Debug{} p =
 castSym Mapnik.Dot{} p =
   [C.block|symbolizer *{ new symbolizer(*static_cast<dot_symbolizer*>($(symbolizer_base *p)));}|]
 
+
 class HasSetProp a where
   setProp :: Key a -> a -> Ptr SymbolizerBase -> IO ()
 
 class HasGetProp a where
   getProp :: Key a -> Ptr SymbolizerBase -> IO (Maybe a)
+
+data Property where
+  (:=>) :: HasSetProp v => Key v -> Prop v -> Property
+
+type Properties = [Property]
+
+data Key a where
+    Gamma :: Key Double
+    GammaMethod :: Key GammaMethod
+    Opacity :: Key Double
+    Alignment :: Key PatternAlignment
+    Offset :: Key Double
+    CompOp :: Key CompositeMode
+    Clip :: Key Bool
+    Fill :: Key Mapnik.Color
+    FillOpacity :: Key Double
+    Stroke :: Key Mapnik.Color
+    StrokeWidth :: Key Double
+    StrokeOpacity :: Key Double
+    StrokeLinejoin :: Key LineJoin
+    StrokeLinecap :: Key LineCap
+    StrokeGamma :: Key Double
+    StrokeGammaMethod :: Key GammaMethod
+    StrokeDashoffset :: Key Double
+    StrokeDasharray :: Key Mapnik.DashArray
+    StrokeMiterlimit :: Key Double
+    GeometryTransform :: Key Mapnik.Transform
+    LineRasterizer :: Key LineRasterizer
+    ImageTransform :: Key Mapnik.Transform
+    Spacing :: Key Double
+    MaxError :: Key Double
+    AllowOverlap :: Key Bool
+    IgnorePlacement :: Key Bool
+    Width :: Key Double
+    Height :: Key Double
+    File :: Key FilePath
+    ShieldDx :: Key Double
+    ShieldDy :: Key Double
+    UnlockImage :: Key Bool
+    Mode :: Key (Either DebugMode RasterMode)
+    Scaling :: Key Scaling
+    FilterFactor :: Key Double
+    MeshSize :: Key Int
+    Premultiplied :: Key Bool
+    Smooth :: Key Double
+    SimplifyAlgorithm :: Key SimplifyAlgorithm
+    SimplifyTolerance :: Key Double
+    HaloRasterizer :: Key HaloRasterizer
+    TextPlacements :: Key TextPlacements
+    LabelPlacement :: Key LabelPlacement
+    MarkersPlacementType :: Key MarkerPlacement
+    MarkersMultipolicy :: Key MarkerMultiPolicy
+    PointPlacementType :: Key PointPlacement
+    Colorizer :: Key Colorizer
+    HaloTransform :: Key Mapnik.Transform
+    NumColumns :: Key Int
+    StartColumn :: Key Int
+    RepeatKey :: Key Mapnik.Expression
+    GroupProperties :: Key GroupProperties
+    LargestBoxOnly :: Key Bool
+    MinimumPathLength :: Key Double
+    HaloCompOp :: Key CompositeMode
+    TextTransform :: Key TextTransform
+    HorizontalAlignment :: Key HorizontalAlignment
+    JustifyAlignment :: Key JustifyAlignment
+    VerticalAlignment :: Key VerticalAlignment
+    Upright :: Key Upright
+    Direction :: Key Direction
+    AvoidEdges :: Key Bool
+    FfSettings :: Key FontFeatureSettings
+
+
+class HasProperties s a | s -> a where
+  properties :: Lens' s a
+
+instance HasProperties Mapnik.Symbolizer Properties where
+  properties = lens getProps setProps where
+    setProps sym@Mapnik.Point{} = foldr step sym  where
+      step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
+      step (File               :=> v) = file ?~ v
+      step (Opacity            :=> v) = opacity ?~ v
+      step (AllowOverlap       :=> v) = allowOverlap ?~ v
+      step (IgnorePlacement    :=> v) = ignorePlacement ?~ v
+      step (PointPlacementType :=> v) = pointPlacement ?~ v
+      step (ImageTransform     :=> v) = imageTransform ?~ v
+      step p                          = stepBase p
+
+    setProps sym@Mapnik.Line{} = foldr step sym  where
+      step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
+      step (Opacity :=> v) = opacity ?~ v
+      step (Offset  :=> v) = offset ?~ v
+      step p               = stepStroke p
+
+    setProps sym@Mapnik.LinePattern{} = foldr step sym  where
+      step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
+      step (File            :=> v) = file ?~ v
+      step (Opacity         :=> v) = opacity ?~ v
+      step (Offset          :=> v) = offset ?~ v
+      step (ImageTransform  :=> v) = imageTransform ?~ v
+      step p                       = stepBase p
+
+    setProps sym@Mapnik.Polygon{} = foldr step sym  where
+      step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
+      step (Fill        :=> v) = fill ?~ v
+      step (FillOpacity :=> v) = fillOpacity ?~ v
+      step (Gamma       :=> v) = gamma ?~ v
+      step (GammaMethod :=> v) = gammaMethod ?~ v
+      step p                   = stepBase p
+
+    setProps sym@Mapnik.PolygonPattern{} = foldr step sym  where
+      step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
+      step (File           :=> v) = file ?~ v
+      step (Opacity        :=> v) = opacity ?~ v
+      step (Gamma          :=> v) = gamma ?~ v
+      step (GammaMethod    :=> v) = gammaMethod ?~ v
+      step (ImageTransform :=> v) = imageTransform ?~ v
+      step (Alignment      :=> v) = alignment ?~ v
+      step p                      = stepBase p
+
+    setProps sym@Mapnik.Raster{} = foldr step sym  where
+      step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
+      step (Mode          :=> Val (Right v)) = rasterMode ?~ v
+      step (Scaling       :=> Val v        ) = scaling ?~ v
+      step (Opacity       :=> Val v        ) = rasterOpacity ?~ v
+      step (FilterFactor  :=> Val v        ) = filterFactor ?~ v
+      step (MeshSize      :=> Val v        ) = meshSize ?~ v
+      step (Premultiplied :=> Val v        ) = preMultiplied ?~ v
+      step (Colorizer     :=> Val v        ) = colorizer ?~ v
+      step p                                 = stepBase p
+
+    setProps sym@Mapnik.Shield{} = foldr step sym  where
+      step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
+      step (TextPlacements :=> v) = placements ?~ v
+      step (ImageTransform :=> v) = imageTransform ?~ v
+      step (ShieldDx       :=> v) = dx ?~ v
+      step (ShieldDy       :=> v) = dy ?~ v
+      step (Opacity        :=> v) = opacity ?~ v
+      step (UnlockImage    :=> v) = unlockImage ?~ v
+      step (File           :=> v) = file ?~ v
+      step (HaloRasterizer :=> v) = haloRasterizer ?~ v
+      step p                      = stepBase p
+
+    setProps sym@Mapnik.Text{} = foldr step sym  where
+      step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
+      step (TextPlacements :=> v) = placements ?~ v
+      step (HaloCompOp     :=> v) = haloCompOp ?~ v
+      step (HaloRasterizer :=> v) = haloRasterizer ?~ v
+      step (HaloTransform  :=> v) = haloTransform ?~ v
+      step p                      = stepBase p
+
+    setProps sym@Mapnik.Building{} = foldr step sym  where
+      step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
+      step (Fill        :=> v) = fill ?~ v
+      step (FillOpacity :=> v) = fillOpacity ?~ v
+      step (Height      :=> v) = height ?~ v
+      step p                   = stepBase p
+
+    setProps sym@Mapnik.Markers{} = foldr step sym  where
+      step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
+      step (File                 :=> v) = file ?~ v
+      step (Opacity              :=> v) = opacity ?~ v
+      step (Fill                 :=> v) = fill ?~ v
+      step (FillOpacity          :=> v) = fillOpacity ?~ v
+      step (Spacing              :=> v) = spacing ?~ v
+      step (MaxError             :=> v) = maxError ?~ v
+      step (Offset               :=> v) = offset ?~ v
+      step (Width                :=> v) = width ?~ v
+      step (Height               :=> v) = height ?~ v
+      step (AllowOverlap         :=> v) = allowOverlap ?~ v
+      step (AvoidEdges           :=> v) = avoidEdges ?~ v
+      step (IgnorePlacement      :=> v) = ignorePlacement ?~ v
+      step (ImageTransform       :=> v) = imageTransform ?~ v
+      step (MarkersPlacementType :=> v) = placement ?~ v
+      step (MarkersMultipolicy   :=> v) = multiPolicy ?~ v
+      step (Direction            :=> v) = direction ?~ v
+      step p                            = stepStroke p
+
+    setProps sym@Mapnik.Group{} = foldr step sym  where
+      step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
+      step (GroupProperties :=> v) = groupProperties ?~ v
+      step (NumColumns      :=> v) = numColumns ?~ v
+      step (StartColumn     :=> v) = startColumn ?~ v
+      step (RepeatKey       :=> v) = repeatKey ?~ v
+      step (TextPlacements  :=> v) = placements ?~ v
+      step p                       = stepBase p
+
+    setProps sym@Mapnik.Debug{} = foldr step sym  where
+      step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
+      step (Mode :=> Val (Left v)) = debugMode ?~ v
+      step p                       = stepBase p
+
+    setProps sym@Mapnik.Dot{} = foldr step sym  where
+      step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
+      step (Fill    :=> v) = fill ?~ v
+      step (Opacity :=> v) = opacity ?~ v
+      step (Width   :=> v) = width ?~ v
+      step (Height  :=> v) = height ?~ v
+      step (CompOp  :=> v) = compOp ?~ v
+      step _               = id
+
+    stepBase, stepStroke :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
+    stepBase (SimplifyTolerance :=> v) = simplifyTolerance ?~ v
+    stepBase (Smooth            :=> v) = smooth ?~ v
+    stepBase (Clip              :=> v) = clip ?~ v
+    stepBase (CompOp            :=> v) = compOp ?~ v
+    stepBase (GeometryTransform :=> v) = geometryTransform ?~ v
+    stepBase (SimplifyAlgorithm :=> v) = simplifyAlgorithm ?~ v
+    stepBase _                         = id
+
+    stepStroke (StrokeGamma       :=> v) = strokeGamma ?~ v
+    stepStroke (StrokeGammaMethod :=> v) = strokeGammaMethod ?~ v
+    stepStroke (StrokeDasharray   :=> v) = strokeDashArray ?~ v
+    stepStroke (StrokeDashoffset  :=> v) = strokeDashOffset ?~ v
+    stepStroke (StrokeMiterlimit  :=> v) = strokeMiterLimit ?~ v
+    stepStroke (StrokeWidth       :=> v) = strokeWidth ?~ v
+    stepStroke (StrokeOpacity     :=> v) = strokeOpacity ?~ v
+    stepStroke (Stroke            :=> v) = stroke ?~ v
+    stepStroke (StrokeLinejoin    :=> v) = strokeLineJoin ?~ v
+    stepStroke (StrokeLinecap     :=> v) = strokeLineCap ?~ v
+    stepStroke p                         = stepBase p
+
+#define GET_BASE_PROPS \
+    fmap (SimplifyTolerance :=>) (sym^?!simplifyTolerance) \
+  , fmap (Smooth            :=>) (sym^?!smooth)            \
+  , fmap (Clip              :=>) (sym^?!clip) \
+  , fmap (CompOp            :=>) (sym^?!compOp) \
+  , fmap (GeometryTransform :=>) (sym^?!geometryTransform) \
+  , fmap (SimplifyAlgorithm :=>) (sym^?!simplifyAlgorithm)
+
+#define GET_STROKE_PROPS \
+    fmap (StrokeGamma       :=>) (sym^?!strokeGamma) \
+  , fmap (StrokeGammaMethod :=>) (sym^?!strokeGammaMethod) \
+  , fmap (StrokeDasharray   :=>) (sym^?!strokeDashArray) \
+  , fmap (StrokeDashoffset  :=>) (sym^?!strokeDashOffset) \
+  , fmap (StrokeMiterlimit  :=>) (sym^?!strokeMiterLimit) \
+  , fmap (StrokeWidth       :=>) (sym^?!strokeWidth) \
+  , fmap (StrokeOpacity     :=>) (sym^?!strokeOpacity) \
+  , fmap (Stroke            :=>) (sym^?!stroke) \
+  , fmap (StrokeLinejoin    :=>) (sym^?!strokeLineJoin) \
+  , fmap (StrokeLinecap     :=>) (sym^?!strokeLineCap) \
+  , GET_BASE_PROPS
+
+    getProps sym = catMaybes $ case sym of
+      Mapnik.Point{} ->
+        [ fmap (File               :=>) (sym^?!file)
+        , fmap (Opacity            :=>) (sym^?!opacity)
+        , fmap (AllowOverlap       :=>) (sym^?!allowOverlap)
+        , fmap (IgnorePlacement    :=>) (sym^?!ignorePlacement)
+        , fmap (PointPlacementType :=>) (sym^?!pointPlacement)
+        , fmap (ImageTransform     :=>) (sym^?!imageTransform)
+        , GET_BASE_PROPS
+        ]
+      Mapnik.Line{} ->
+        [ fmap (Offset         :=>) (sym^?!offset)
+        , fmap (LineRasterizer :=>) (sym^?!lineRasterizer)
+        , GET_STROKE_PROPS
+        ]
+      Mapnik.LinePattern{} ->
+        [ fmap (File           :=>) (sym^?!file)
+        , fmap (Opacity        :=>) (sym^?!opacity)
+        , fmap (Offset         :=>) (sym^?!offset)
+        , fmap (ImageTransform :=>) (sym^?!imageTransform)
+        , GET_BASE_PROPS
+        ]
+      Mapnik.Polygon{} ->
+        [ fmap (Fill        :=>) (sym^?!fill)
+        , fmap (FillOpacity :=>) (sym^?!fillOpacity)
+        , fmap (Gamma       :=>) (sym^?!gamma)
+        , fmap (GammaMethod :=>) (sym^?!gammaMethod)
+        , GET_BASE_PROPS
+        ]
+      Mapnik.PolygonPattern{} ->
+        [ fmap (File           :=>) (sym^?!file)
+        , fmap (Opacity        :=>) (sym^?!opacity)
+        , fmap (Gamma          :=>) (sym^?!gamma)
+        , fmap (GammaMethod    :=>) (sym^?!gammaMethod)
+        , fmap (ImageTransform :=>) (sym^?!imageTransform)
+        , fmap (Alignment      :=>) (sym^?!alignment)
+        , GET_BASE_PROPS
+        ]
+      Mapnik.Raster{} ->
+        [ fmap ((Mode :=>) . Val . Right)  (sym^?!rasterMode)
+        , fmap ((Scaling       :=>) . Val) (sym^?!scaling)
+        , fmap ((Opacity       :=>) . Val) (sym^?!rasterOpacity)
+        , fmap ((FilterFactor  :=>) . Val) (sym^?!filterFactor)
+        , fmap ((MeshSize      :=>) . Val) (sym^?!meshSize)
+        , fmap ((Premultiplied :=>) . Val) (sym^?!preMultiplied)
+        , fmap ((Colorizer     :=>) . Val) (sym^?!colorizer)
+        , GET_BASE_PROPS
+        ]
+      Mapnik.Shield{} ->
+        [ fmap (TextPlacements    :=>) (sym^?!placements)
+        , fmap (GeometryTransform :=>) (sym^?!imageTransform)
+        , fmap (ShieldDx          :=>) (sym^?!dx)
+        , fmap (ShieldDy          :=>) (sym^?!dy)
+        , fmap (Opacity           :=>) (sym^?!opacity)
+        , fmap (UnlockImage       :=>) (sym^?!unlockImage)
+        , fmap (File              :=>) (sym^?!file)
+        , fmap (HaloRasterizer    :=>) (sym^?!haloRasterizer)
+        , GET_BASE_PROPS
+        ]
+      Mapnik.Text{} ->
+        [ fmap (TextPlacements    :=>) (sym^?!placements)
+        , fmap (HaloCompOp        :=>) (sym^?!haloCompOp)
+        , fmap (HaloRasterizer    :=>) (sym^?!haloRasterizer)
+        , fmap (GeometryTransform :=>) (sym^?!haloTransform)
+        , GET_BASE_PROPS
+        ]
+      Mapnik.Building{} ->
+        [ fmap (Fill        :=>) (sym^?!fill)
+        , fmap (FillOpacity :=>) (sym^?!fillOpacity)
+        , fmap (Height      :=>) (sym^?!height)
+        , GET_BASE_PROPS
+        ]
+      Mapnik.Markers{} ->
+        [ fmap (File                 :=>) (sym^?!file)
+        , fmap (Opacity              :=>) (sym^?!opacity)
+        , fmap (Fill                 :=>) (sym^?!fill)
+        , fmap (FillOpacity          :=>) (sym^?!fillOpacity)
+        , fmap (Spacing              :=>) (sym^?!spacing)
+        , fmap (MaxError             :=>) (sym^?!maxError)
+        , fmap (Offset               :=>) (sym^?!offset)
+        , fmap (Width                :=>) (sym^?!width)
+        , fmap (Height               :=>) (sym^?!height)
+        , fmap (AllowOverlap         :=>) (sym^?!allowOverlap)
+        , fmap (AvoidEdges           :=>) (sym^?!avoidEdges)
+        , fmap (IgnorePlacement      :=>) (sym^?!ignorePlacement)
+        , fmap (GeometryTransform    :=>) (sym^?!imageTransform)
+        , fmap (MarkersPlacementType :=>) (sym^?!placement)
+        , fmap (MarkersMultipolicy   :=>) (sym^?!multiPolicy)
+        , fmap (Direction            :=>) (sym^?!direction)
+        , GET_STROKE_PROPS
+        ]
+      Mapnik.Group{} ->
+        [ fmap (GroupProperties :=>) (sym^?!groupProperties)
+        , fmap (NumColumns      :=>) (sym^?!numColumns)
+        , fmap (StartColumn     :=>) (sym^?!startColumn)
+        , fmap (RepeatKey       :=>) (sym^?!repeatKey)
+        , fmap (TextPlacements  :=>) (sym^?!placements)
+        , GET_BASE_PROPS
+        ]
+      Mapnik.Debug{} ->
+        [ fmap ((Mode :=>) . Val . Left)  (sym^?!debugMode)
+        , GET_BASE_PROPS
+        ]
+      Mapnik.Dot{} ->
+        [ fmap (Fill    :=>) (sym^?!fill)
+        , fmap (Opacity :=>) (sym^?!opacity)
+        , fmap (Width   :=>) (sym^?!width)
+        , fmap (Height  :=>) (sym^?!height)
+        , fmap (CompOp  :=>) (sym^?!compOp)
+        ]
+
 
 
 instance HasGetProp Double where
@@ -217,7 +578,7 @@ instance HasGetProp Double where
     }|]
 
 instance HasSetProp Double where
-  setProp (keyIndex -> k) ((realToFrac -> v)) s = 
+  setProp (keyIndex -> k) (realToFrac -> v) s = 
     [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = $(double v);}|]
 
 instance HasSetProp () where setProp _ _ _ = return ()
@@ -252,7 +613,7 @@ instance HasGetProp Int where
     }|]
 
 instance HasSetProp Int where
-  setProp (keyIndex -> k) ((fromIntegral -> v)) s =
+  setProp (keyIndex -> k) (fromIntegral -> v) s =
     [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = $(int v);}|]
 
 instance HasGetProp Text where
@@ -268,7 +629,7 @@ instance HasGetProp Text where
     }|]
 
 instance HasSetProp Text where
-  setProp (keyIndex -> k) ((encodeUtf8 -> v)) s =
+  setProp (keyIndex -> k) (encodeUtf8 -> v) s =
     [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = std::string($bs-ptr:v, $bs-len:v);}|]
 
 instance HasGetProp String where
@@ -379,18 +740,18 @@ HAS_GET_PROP_ENUM(Upright,text_upright_enum)
 HAS_GET_PROP_ENUM(Direction,direction_enum)
 HAS_GET_PROP_ENUM(GammaMethod,gamma_method_enum)
 
-setProp' :: HasSetProp a
-         => Key a -> Prop a -> Ptr SymbolizerBase -> IO ()
-setProp' k (Val v) = setProp k v
-setProp' k (Exp v) = setPropExpression k v
 
-getProp' :: HasGetProp a
-         => Key a -> Ptr SymbolizerBase -> IO (Maybe (Prop a))
-getProp' k p = do
+getProperty :: (HasSetProp a, HasGetProp a)
+            => Key a -> Ptr SymbolizerBase -> IO (Maybe Property)
+getProperty k p = do
   eVal <- getPropExpression k p
   case eVal of
-    Nothing -> fmap Val <$> getProp k p
-    Just e -> return (Just (Exp e))
+    Nothing -> fmap ((k :=>) . Val) <$> getProp k p
+    Just e -> return (Just (k :=> Exp e))
+
+setProperty :: Property -> Ptr SymbolizerBase -> IO ()
+setProperty (k :=> Val v) = setProp k v
+setProperty (k :=> Exp v) = setPropExpression k v
 
 setPropExpression :: Key a
                   -> Mapnik.Expression -> Ptr SymbolizerBase -> IO ()
@@ -415,141 +776,6 @@ getPropExpression (keyIndex -> k) sym =
     }
     }|]
 
-{-
-delProp :: Key a -> Ptr SymbolizerBase -> IO ()
-delProp (keyIndex -> k) sym =
-  [C.block|void { $(symbolizer_base *sym)->properties.erase($(keys k)); }|]
--}
-
-getProperty :: Key a -> Ptr SymbolizerBase -> IO (Maybe Property)
-getProperty Gamma = fmap (fmap (Gamma :=>)) . getProp' Gamma
-getProperty GammaMethod = fmap (fmap (GammaMethod :=>)) . getProp' GammaMethod
-getProperty Opacity = fmap (fmap (Opacity :=>)) . getProp' Opacity
-getProperty Alignment = fmap (fmap (Alignment :=>)) . getProp' Alignment
-getProperty Offset = fmap (fmap (Offset :=>)) . getProp' Offset
-getProperty CompOp = fmap (fmap (CompOp :=>)) . getProp' CompOp
-getProperty Clip = fmap (fmap (Clip :=>)) . getProp' Clip
-getProperty Fill = fmap (fmap (Fill :=>)) . getProp' Fill
-getProperty FillOpacity = fmap (fmap (FillOpacity :=>)) . getProp' FillOpacity
-getProperty Stroke = fmap (fmap (Stroke :=>)) . getProp' Stroke
-getProperty StrokeWidth = fmap (fmap (StrokeWidth :=>)) . getProp' StrokeWidth
-getProperty StrokeOpacity = fmap (fmap (StrokeOpacity :=>)) . getProp' StrokeOpacity
-getProperty StrokeLinejoin = fmap (fmap (StrokeLinejoin :=>)) . getProp' StrokeLinejoin
-getProperty StrokeLinecap = fmap (fmap (StrokeLinecap :=>)) . getProp' StrokeLinecap
-getProperty StrokeGamma = fmap (fmap (StrokeGamma :=>)) . getProp' StrokeGamma
-getProperty StrokeGammaMethod = fmap (fmap (StrokeGammaMethod :=>)) . getProp' StrokeGammaMethod
-getProperty StrokeDashoffset = fmap (fmap (StrokeDashoffset :=>)) . getProp' StrokeDashoffset
-getProperty StrokeDasharray = fmap (fmap (StrokeDasharray :=>)) . getProp' StrokeDasharray
-getProperty StrokeMiterlimit = fmap (fmap (StrokeMiterlimit :=>)) . getProp' StrokeMiterlimit
-getProperty GeometryTransform = fmap (fmap (GeometryTransform :=>)) . getProp' GeometryTransform
-getProperty LineRasterizer = fmap (fmap (LineRasterizer :=>)) . getProp' LineRasterizer
-getProperty ImageTransform = fmap (fmap (ImageTransform :=>)) . getProp' ImageTransform
-getProperty Spacing = fmap (fmap (Spacing :=>)) . getProp' Spacing
-getProperty MaxError = fmap (fmap (MaxError :=>)) . getProp' MaxError
-getProperty AllowOverlap = fmap (fmap (AllowOverlap :=>)) . getProp' AllowOverlap
-getProperty IgnorePlacement = fmap (fmap (IgnorePlacement :=>)) . getProp' IgnorePlacement
-getProperty Width = fmap (fmap (Width :=>)) . getProp' Width
-getProperty Height = fmap (fmap (Height :=>)) . getProp' Height
-getProperty File = fmap (fmap (File :=>)) . getProp' File
-getProperty ShieldDx = fmap (fmap (ShieldDx :=>)) . getProp' ShieldDx
-getProperty ShieldDy = fmap (fmap (ShieldDy :=>)) . getProp' ShieldDy
-getProperty UnlockImage = fmap (fmap (UnlockImage :=>)) . getProp' UnlockImage
-getProperty Mode = fmap (fmap (Mode :=>)) . getProp' Mode
-getProperty Scaling = fmap (fmap (Scaling :=>)) . getProp' Scaling
-getProperty FilterFactor = fmap (fmap (FilterFactor :=>)) . getProp' FilterFactor
-getProperty MeshSize = fmap (fmap (MeshSize :=>)) . getProp' MeshSize
-getProperty Premultiplied = fmap (fmap (Premultiplied :=>)) . getProp' Premultiplied
-getProperty Smooth = fmap (fmap (Smooth :=>)) . getProp' Smooth
-getProperty SimplifyAlgorithm = fmap (fmap (SimplifyAlgorithm :=>)) . getProp' SimplifyAlgorithm
-getProperty SimplifyTolerance = fmap (fmap (SimplifyTolerance :=>)) . getProp' SimplifyTolerance
-getProperty HaloRasterizer = fmap (fmap (HaloRasterizer :=>)) . getProp' HaloRasterizer
-getProperty TextPlacements = fmap (fmap (TextPlacements :=>)) . getProp' TextPlacements
-getProperty LabelPlacement = fmap (fmap (LabelPlacement :=>)) . getProp' LabelPlacement
-getProperty MarkersPlacementType = fmap (fmap (MarkersPlacementType :=>)) . getProp' MarkersPlacementType
-getProperty MarkersMultipolicy = fmap (fmap (MarkersMultipolicy :=>)) . getProp' MarkersMultipolicy
-getProperty PointPlacementType = fmap (fmap (PointPlacementType :=>)) . getProp' PointPlacementType
-getProperty Colorizer = fmap (fmap (Colorizer :=>)) . getProp' Colorizer
-getProperty HaloTransform = fmap (fmap (HaloTransform :=>)) . getProp' HaloTransform
-getProperty NumColumns = fmap (fmap (NumColumns :=>)) . getProp' NumColumns
-getProperty StartColumn = fmap (fmap (StartColumn :=>)) . getProp' StartColumn
-getProperty RepeatKey = fmap (fmap (RepeatKey :=>)) . getProp' RepeatKey
-getProperty GroupProperties = fmap (fmap (GroupProperties :=>)) . getProp' GroupProperties
-getProperty LargestBoxOnly = fmap (fmap (LargestBoxOnly :=>)) . getProp' LargestBoxOnly
-getProperty MinimumPathLength = fmap (fmap (MinimumPathLength :=>)) . getProp' MinimumPathLength
-getProperty HaloCompOp = fmap (fmap (HaloCompOp :=>)) . getProp' HaloCompOp
-getProperty TextTransform = fmap (fmap (TextTransform :=>)) . getProp' TextTransform
-getProperty HorizontalAlignment = fmap (fmap (HorizontalAlignment :=>)) . getProp' HorizontalAlignment
-getProperty JustifyAlignment = fmap (fmap (JustifyAlignment :=>)) . getProp' JustifyAlignment
-getProperty VerticalAlignment = fmap (fmap (VerticalAlignment :=>)) . getProp' VerticalAlignment
-getProperty Upright = fmap (fmap (Upright :=>)) . getProp' Upright
-getProperty Direction = fmap (fmap (Direction :=>)) . getProp' Direction
-getProperty AvoidEdges = fmap (fmap (AvoidEdges :=>)) . getProp' AvoidEdges
-getProperty FfSettings = fmap (fmap (FfSettings :=>)) . getProp' FfSettings
-
-setProperty :: Property -> Ptr SymbolizerBase -> IO ()
-setProperty (Gamma :=> v) = setProp' Gamma v
-setProperty (GammaMethod :=> v) = setProp' GammaMethod v
-setProperty (Opacity :=> v) = setProp' Opacity v
-setProperty (Alignment :=> v) = setProp' Alignment v
-setProperty (Offset :=> v) = setProp' Offset v
-setProperty (CompOp :=> v) = setProp' CompOp v
-setProperty (Clip :=> v) = setProp' Clip v
-setProperty (Fill :=> v) = setProp' Fill v
-setProperty (FillOpacity :=> v) = setProp' FillOpacity v
-setProperty (Stroke :=> v) = setProp' Stroke v
-setProperty (StrokeWidth :=> v) = setProp' StrokeWidth v
-setProperty (StrokeOpacity :=> v) = setProp' StrokeOpacity v
-setProperty (StrokeLinejoin :=> v) = setProp' StrokeLinejoin v
-setProperty (StrokeLinecap :=> v) = setProp' StrokeLinecap v
-setProperty (StrokeGamma :=> v) = setProp' StrokeGamma v
-setProperty (StrokeGammaMethod :=> v) = setProp' StrokeGammaMethod v
-setProperty (StrokeDashoffset :=> v) = setProp' StrokeDashoffset v
-setProperty (StrokeDasharray :=> v) = setProp' StrokeDasharray v
-setProperty (StrokeMiterlimit :=> v) = setProp' StrokeMiterlimit v
-setProperty (GeometryTransform :=> v) = setProp' GeometryTransform v
-setProperty (LineRasterizer :=> v) = setProp' LineRasterizer v
-setProperty (ImageTransform :=> v) = setProp' ImageTransform v
-setProperty (Spacing :=> v) = setProp' Spacing v
-setProperty (MaxError :=> v) = setProp' MaxError v
-setProperty (AllowOverlap :=> v) = setProp' AllowOverlap v
-setProperty (IgnorePlacement :=> v) = setProp' IgnorePlacement v
-setProperty (Width :=> v) = setProp' Width v
-setProperty (Height :=> v) = setProp' Height v
-setProperty (File :=> v) = setProp' File v
-setProperty (ShieldDx :=> v) = setProp' ShieldDx v
-setProperty (ShieldDy :=> v) = setProp' ShieldDy v
-setProperty (UnlockImage :=> v) = setProp' UnlockImage v
-setProperty (Mode :=> v) = setProp' Mode v
-setProperty (Scaling :=> v) = setProp' Scaling v
-setProperty (FilterFactor :=> v) = setProp' FilterFactor v
-setProperty (MeshSize :=> v) = setProp' MeshSize v
-setProperty (Premultiplied :=> v) = setProp' Premultiplied v
-setProperty (Smooth :=> v) = setProp' Smooth v
-setProperty (SimplifyAlgorithm :=> v) = setProp' SimplifyAlgorithm v
-setProperty (SimplifyTolerance :=> v) = setProp' SimplifyTolerance v
-setProperty (HaloRasterizer :=> v) = setProp' HaloRasterizer v
-setProperty (TextPlacements :=> v) = setProp' TextPlacements v
-setProperty (LabelPlacement :=> v) = setProp' LabelPlacement v
-setProperty (MarkersPlacementType :=> v) = setProp' MarkersPlacementType v
-setProperty (MarkersMultipolicy :=> v) = setProp' MarkersMultipolicy v
-setProperty (PointPlacementType :=> v) = setProp' PointPlacementType v
-setProperty (Colorizer :=> v) = setProp' Colorizer v
-setProperty (HaloTransform :=> v) = setProp' HaloTransform v
-setProperty (NumColumns :=> v) = setProp' NumColumns v
-setProperty (StartColumn :=> v) = setProp' StartColumn v
-setProperty (RepeatKey :=> v) = setProp' RepeatKey v
-setProperty (GroupProperties :=> v) = setProp' GroupProperties v
-setProperty (LargestBoxOnly :=> v) = setProp' LargestBoxOnly v
-setProperty (MinimumPathLength :=> v) = setProp' MinimumPathLength v
-setProperty (HaloCompOp :=> v) = setProp' HaloCompOp v
-setProperty (TextTransform :=> v) = setProp' TextTransform v
-setProperty (HorizontalAlignment :=> v) = setProp' HorizontalAlignment v
-setProperty (JustifyAlignment :=> v) = setProp' JustifyAlignment v
-setProperty (VerticalAlignment :=> v) = setProp' VerticalAlignment v
-setProperty (Upright :=> v) = setProp' Upright v
-setProperty (Direction :=> v) = setProp' Direction v
-setProperty (AvoidEdges :=> v) = setProp' AvoidEdges v
-setProperty (FfSettings :=> v) = setProp' FfSettings v
 
 keyIndex :: Key a -> C.CUChar
 keyIndex Gamma = [C.pure|keys{keys::gamma}|]

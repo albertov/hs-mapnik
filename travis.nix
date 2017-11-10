@@ -10,9 +10,9 @@ let
     let myGhc = ghc.override {
       overrides = self: super:
         {
-          hs-mapnik-setup = self.callCabal2nix "hs-mapnik-setup" ./hs-mapnik-setup {};
-          hs-mapnik = self.callCabal2nix "hs-mapnik" ./hs-mapnik {};
-          hs-mapnik-bindings = self.callPackage ./hs-mapnik-bindings  { inherit (pkgs) mapnik; };
+          hs-mapnik-setup = self.callCabal2nix "hs-mapnik-setup" ./setup {};
+          hs-mapnik = self.callCabal2nix "hs-mapnik" ./pure {};
+          hs-mapnik-bindings = self.callPackage ./bindings  { inherit (pkgs) mapnik; };
           inline-c = super.inline-c_0_6_0_5;
           inline-c-cpp = super.inline-c-cpp_0_2_1_0;
         };
