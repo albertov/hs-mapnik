@@ -29,6 +29,7 @@ library
                      , Mapnik.Bindings.Registry
                      , Mapnik.Bindings.Rule
                      , Mapnik.Bindings.Symbolizer
+                     , Mapnik.Bindings.Symbolizer.Property
                      , Mapnik.Bindings.Expression
                      , Mapnik.Bindings.Transform
                      , Mapnik.Bindings.Util

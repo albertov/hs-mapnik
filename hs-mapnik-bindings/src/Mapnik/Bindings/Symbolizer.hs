@@ -19,16 +19,16 @@ module Mapnik.Bindings.Symbolizer (
 
 import qualified Mapnik
 import           Mapnik.Enums
-import           Mapnik ( Property(..), Key(..), toProperties, Transform(..)
-                        , Prop (..), properties, pattern PropExpression)
+import           Mapnik ( Transform(..), Prop (..) )
 import           Mapnik.Bindings hiding (TextPlacements(..))
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()
+import           Mapnik.Bindings.Symbolizer.Property
 import qualified Mapnik.Bindings.Expression as Expression
 import qualified Mapnik.Bindings.Transform as Transform
 
 import           Control.Exception
-import           Control.Lens ((&), (.~))
+import           Control.Lens ((&), (.~), (^.))
 import           Data.Maybe (catMaybes)
 import           Data.Text (Text, unpack)
 import           Data.Text.Encoding (encodeUtf8)
@@ -67,7 +67,7 @@ unsafeNew = fmap Symbolizer . newForeignPtr destroySymbolizer
 
 create :: Mapnik.Symbolizer -> IO Symbolizer
 create sym = bracket alloc dealloc $ \p -> do
-  mapM_ (flip setProperty p) (toProperties sym)
+  mapM_ (`setProperty` p) (sym^.properties)
   unsafeNew =<< castSym sym p
   where
     alloc = [C.exp|symbolizer_base * { new symbolizer_base() }|]
@@ -390,7 +390,7 @@ getProp' k p = do
   eVal <- getPropExpression k p
   case eVal of
     Nothing -> fmap Val <$> getProp k p
-    Just e -> return (PropExpression e)
+    Just e -> return (Just (Exp e))
 
 setPropExpression :: Key a
                   -> Mapnik.Expression -> Ptr SymbolizerBase -> IO ()

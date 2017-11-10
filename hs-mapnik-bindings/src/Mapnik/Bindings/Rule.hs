@@ -137,5 +137,3 @@ hasAlsoFilter r = toEnum . fromIntegral <$> [C.exp|int { $fptr-ptr:(rule *r)->ha
 setAlso :: Rule -> Bool -> IO ()
 setAlso r (fromIntegral . fromEnum -> q) =
   [C.block|void { $fptr-ptr:(rule *r)->set_also($(int q)); }|]
-
-
