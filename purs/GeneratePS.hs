@@ -1,4 +1,4 @@
-{-# LANGUAGE AutoDeriveTypeable    #-}
+{-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE OverloadedLists       #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
@@ -9,13 +9,24 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE NamedFieldPuns        #-}
 
-module Mapnik.Purescript (generatePS) where
+import           System.Environment (getArgs)
 
 import           Mapnik
 
+import           Control.Lens
+import           Data.Text (Text)
 import           Data.Proxy
 import           Language.PureScript.Bridge
+import           Language.PureScript.Bridge.PSTypes
 import           Language.PureScript.Bridge.TypeParameters (A)
+
+
+main :: IO ()
+main = do
+  args <- getArgs
+  case args of
+    [outputDir] -> generatePS outputDir
+    _ -> putStrLn "Usage: hs-mapnik-purs <outputDir>"
 
 --
 -- Purescript bridge
@@ -26,8 +37,38 @@ generatePS frontEndRoot = writePSTypes frontEndRoot (buildBridge myBridge) myTyp
 
 
 myBridge :: BridgePart
-myBridge = defaultBridge
+myBridge = defaultBridge <|> vectorBridge <|> wordBridge <|> hashMapBridge
 
+hashMapBridge :: BridgePart
+hashMapBridge = do
+  typeName ^== "HashMap"
+  doCheck typeParameters isStringMap
+  [_,x] <- psTypeParameters
+  return TypeInfo
+    { _typePackage = "hs-mapnik-purs"
+    , _typeModule = "Data.StringMap"
+    , _typeName = "StringMap"
+    , _typeParameters = [x]
+    }
+
+isStringMap :: [TypeInfo lang] -> Bool
+isStringMap [x,_] = (x^.typeName) `elem` (["Text","String"] :: [Text])
+isStringMap _     = False
+
+vectorBridge :: BridgePart
+vectorBridge = do
+  typeName ^== "Vector"
+  return TypeInfo
+    { _typePackage = "purescript-arrays"
+    , _typeModule = "Data.Array"
+    , _typeName = "Array"
+    , _typeParameters = []
+    }
+
+wordBridge :: BridgePart
+wordBridge = do
+  typeName ^== "Word8"
+  return psInt
 
 myTypes :: [SumType 'Haskell]
 myTypes = [ mkSumType (Proxy :: Proxy Map)
@@ -40,6 +81,8 @@ myTypes = [ mkSumType (Proxy :: Proxy Map)
           , mkSumType (Proxy :: Proxy Transform)
           , mkSumType (Proxy :: Proxy Box)
           , mkSumType (Proxy :: Proxy Dash)
+          , mkSumType (Proxy :: Proxy Datasource)
+          , mkSumType (Proxy :: Proxy ParamValue)
           --, mkSumType (Proxy :: Proxy DashArray)
           --, mkSumType (Proxy :: Proxy Proj4)
           , mkSumType (Proxy :: Proxy (Prop A))
