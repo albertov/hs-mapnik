@@ -16,7 +16,6 @@ import qualified Mapnik.Bindings.Expression as Expression
 import qualified Mapnik.Bindings.Datasource as Datasource
 import qualified Mapnik.Bindings.Symbolizer as Symbolizer
 
-import qualified Data.HashMap.Strict as HM
 import           Prelude hiding (filter)
 
 class FromMapnik a where
@@ -56,8 +55,7 @@ instance FromMapnik Map where
     maximumExtent <- Map.getMaxExtent m
     fontDirectory <- Map.getFontDirectory m
     layers <- mapM fromMapnik =<< Map.getLayers m
-    styles <- HM.fromList
-             <$> (mapM (\(k,v) -> (k,) <$> fromMapnik v) =<< Map.getStyles m)
+    styleLst <- mapM (\(k,v) -> (k,) <$> fromMapnik v) =<< Map.getStyles m
     return Mapnik.Map{..}
 
 instance FromMapnik Expression where
@@ -102,7 +100,7 @@ instance FromMapnik Style where
 
 instance FromMapnik Datasource where
   type HsType Datasource = Mapnik.Datasource
-  fromMapnik = fmap (Mapnik.Datasource . HM.fromList . Datasource.toList)
+  fromMapnik = fmap (Mapnik.Datasource . Datasource.toList)
              . Datasource.getParameters
 
 instance FromMapnik Symbolizer where

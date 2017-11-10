@@ -25,7 +25,7 @@ data Map = Map
   , bufferSize             :: !(Maybe Int)
   , maximumExtent          :: !(Maybe Box)
   , fontDirectory          :: !(Maybe FilePath)
-  , _styleLst              :: !Styles --FIXME: Rename to styles when HashMap
+  , styleLst               :: !Styles --FIXME: Rename to styles when HashMap
   , layers                 :: ![Layer]
   } deriving (Eq, Show, Generic)
 deriveMapnikJSON ''Map
@@ -41,6 +41,6 @@ empty = Map
   , bufferSize             = Nothing
   , maximumExtent          = Nothing
   , fontDirectory          = Nothing
-  , _styleLst              = mempty
+  , styleLst              = mempty
   , layers                 = mempty
   }

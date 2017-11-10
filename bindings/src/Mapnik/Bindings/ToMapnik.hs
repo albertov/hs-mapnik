@@ -6,6 +6,7 @@
 module Mapnik.Bindings.ToMapnik (ToMapnik(..)) where
 
 import qualified Mapnik
+import           Mapnik.Lens
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Layer as Layer
 import           Mapnik.Bindings.Map as Map
@@ -16,6 +17,7 @@ import           Mapnik.Bindings.Rule as Rule
 import           Mapnik.Bindings.Expression as Expression
 
 import           Control.Exception
+import           Control.Lens
 import           Control.Monad
 import           Data.HashMap.Strict (toList)
 import qualified GHC.Exts as Exts
@@ -44,19 +46,19 @@ toMapnikId(Expression)
 
 instance ToMapnik Mapnik.Map where
   type MapnikType Mapnik.Map = Map
-  toMapnik Mapnik.Map {..} = do
-    m <- Map.create 400 400
-    forM_ backgroundColor        (setBackground m <=< toMapnik)
-    forM_ backgroundImage        (setBackgroundImage m)
-    forM_ backgroundImageCompOp  (setBackgroundImageCompOp m)
-    forM_ backgroundImageOpacity (setBackgroundImageOpacity m)
-    forM_ srs                    (Map.setSrs m)
-    forM_ bufferSize             (Map.setBufferSize m)
-    forM_ maximumExtent          (Map.setMaxExtent m)
-    forM_ fontDirectory          (Map.setFontDirectory m)
-    forM_ layers                 (addLayer m <=< toMapnik)
-    forM_ (toList styles)        (\(k,v) -> insertStyle m k =<< toMapnik v)
-    return m
+  toMapnik m = do
+    m' <- Map.create 400 400
+    forM_ (m^.backgroundColor)        (setBackground m' <=< toMapnik)
+    forM_ (m^.backgroundImage)        (setBackgroundImage m')
+    forM_ (m^.backgroundImageCompOp)  (setBackgroundImageCompOp m')
+    forM_ (m^.backgroundImageOpacity) (setBackgroundImageOpacity m')
+    forM_ (m^.srs)                    (Map.setSrs m')
+    forM_ (m^.bufferSize)             (Map.setBufferSize m')
+    forM_ (m^.maximumExtent)          (Map.setMaxExtent m')
+    forM_ (m^.fontDirectory)          (Map.setFontDirectory m')
+    forM_ (m^.layers)                 (addLayer m' <=< toMapnik)
+    forM_ (m^.styleLst)               (\(k,v) -> insertStyle m' k =<< toMapnik v)
+    return m'
 
 instance ToMapnik Mapnik.Style where
   type MapnikType Mapnik.Style = Style
