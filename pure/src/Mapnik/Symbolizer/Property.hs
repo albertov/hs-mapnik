@@ -100,11 +100,23 @@ data TextLayoutProperties = TextLayoutProperties
   } deriving (Eq, Show, Generic, Default)
 deriveMapnikJSON ''TextLayoutProperties
 
+data SimplePlacementPosition = SimplePlacementPosition
+  { textSizes            :: ![Int]
+  , directions           :: ![PlacementDirection]
+  } deriving (Eq, Show, Generic, Default)
+deriveMapnikJSON ''SimplePlacementPosition
+
 data TextPlacements
   = Simple
+    { defaults  :: !TextProperties
+    , positions :: !(PropValue [SimplePlacementPosition])
+    }
   | List
+    { defaults :: !TextProperties
+    , placements :: ![TextProperties]
+    }
   | Dummy
-    { properties :: !TextProperties
+    { defaults :: !TextProperties
     }
   deriving (Eq, Show, Generic)
 deriveMapnikJSON ''TextPlacements
