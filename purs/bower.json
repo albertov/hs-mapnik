@@ -6,14 +6,11 @@
   ],
   "description": "",
   "license": "BSD3",
-    "dependencies": {
-      "purescript-profunctor-lenses": "*",
-      "purescript-generics": "*",
-      "purescript-foreign": "*",
-      "purescript-foreign-generic": "*",
-      "purescript-maybe": "*",
-      "purescript-maps": "*",
-      "purescript-prelude": "*",
-      "purescript-arrays": "*"
-    }
+  "dependencies": {
+    "purescript-profunctor-lenses": "^3.8.0",
+    "purescript-maybe": "^3.0.0",
+    "purescript-prelude": "^3.1.1",
+    "purescript-generics": "^4.0.0",
+    "purescript-tuples": "^4.1.0"
+  }
 }

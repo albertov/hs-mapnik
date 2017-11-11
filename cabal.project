@@ -1,0 +1,5 @@
+packages:
+  ./bindings
+  ./pure
+  ./purs
+  ./setup
