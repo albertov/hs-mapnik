@@ -28,6 +28,9 @@ import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()
 import qualified Mapnik.Bindings.Expression as Expression
 import qualified Mapnik.Bindings.Transform as Transform
+import qualified Mapnik.Bindings.Colorizer as Colorizer
+import qualified Mapnik.Bindings.TextPlacements as TextPlacements
+import qualified Mapnik.Bindings.GroupProperties as GroupProperties
 
 import           Control.Exception
 import           Control.Lens hiding (has)
@@ -121,17 +124,17 @@ unCreate sym' = bracket alloc dealloc $ \sym -> do
     , getProperty SimplifyAlgorithm sym
     , getProperty SimplifyTolerance sym
     , getProperty HaloRasterizer sym
-    , getProperty TextPlacementsType sym
+    , getProperty TextPlacementsKey sym
     , getProperty LabelPlacement sym
-    , getProperty MarkersPlacementType sym
+    , getProperty MarkersPlacementKey sym
     , getProperty MarkersMultipolicy sym
-    , getProperty PointPlacementType sym
-    , getProperty ColorizerType sym
+    , getProperty PointPlacementKey sym
+    , getProperty ColorizerKey sym
     , getProperty HaloTransform sym
     , getProperty NumColumns sym
     , getProperty StartColumn sym
     , getProperty RepeatKey sym
-    , getProperty GroupProperties sym
+    , getProperty GroupPropertiesKey sym
     , getProperty LargestBoxOnly sym
     , getProperty MinimumPathLength sym
     , getProperty HaloCompOp sym
@@ -259,17 +262,17 @@ data Key a where
     SimplifyAlgorithm :: Key SimplifyAlgorithm
     SimplifyTolerance :: Key Double
     HaloRasterizer :: Key HaloRasterizer
-    TextPlacementsType :: Key Mapnik.TextPlacements
+    TextPlacementsKey :: Key Mapnik.TextPlacements
     LabelPlacement :: Key LabelPlacement
-    MarkersPlacementType :: Key MarkerPlacement
+    MarkersPlacementKey :: Key MarkerPlacement
     MarkersMultipolicy :: Key MarkerMultiPolicy
-    PointPlacementType :: Key PointPlacement
-    ColorizerType :: Key Mapnik.Colorizer
+    PointPlacementKey :: Key PointPlacement
+    ColorizerKey :: Key Mapnik.Colorizer
     HaloTransform :: Key Mapnik.Transform
     NumColumns :: Key Int
     StartColumn :: Key Int
     RepeatKey :: Key Mapnik.Expression
-    GroupProperties :: Key Mapnik.GroupProperties
+    GroupPropertiesKey :: Key Mapnik.GroupProperties
     LargestBoxOnly :: Key Bool
     MinimumPathLength :: Key Double
     HaloCompOp :: Key CompositeMode
@@ -294,7 +297,7 @@ instance HasProperties Mapnik.Symbolizer Properties where
       step (Opacity            :=> v) = opacity ?~ v
       step (AllowOverlap       :=> v) = allowOverlap ?~ v
       step (IgnorePlacement    :=> v) = ignorePlacement ?~ v
-      step (PointPlacementType :=> v) = pointPlacement ?~ v
+      step (PointPlacementKey :=> v) = pointPlacement ?~ v
       step (ImageTransform     :=> v) = imageTransform ?~ v
       step p                          = stepBase p
 
@@ -337,12 +340,12 @@ instance HasProperties Mapnik.Symbolizer Properties where
       step (FilterFactor  :=> Val v        ) = filterFactor ?~ v
       step (MeshSize      :=> Val v        ) = meshSize ?~ v
       step (Premultiplied :=> Val v        ) = preMultiplied ?~ v
-      step (ColorizerType :=> Val v        ) = colorizer ?~ v
+      step (ColorizerKey :=> Val v        ) = colorizer ?~ v
       step p                                 = stepBase p
 
     setProps sym@Mapnik.Shield{} = foldr step sym  where
       step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
-      step (TextPlacementsType :=> v) = placements ?~ v
+      step (TextPlacementsKey :=> v) = placements ?~ v
       step (ImageTransform :=> v) = imageTransform ?~ v
       step (ShieldDx       :=> v) = dx ?~ v
       step (ShieldDy       :=> v) = dy ?~ v
@@ -354,7 +357,7 @@ instance HasProperties Mapnik.Symbolizer Properties where
 
     setProps sym@Mapnik.Text{} = foldr step sym  where
       step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
-      step (TextPlacementsType :=> v) = placements ?~ v
+      step (TextPlacementsKey :=> v) = placements ?~ v
       step (HaloCompOp     :=> v) = haloCompOp ?~ v
       step (HaloRasterizer :=> v) = haloRasterizer ?~ v
       step (HaloTransform  :=> v) = haloTransform ?~ v
@@ -382,18 +385,18 @@ instance HasProperties Mapnik.Symbolizer Properties where
       step (AvoidEdges           :=> v) = avoidEdges ?~ v
       step (IgnorePlacement      :=> v) = ignorePlacement ?~ v
       step (ImageTransform       :=> v) = imageTransform ?~ v
-      step (MarkersPlacementType :=> v) = placement ?~ v
+      step (MarkersPlacementKey :=> v) = placement ?~ v
       step (MarkersMultipolicy   :=> v) = multiPolicy ?~ v
       step (Direction            :=> v) = direction ?~ v
       step p                            = stepStroke p
 
     setProps sym@Mapnik.Group{} = foldr step sym  where
       step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
-      step (GroupProperties :=> v) = groupProperties ?~ v
+      step (GroupPropertiesKey :=> v) = groupProperties ?~ v
       step (NumColumns      :=> v) = numColumns ?~ v
       step (StartColumn     :=> v) = startColumn ?~ v
       step (RepeatKey       :=> v) = repeatKey ?~ v
-      step (TextPlacementsType  :=> v) = placements ?~ v
+      step (TextPlacementsKey  :=> v) = placements ?~ v
       step p                       = stepBase p
 
     setProps sym@Mapnik.Debug{} = foldr step sym  where
@@ -458,7 +461,7 @@ instance HasProperties Mapnik.Symbolizer Properties where
         , fmap (Opacity            :=>) (sym^?!opacity)
         , fmap (AllowOverlap       :=>) (sym^?!allowOverlap)
         , fmap (IgnorePlacement    :=>) (sym^?!ignorePlacement)
-        , fmap (PointPlacementType :=>) (sym^?!pointPlacement)
+        , fmap (PointPlacementKey :=>) (sym^?!pointPlacement)
         , fmap (ImageTransform     :=>) (sym^?!imageTransform)
         , GET_BASE_PROPS
         ]
@@ -496,11 +499,11 @@ instance HasProperties Mapnik.Symbolizer Properties where
         , fmap ((FilterFactor  :=>) . Val) (sym^?!filterFactor)
         , fmap ((MeshSize      :=>) . Val) (sym^?!meshSize)
         , fmap ((Premultiplied :=>) . Val) (sym^?!preMultiplied)
-        , fmap ((ColorizerType :=>) . Val) (sym^?!colorizer)
+        , fmap ((ColorizerKey :=>) . Val) (sym^?!colorizer)
         , GET_BASE_PROPS
         ]
       Mapnik.Shield{} ->
-        [ fmap (TextPlacementsType    :=>) (sym^?!placements)
+        [ fmap (TextPlacementsKey    :=>) (sym^?!placements)
         , fmap (GeometryTransform :=>) (sym^?!imageTransform)
         , fmap (ShieldDx          :=>) (sym^?!dx)
         , fmap (ShieldDy          :=>) (sym^?!dy)
@@ -511,7 +514,7 @@ instance HasProperties Mapnik.Symbolizer Properties where
         , GET_BASE_PROPS
         ]
       Mapnik.Text{} ->
-        [ fmap (TextPlacementsType    :=>) (sym^?!placements)
+        [ fmap (TextPlacementsKey    :=>) (sym^?!placements)
         , fmap (HaloCompOp        :=>) (sym^?!haloCompOp)
         , fmap (HaloRasterizer    :=>) (sym^?!haloRasterizer)
         , fmap (GeometryTransform :=>) (sym^?!haloTransform)
@@ -537,17 +540,17 @@ instance HasProperties Mapnik.Symbolizer Properties where
         , fmap (AvoidEdges           :=>) (sym^?!avoidEdges)
         , fmap (IgnorePlacement      :=>) (sym^?!ignorePlacement)
         , fmap (GeometryTransform    :=>) (sym^?!imageTransform)
-        , fmap (MarkersPlacementType :=>) (sym^?!placement)
+        , fmap (MarkersPlacementKey :=>) (sym^?!placement)
         , fmap (MarkersMultipolicy   :=>) (sym^?!multiPolicy)
         , fmap (Direction            :=>) (sym^?!direction)
         , GET_STROKE_PROPS
         ]
       Mapnik.Group{} ->
-        [ fmap (GroupProperties :=>) (sym^?!groupProperties)
+        [ fmap (GroupPropertiesKey :=>) (sym^?!groupProperties)
         , fmap (NumColumns      :=>) (sym^?!numColumns)
         , fmap (StartColumn     :=>) (sym^?!startColumn)
         , fmap (RepeatKey       :=>) (sym^?!repeatKey)
-        , fmap (TextPlacementsType  :=>) (sym^?!placements)
+        , fmap (TextPlacementsKey  :=>) (sym^?!placements)
         , GET_BASE_PROPS
         ]
       Mapnik.Debug{} ->
@@ -703,11 +706,44 @@ instance HasGetProp Mapnik.DashArray where
       Just <$> V.freeze (VM.unsafeFromForeignPtr0 fp len)
     else return Nothing
 
-instance HasGetProp Mapnik.TextPlacements where getProp key sym = return Nothing --TODO
-instance HasSetProp Mapnik.TextPlacements where setProp key val sym = undefined --TODO
+instance HasGetProp Mapnik.TextPlacements where
+  getProp (keyIndex -> k) sym = mapM TextPlacements.unCreate =<<
+    TextPlacements.unsafeNewMaybe (\p ->
+      [C.block|void {
+      auto val = get_optional<text_placements_ptr>(*$(symbolizer_base *sym), $(keys k));
+      if (val) {
+        *$(text_placements_ptr **p) = new text_placements_ptr(*val);
+      } else {
+        *$(text_placements_ptr **p) = NULL;
+      }
+      }|])
 
-instance HasGetProp Mapnik.Colorizer where getProp key sym = return Nothing --TODO
-instance HasSetProp Mapnik.Colorizer where setProp key val sym = undefined --TODO
+instance HasSetProp Mapnik.TextPlacements where
+  setProp (keyIndex -> k) v s = do
+    t <- TextPlacements.create v
+    [C.block|void {
+      $(symbolizer_base *s)->properties[$(keys k)] = *$fptr-ptr:(text_placements_ptr *t);
+    }|]
+
+instance HasGetProp Mapnik.Colorizer where
+  getProp (keyIndex -> k) sym = mapM Colorizer.unCreate =<<
+    Colorizer.unsafeNewMaybe (\p ->
+      [C.block|void {
+      auto val = get_optional<raster_colorizer_ptr>(*$(symbolizer_base *sym), $(keys k));
+      if (val) {
+        *$(raster_colorizer_ptr **p) = new raster_colorizer_ptr(*val);
+      } else {
+        *$(raster_colorizer_ptr **p) = NULL;
+      }
+      }|])
+    
+
+instance HasSetProp Mapnik.Colorizer where
+  setProp (keyIndex -> k) v s = do
+    c <- Colorizer.create v
+    [C.block|void {
+      $(symbolizer_base *s)->properties[$(keys k)] = *$fptr-ptr:(raster_colorizer_ptr *c);
+    }|]
 
 instance HasGetProp Mapnik.FontFeatureSettings where
   getProp (keyIndex -> k) sym =
@@ -730,8 +766,24 @@ instance HasSetProp Mapnik.FontFeatureSettings where
         font_feature_settings(std::string($bs-ptr:v, $bs-len:v));
     |]
 
-instance HasGetProp Mapnik.GroupProperties where getProp key sym = return Nothing --TODO
-instance HasSetProp Mapnik.GroupProperties where setProp key val sym = undefined --TODO
+instance HasGetProp Mapnik.GroupProperties where
+  getProp (keyIndex -> k) sym = mapM GroupProperties.unCreate =<<
+    GroupProperties.unsafeNewMaybe (\p ->
+      [C.block|void {
+      auto val = get_optional<group_symbolizer_properties_ptr>(*$(symbolizer_base *sym), $(keys k));
+      if (val) {
+        *$(group_symbolizer_properties_ptr **p) = new group_symbolizer_properties_ptr(*val);
+      } else {
+        *$(group_symbolizer_properties_ptr **p) = NULL;
+      }
+      }|])
+
+instance HasSetProp Mapnik.GroupProperties where
+  setProp (keyIndex -> k) v s = do
+    t <- GroupProperties.create v
+    [C.block|void {
+      $(symbolizer_base *s)->properties[$(keys k)] = *$fptr-ptr:(group_symbolizer_properties_ptr *t);
+    }|]
 
 #define HAS_GET_PROP_ENUM(HS,CPP) \
 instance HasGetProp HS where {\
@@ -851,17 +903,17 @@ keyIndex Smooth = [C.pure|keys{keys::smooth}|]
 keyIndex SimplifyAlgorithm = [C.pure|keys{keys::simplify_algorithm}|]
 keyIndex SimplifyTolerance = [C.pure|keys{keys::simplify_tolerance}|]
 keyIndex HaloRasterizer = [C.pure|keys{keys::halo_rasterizer}|]
-keyIndex TextPlacementsType = [C.pure|keys{keys::text_placements_}|]
+keyIndex TextPlacementsKey = [C.pure|keys{keys::text_placements_}|]
 keyIndex LabelPlacement = [C.pure|keys{keys::label_placement}|]
-keyIndex MarkersPlacementType = [C.pure|keys{keys::markers_placement_type}|]
+keyIndex MarkersPlacementKey = [C.pure|keys{keys::markers_placement_type}|]
 keyIndex MarkersMultipolicy = [C.pure|keys{keys::markers_multipolicy}|]
-keyIndex PointPlacementType = [C.pure|keys{keys::point_placement_type}|]
-keyIndex ColorizerType = [C.pure|keys{keys::colorizer}|]
+keyIndex PointPlacementKey = [C.pure|keys{keys::point_placement_type}|]
+keyIndex ColorizerKey = [C.pure|keys{keys::colorizer}|]
 keyIndex HaloTransform = [C.pure|keys{keys::halo_transform}|]
 keyIndex NumColumns = [C.pure|keys{keys::num_columns}|]
 keyIndex StartColumn = [C.pure|keys{keys::start_column}|]
 keyIndex RepeatKey = [C.pure|keys{keys::repeat_key}|]
-keyIndex GroupProperties = [C.pure|keys{keys::group_properties}|]
+keyIndex GroupPropertiesKey = [C.pure|keys{keys::group_properties}|]
 keyIndex LargestBoxOnly = [C.pure|keys{keys::largest_box_only}|]
 keyIndex MinimumPathLength = [C.pure|keys{keys::minimum_path_length}|]
 keyIndex HaloCompOp = [C.pure|keys{keys::halo_comp_op}|]

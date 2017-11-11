@@ -15,8 +15,11 @@ module Mapnik.Bindings (
 , Expression (..)
 , Transform (..)
 , TextPlacements (..)
+, GroupProperties (..)
 , FontSet(..)
 , Color(..)
+, Colorizer(..)
+, Stop(..)
 , Box (..)
 , Datasource (..)
 , Parameters (..)
@@ -55,7 +58,6 @@ fptr(Transform)
 fptr(TextPlacements)
 fptr(Colorizer)
 fptr(Stop)
-fptr(FontFeatureSettings)
 fptr(FontSet)
 fptr(GroupProperties)
 
@@ -89,5 +91,8 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "color", [t| Mapnik.Color |])
       , (C.TypeName "text_placements_ptr", [t| TextPlacements |])
       , (C.TypeName "dash_t", [t| Dash |])
+      , (C.TypeName "group_symbolizer_properties_ptr", [t| GroupProperties |])
+      , (C.TypeName "raster_colorizer_ptr", [t| Colorizer |])
+      , (C.TypeName "colorizer_stop", [t| Stop |])
       ]
     }

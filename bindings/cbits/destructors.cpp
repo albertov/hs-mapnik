@@ -9,6 +9,7 @@
 #include <mapnik/feature_type_style.hpp>
 #include <mapnik/rule.hpp>
 #include <mapnik/symbolizer_base.hpp>
+#include <mapnik/raster_colorizer.hpp>
 
 extern "C" {
 
@@ -58,6 +59,19 @@ MAPNIK_DECL void hs_mapnik_destroy_Expression(void *p) {
 
 MAPNIK_DECL void hs_mapnik_destroy_Transform(void *p) {
   delete static_cast<mapnik::transform_type*>(p);
+}
+
+MAPNIK_DECL void hs_mapnik_destroy_Colorizer(void *p) {
+  delete static_cast<mapnik::raster_colorizer_ptr*>(p);
+}
+
+MAPNIK_DECL void hs_mapnik_destroy_TextPlacements(void *p) {
+  delete static_cast<mapnik::text_placements_ptr*>(p);
+}
+
+
+MAPNIK_DECL void hs_mapnik_destroy_GroupProperties(void *p) {
+  delete static_cast<mapnik::group_symbolizer_properties_ptr*>(p);
 }
 }
 

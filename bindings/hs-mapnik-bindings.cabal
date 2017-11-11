@@ -25,7 +25,9 @@ library
                      , Mapnik.Bindings.Style
                      , Mapnik.Bindings.Datasource
                      , Mapnik.Bindings.Projection
+                     , Mapnik.Bindings.Colorizer
                      , Mapnik.Bindings.TextPlacements
+                     , Mapnik.Bindings.GroupProperties
                      , Mapnik.Bindings.Registry
                      , Mapnik.Bindings.Rule
                      , Mapnik.Bindings.Symbolizer

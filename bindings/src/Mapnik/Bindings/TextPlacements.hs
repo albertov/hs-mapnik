@@ -8,24 +8,23 @@
 module Mapnik.Bindings.TextPlacements (
   unsafeNew
 , unsafeNewMaybe
+, create
+, unCreate
 ) where
 
+import qualified Mapnik
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
 
 import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Cpp.Exceptions as C
-
-
 
 C.context mapnikCtx
 
 C.include "<string>"
-C.include "<mapnik/transform_expression.hpp>"
-C.include "<mapnik/parse_transform.hpp>"
-C.include "<mapnik/transform_processor.hpp>"
+C.include "<mapnik/symbolizer_base.hpp>"
+C.include "<mapnik/text/placements/dummy.hpp>"
 
 C.using "namespace mapnik"
 
@@ -39,3 +38,15 @@ unsafeNew = mkUnsafeNew TextPlacements destroyTextPlacements
 
 unsafeNewMaybe :: (Ptr (Ptr TextPlacements) -> IO ()) -> IO (Maybe TextPlacements)
 unsafeNewMaybe = mkUnsafeNewMaybe TextPlacements destroyTextPlacements
+
+--TODO
+create :: Mapnik.TextPlacements -> IO TextPlacements
+create _ = unsafeNew $ \p ->
+  [C.block|void {
+    auto placements = std::make_shared<text_placements_dummy>();
+    *$(text_placements_ptr **p) = new text_placements_ptr(placements);
+  }|]
+
+--TODO
+unCreate :: TextPlacements -> IO Mapnik.TextPlacements
+unCreate = const (return Mapnik.dummyPlacements)

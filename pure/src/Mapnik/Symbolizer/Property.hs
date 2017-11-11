@@ -12,7 +12,7 @@ import Mapnik.Enums
 import Mapnik.Common
 
 import Data.Text (Text)
-import Data.Default (Default)
+import Data.Default (Default(def))
 
 data Prop a = Exp Expression
             | Val a
@@ -121,3 +121,8 @@ data TextPlacements
     }
   deriving (Eq, Show, Generic)
 deriveMapnikJSON ''TextPlacements
+
+simplePlacements, listPlacements, dummyPlacements :: TextPlacements
+simplePlacements = Simple def def
+listPlacements = List def def
+dummyPlacements = Dummy def
