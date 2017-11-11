@@ -15,6 +15,7 @@ module Mapnik.Bindings (
 , Expression (..)
 , Transform (..)
 , TextPlacements (..)
+, TextProperties (..)
 , GroupProperties (..)
 , FontSet(..)
 , Color(..)
@@ -60,6 +61,7 @@ fptr(Colorizer)
 fptr(Stop)
 fptr(FontSet)
 fptr(GroupProperties)
+fptr(TextProperties)
 
 #ifdef BIGINT
 type MapnikInt = C.CLong
@@ -94,5 +96,6 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "group_symbolizer_properties_ptr", [t| GroupProperties |])
       , (C.TypeName "raster_colorizer_ptr", [t| Colorizer |])
       , (C.TypeName "colorizer_stop", [t| Stop |])
+      , (C.TypeName "text_symbolizer_properties", [t| TextProperties |])
       ]
     }

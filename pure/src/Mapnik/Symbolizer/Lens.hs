@@ -21,8 +21,6 @@ class HasDy s a | s -> a where dy :: ApLens' s a
 
 makeMapnikFields ''TextProperties
 makeMapnikFields ''TextPlacements
-makeMapnikFields ''FormatProperties
-makeMapnikFields ''TextLayoutProperties
 makeMapnikFields ''Symbolizer
 makeMapnikFields ''Colorizer
 makeMapnikFields ''Stop

@@ -48,58 +48,53 @@ deriveMapnikJSON ''FontSet
 
 
 data TextProperties = TextProperties
-  { labelPlacement          :: !(PropValue LabelPlacement)
-  , labelSpacing            :: !(PropValue Double)
-  , labelPositionTolerance  :: !(PropValue Double)
-  , avoidEdges              :: !(PropValue Bool)
-  , margin                  :: !(PropValue Double)
-  , repeatDistance          :: !(PropValue Double)
-  , minimumDistance         :: !(PropValue Double) -- Deprecated
-  , minimumPadding          :: !(PropValue Double)
-  , minimumPathLength       :: !(PropValue Double)
-  , maxCharAngleDelta       :: !(PropValue Double)
-  , allowOverlap            :: !(PropValue Bool)
-  , largestBoxOnly          :: !(PropValue Bool)
-  , upright                 :: !(PropValue Upright)
+  { labelPlacement         :: !(PropValue LabelPlacement)
+  , labelSpacing           :: !(PropValue Double)
+  , labelPositionTolerance :: !(PropValue Double)
+  , avoidEdges             :: !(PropValue Bool)
+  , margin                 :: !(PropValue Double)
+  , repeatDistance         :: !(PropValue Double)
+  , minimumDistance        :: !(PropValue Double) -- Deprecated
+  , minimumPadding         :: !(PropValue Double)
+  , minimumPathLength      :: !(PropValue Double)
+  , maxCharAngleDelta      :: !(PropValue Double)
+  , allowOverlap           :: !(PropValue Bool)
+  , largestBoxOnly         :: !(PropValue Bool)
+  , upright                :: !(PropValue Upright)
+  -- Layout properties
+  , faceName               :: !(PropValue Text)
+  , fontSet                :: !(PropValue FontSet)
+  , textSize               :: !(PropValue Double)
+  , characterSpacing       :: !(PropValue Double)
+  , lineSpacing            :: !(PropValue Double)
+  , textOpacity            :: !(PropValue Double)
+  , haloOpacity            :: !(PropValue Double)
+  , textTransform          :: !(PropValue TextTransform)
+  , fill                   :: !(PropValue Color)
+  , haloFill               :: !(PropValue Color)
+  , haloRadius             :: !(PropValue Double)
+  , ffSettings             :: !(PropValue FontFeatureSettings)
+  -- format properties
+  , dx                     :: !(PropValue Double)
+  , dy                     :: !(PropValue Double)
+  , orientation            :: !(PropValue Double)
+  , textRatio              :: !(PropValue Double)
+  , wrapWidth              :: !(PropValue Double)
+  , wrapChar               :: !(PropValue Text)
+  , wrapBefore             :: !(PropValue Bool)
+  , repeatWrapChar         :: !(PropValue Bool)
+  , rotateDisplacement     :: !(PropValue Double)
+  , horizontalAlignment    :: !(PropValue HorizontalAlignment)
+  , justifyAlignment       :: !(PropValue JustifyAlignment)
+  , verticalAlignment      :: !(PropValue VerticalAlignment)
+  , maxCharAngleDelta      :: !(PropValue Double)
+  , allowOverlap           :: !(PropValue Bool)
+  , largestBoxOnly         :: !(PropValue Bool)
+  , upright                :: !(PropValue Upright)
+  , direction              :: !(PropValue PlacementDirection)
   } deriving (Eq, Show, Generic, Default)
 deriveMapnikJSON ''TextProperties
 
-data FormatProperties = FormatProperties
-  { faceName         :: !(PropValue Text)
-  , fontSet          :: !(PropValue FontSet)
-  , textSize         :: !(PropValue Double)
-  , characterSpacing :: !(PropValue Double)
-  , lineSpacing      :: !(PropValue Double)
-  , textOpacity      :: !(PropValue Double)
-  , haloOpacity      :: !(PropValue Double)
-  , textTransform    :: !(PropValue TextTransform)
-  , fill             :: !(PropValue Color)
-  , haloFill         :: !(PropValue Color)
-  , haloRadius       :: !(PropValue Double)
-  , ffSettings       :: !(PropValue FontFeatureSettings)
-  } deriving (Eq, Show, Generic, Default)
-deriveMapnikJSON ''FormatProperties
-
-data TextLayoutProperties = TextLayoutProperties
-  { dx                  :: !(PropValue Double)
-  , dy                  :: !(PropValue Double)
-  , orientation         :: !(PropValue Double)
-  , textRatio           :: !(PropValue Double)
-  , wrapWidth           :: !(PropValue Double)
-  , wrapChar            :: !(PropValue Text)
-  , wrapBefore          :: !(PropValue Bool)
-  , repeatWrapChar      :: !(PropValue Bool)
-  , rotateDisplacement  :: !(PropValue Double)
-  , horizontalAlignment :: !(PropValue HorizontalAlignment)
-  , justifyAlignment    :: !(PropValue JustifyAlignment)
-  , verticalAlignment   :: !(PropValue VerticalAlignment)
-  , maxCharAngleDelta   :: !(PropValue Double)
-  , allowOverlap        :: !(PropValue Bool)
-  , largestBoxOnly      :: !(PropValue Bool)
-  , upright             :: !(PropValue Upright)
-  , direction           :: !(PropValue PlacementDirection)
-  } deriving (Eq, Show, Generic, Default)
-deriveMapnikJSON ''TextLayoutProperties
 
 data SimplePlacementPosition = SimplePlacementPosition
   { textSizes            :: ![Int]
@@ -126,3 +121,5 @@ simplePlacements, listPlacements, dummyPlacements :: TextPlacements
 simplePlacements = Simple def def
 listPlacements = List def def
 dummyPlacements = Dummy def
+
+instance Default TextPlacements where def = dummyPlacements
