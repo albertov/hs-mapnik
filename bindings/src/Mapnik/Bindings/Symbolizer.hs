@@ -43,6 +43,7 @@ import qualified Data.Vector.Storable.Mutable as VM
 import qualified Data.Vector.Storable         as V
 
 import qualified Language.C.Inline.Cpp as C
+import qualified Language.C.Inline.Cpp.Exceptions as C
 
 
 C.context mapnikCtx
@@ -54,6 +55,7 @@ C.include "<mapnik/symbolizer_keys.hpp>"
 C.include "<mapnik/expression_string.hpp>"
 C.include "<mapnik/expression_evaluator.hpp>"
 C.include "<mapnik/transform_processor.hpp>"
+C.include "<mapnik/text/font_feature_settings.hpp>"
 C.include "symbolizer_util.hpp"
 
 C.using "namespace mapnik"
@@ -707,8 +709,26 @@ instance HasSetProp Mapnik.TextPlacements where setProp key val sym = undefined 
 instance HasGetProp Mapnik.Colorizer where getProp key sym = return Nothing --TODO
 instance HasSetProp Mapnik.Colorizer where setProp key val sym = undefined --TODO
 
-instance HasGetProp Mapnik.FontFeatureSettings where getProp key sym = return Nothing --TODO
-instance HasSetProp Mapnik.FontFeatureSettings where setProp key val sym = undefined --TODO
+instance HasGetProp Mapnik.FontFeatureSettings where
+  getProp (keyIndex -> k) sym =
+    fmap (fmap Mapnik.FontFeatureSettings) $ newTextMaybe $ \(ptr, len) ->
+      [C.block|void {
+      auto v = get_optional<font_feature_settings>(*$(symbolizer_base *sym), $(keys k));
+      if (v) {
+        std::string s = v->to_string();
+        *$(char** ptr) = strdup(s.c_str());
+        *$(int* len) = s.length();
+      } else {
+        *$(char** ptr) = NULL;
+      }
+      }|]
+
+instance HasSetProp Mapnik.FontFeatureSettings where
+  setProp (keyIndex -> k) (Mapnik.FontFeatureSettings (encodeUtf8 -> v)) s =
+    [C.catchBlock|
+      $(symbolizer_base *s)->properties[$(keys k)] =
+        font_feature_settings(std::string($bs-ptr:v, $bs-len:v));
+    |]
 
 instance HasGetProp Mapnik.GroupProperties where getProp key sym = return Nothing --TODO
 instance HasSetProp Mapnik.GroupProperties where setProp key val sym = undefined --TODO
