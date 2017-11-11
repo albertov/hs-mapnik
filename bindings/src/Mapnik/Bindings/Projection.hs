@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -6,14 +5,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 module Mapnik.Bindings.Projection (
-  fromProj4
+  parse
+, toText
 , projTransform
 , CanTransform (..)
 ) where
 
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util (newText)
-import           Data.Text (unpack)
 import           Control.Exception (try)
 import           Control.Monad ((<=<))
 import           Data.Text (Text)
@@ -44,8 +43,8 @@ foreign import ccall "&hs_mapnik_destroy_Projection" destroyProjection :: Finali
 unsafeNew :: (Ptr (Ptr Projection) -> IO ()) -> IO Projection
 unsafeNew = fmap Projection . newForeignPtr destroyProjection <=< C.withPtr_
 
-fromProj4 :: Text -> Either String Projection
-fromProj4 (encodeUtf8 -> s) =
+parse :: Text -> Either String Projection
+parse (encodeUtf8 -> s) =
   unsafePerformIO $ fmap showExc $ try $ unsafeNew $ \p ->
     [C.catchBlock|*$(projection **p) = new projection(std::string($bs-ptr:s, $bs-len:s));|]
   where
@@ -61,8 +60,8 @@ projTransform src dst = unsafePerformIO $ do
   ProjTransform <$> newForeignPtr destroyProjTransform ptr
 
   
-instance Show Projection where
-  show pr = unsafePerformIO $ fmap unpack $ newText $ \(ptr,len) ->
+toText :: Projection -> Text
+toText pr = unsafePerformIO $ newText $ \(ptr,len) ->
     [C.block|void {
     std::string const &s = $fptr-ptr:(projection *pr)->params();
     *$(char** ptr) = strdup(s.c_str());

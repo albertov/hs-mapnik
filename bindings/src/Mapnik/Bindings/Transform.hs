@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -15,7 +14,7 @@ module Mapnik.Bindings.Transform (
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 import           Control.Exception (try)
-import           Data.Text (Text, unpack)
+import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
 import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
@@ -52,8 +51,6 @@ parse (encodeUtf8 -> s) =
     [C.catchBlock|*$(transform_type **p) = new transform_type(parse_transform(std::string($bs-ptr:s, $bs-len:s)));|]
   where
     showExc = either (Left . show @C.CppException) Right
-
-instance Show Transform where show = unpack . toText
 
 
 toText :: Transform -> Text

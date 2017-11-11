@@ -110,18 +110,18 @@ spec = beforeAll_ registerDefaults $ do
 
   describe "Projection" $ do
     it "can create valid" $
-      fromProj4 merc `shouldSatisfy` isRight
+      Projection.parse merc `shouldSatisfy` isRight
 
-    it "can show valid" $
-      show (fromProj4 merc) `shouldBe` "Right +proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over"
+    it "can toText valid" $
+      fmap Projection.toText (Projection.parse merc) `shouldBe` Right "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over"
 
 
     it "cannot create invalid" $
-      fromProj4 "foo" `shouldSatisfy` isLeft
+      Projection.parse "foo" `shouldSatisfy` isLeft
 
     it "can trasform" $ do
-      let Right src = fromProj4 merc
-          Right dst = fromProj4 "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
+      let Right src = Projection.parse merc
+          Right dst = Projection.parse "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
           trans = projTransform src dst
           expected = Box { minx = 1372637.1001942465
                          , miny = -247003.8133187965
@@ -143,7 +143,7 @@ spec = beforeAll_ registerDefaults $ do
     it "getDatasource returns Nothing if no datasource" $ do
       l <- Layer.create "fooo"
       ds <- Layer.getDatasource l
-      ds `shouldBe` Nothing
+      ds `shouldSatisfy` isNothing
 
     it "getDatasource returns Just if datasource" $ do
       l <- Layer.create "fooo"
@@ -202,7 +202,7 @@ spec = beforeAll_ registerDefaults $ do
       length syms1 `shouldBe` 1
       [sym] <- Rule.getSymbolizers r2
       Just f <- Rule.getFilter r2
-      show f `shouldBe` "([NOM_FR]='Québec')"
+      Expression.toText f `shouldBe` "([NOM_FR]='Québec')"
       mSym <- Symbolizer.unCreate sym
       let expected = Mapnik.polygon
                        & L.fill   ?~ Val (RGBA 217 235 203 255)
@@ -239,7 +239,7 @@ spec = beforeAll_ registerDefaults $ do
       Image.serialize "png8" img `shouldBe` Image.serialize "png8" img2
 
     it "cannot create empty image" $
-      Image.fromRgba8 ((0,0), "") `shouldBe` Nothing
+      Image.fromRgba8 ((0,0), "") `shouldSatisfy` isNothing
 
     it "doesnt serialize bad format" $ do
       let Just img = Image.fromRgba8 ((10, 10), (BS.replicate (4*10*10) 0))

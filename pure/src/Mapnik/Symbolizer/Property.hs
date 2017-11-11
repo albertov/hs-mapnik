@@ -26,6 +26,7 @@ data Stop = Stop
   { value :: !Double
   , color :: !Color
   , mode  :: !ColorizerMode
+  , label :: !(Maybe Text)
   } deriving (Eq, Show, Generic)
 deriveMapnikJSON ''Stop
 

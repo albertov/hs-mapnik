@@ -15,7 +15,7 @@ module Mapnik.Bindings.Expression (
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 import           Control.Exception (try)
-import           Data.Text (Text, unpack)
+import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
 import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
@@ -52,9 +52,6 @@ parse (encodeUtf8 -> s) =
     [C.catchBlock|*$(expression_ptr **p) = new expression_ptr(parse_expression(std::string($bs-ptr:s, $bs-len:s)));|]
   where
     showExc = either (Left . show @C.CppException) Right
-
-instance Show Expression where show = unpack . toText
-
 
 toText :: Expression -> Text
 toText expr = unsafePerformIO $ newText $ \(ptr,len) ->
