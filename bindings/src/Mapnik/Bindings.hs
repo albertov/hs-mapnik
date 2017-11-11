@@ -23,11 +23,12 @@ module Mapnik.Bindings (
 , Projection (..)
 , ProjTransform (..)
 , C.CppException (..)
+, Dash(..)
 , MapnikInt
 , mapnikCtx
 ) where
 
-import           Mapnik (Box(..), Color(..))
+import           Mapnik (Box(..), Color(..), Dash(..))
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
@@ -87,5 +88,6 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "value_integer", [t| MapnikInt |])
       , (C.TypeName "color", [t| Mapnik.Color |])
       , (C.TypeName "text_placements_ptr", [t| TextPlacements |])
+      , (C.TypeName "dash_t", [t| Dash |])
       ]
     }

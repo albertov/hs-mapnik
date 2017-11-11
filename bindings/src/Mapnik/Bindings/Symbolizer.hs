@@ -668,7 +668,15 @@ instance HasGetProp Mapnik.Transform where
       }|]
 
 instance HasSetProp Mapnik.DashArray where
-  setProp (keyIndex -> k) dashes s = undefined --TODO
+  setProp (keyIndex -> k) dashes s =
+    [C.block|void {
+      std::vector<dash_t> dashes($vec-len:dashes);
+      for (int i=0; i<$vec-len:dashes; i++) {
+        dashes.emplace_back($vec-ptr:(dash_t *dashes)[i]);
+      }
+      $(symbolizer_base *s)->properties[$(keys k)] = dashes;
+    }|]
+
 
 instance HasGetProp Mapnik.DashArray where
   getProp (keyIndex -> k) sym = do
@@ -678,12 +686,11 @@ instance HasGetProp Mapnik.DashArray where
       if (arr) {
         *$(int *has) = 1;
         *$(size_t *len) = arr->size();
-        double *dashes = *$(double **ptr) =
-          static_cast<double *>(malloc(arr->size()*2*sizeof(double)));
+        dash_t *dashes = *$(dash_t **ptr) =
+          static_cast<dash_t *>(malloc(arr->size()*sizeof(dash_t)));
         int i=0;
         for (dash_array::const_iterator it=arr->begin(); it!=arr->end(); ++it, ++i) {
-          dashes[i*2]   = it->first;
-          dashes[i*2+1] = it->second;
+          dashes[i] = *it;
         }
       } else {
         *$(int *has) = 0;

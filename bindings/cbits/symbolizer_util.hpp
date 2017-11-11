@@ -4,6 +4,8 @@
 // stl
 #include <string>
 
+typedef std::pair<double,double> dash_t;
+
 using namespace mapnik;
 
 struct symbolizer_base_extractor
