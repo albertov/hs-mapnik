@@ -24,6 +24,8 @@ makeMapnikFields ''TextPlacements
 makeMapnikFields ''FormatProperties
 makeMapnikFields ''TextLayoutProperties
 makeMapnikFields ''Symbolizer
+makeMapnikFields ''Colorizer
+makeMapnikFields ''Stop
 makePrisms ''Symbolizer
 makePrisms ''Prop
 makePrisms ''TextPlacements

@@ -1,24 +1,19 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 module Mapnik.Symbolizer (
   module Mapnik.Symbolizer
 , module Mapnik.Symbolizer.Property
-, module Mapnik.Symbolizer.TextProperties
 ) where
 
 import Mapnik.Imports
 import Mapnik.Common
 import Mapnik.Enums
-import Mapnik.Symbolizer.TextProperties
 import Mapnik.Symbolizer.Property
 
 

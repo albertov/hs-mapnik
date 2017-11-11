@@ -24,6 +24,7 @@ makeMapnikFields ''Layer
 makeMapnikFields ''Map.Map
 makeMapnikFields ''Rule
 makeMapnikFields ''Style
+
 makePrisms ''ParamValue
 
 class HasStyleLst s a | s -> a where

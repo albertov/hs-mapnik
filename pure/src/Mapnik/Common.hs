@@ -34,6 +34,10 @@ newtype Expression = Expression Text
   deriving (Generic)
   deriving newtype (Eq, Show, ToJSON, FromJSON, IsString)
 
+newtype FontFeatureSettings = FontFeatureSettings Text
+  deriving (Generic)
+  deriving newtype (Eq, Show, ToJSON, FromJSON, IsString)
+
 data Dash = Dash {-# UNPACK #-} !Double {-# UNPACK #-} !Double
   deriving (Eq, Show, Generic)
 deriveMapnikJSON ''Dash

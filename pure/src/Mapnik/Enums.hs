@@ -189,15 +189,15 @@ data Direction
 deriveMapnikJSON ''Direction
 
 data PlacementDirection
-  = PlacementNorth
-  | PlacementEast
-  | PlacementSouth
-  | PlacementWest
-  | PlacementNorthEast
-  | PlacementSouthEast
-  | PlacementNorthWest
-  | PlacementSouthWest
-  | PlacementExact
+  = North
+  | East
+  | South
+  | West
+  | NorthEast
+  | SouthEast
+  | NorthWest
+  | SouthWest
+  | PExact
   deriving (Eq, Show, Bounded, Enum, Generic)
 deriveMapnikJSON ''PlacementDirection
 
@@ -244,3 +244,11 @@ data ScalingMethod
   | Blackman
   deriving (Eq, Show, Bounded, Enum, Generic)
 deriveMapnikJSON ''ScalingMethod
+
+data ColorizerMode
+  = Inherit
+  | Linear
+  | Discrete
+  | CExact
+  deriving (Eq, Show, Bounded, Enum, Generic)
+deriveMapnikJSON ''ColorizerMode

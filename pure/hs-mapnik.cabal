@@ -26,7 +26,6 @@ library
                      , Mapnik.Symbolizer
                      , Mapnik.Symbolizer.Lens
                      , Mapnik.Symbolizer.Property
-                     , Mapnik.Symbolizer.TextProperties
   other-modules:       Mapnik.Imports
                      , Mapnik.TH
   build-depends:       base                >= 4.7  && < 5

@@ -22,9 +22,8 @@ module Mapnik.Bindings.Symbolizer (
 import           Mapnik.Lens
 import qualified Mapnik
 import           Mapnik.Enums
-import           Mapnik.Symbolizer.Property
 import           Mapnik ( Transform(..), Prop (..) )
-import           Mapnik.Bindings hiding (TextPlacements(..))
+import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()
 import qualified Mapnik.Bindings.Expression as Expression
@@ -120,12 +119,12 @@ unCreate sym' = bracket alloc dealloc $ \sym -> do
     , getProperty SimplifyAlgorithm sym
     , getProperty SimplifyTolerance sym
     , getProperty HaloRasterizer sym
-    , getProperty TextPlacements sym
+    , getProperty TextPlacementsType sym
     , getProperty LabelPlacement sym
     , getProperty MarkersPlacementType sym
     , getProperty MarkersMultipolicy sym
     , getProperty PointPlacementType sym
-    , getProperty Colorizer sym
+    , getProperty ColorizerType sym
     , getProperty HaloTransform sym
     , getProperty NumColumns sym
     , getProperty StartColumn sym
@@ -258,17 +257,17 @@ data Key a where
     SimplifyAlgorithm :: Key SimplifyAlgorithm
     SimplifyTolerance :: Key Double
     HaloRasterizer :: Key HaloRasterizer
-    TextPlacements :: Key TextPlacements
+    TextPlacementsType :: Key Mapnik.TextPlacements
     LabelPlacement :: Key LabelPlacement
     MarkersPlacementType :: Key MarkerPlacement
     MarkersMultipolicy :: Key MarkerMultiPolicy
     PointPlacementType :: Key PointPlacement
-    Colorizer :: Key Colorizer
+    ColorizerType :: Key Mapnik.Colorizer
     HaloTransform :: Key Mapnik.Transform
     NumColumns :: Key Int
     StartColumn :: Key Int
     RepeatKey :: Key Mapnik.Expression
-    GroupProperties :: Key GroupProperties
+    GroupProperties :: Key Mapnik.GroupProperties
     LargestBoxOnly :: Key Bool
     MinimumPathLength :: Key Double
     HaloCompOp :: Key CompositeMode
@@ -279,11 +278,8 @@ data Key a where
     Upright :: Key Upright
     Direction :: Key Direction
     AvoidEdges :: Key Bool
-    FfSettings :: Key FontFeatureSettings
+    FfSettings :: Key Mapnik.FontFeatureSettings
 
-
-class HasProperties s a | s -> a where
-  properties :: Lens' s a
 
 instance HasProperties Mapnik.Symbolizer Properties where
   properties = lens getProps setProps where
@@ -337,12 +333,12 @@ instance HasProperties Mapnik.Symbolizer Properties where
       step (FilterFactor  :=> Val v        ) = filterFactor ?~ v
       step (MeshSize      :=> Val v        ) = meshSize ?~ v
       step (Premultiplied :=> Val v        ) = preMultiplied ?~ v
-      step (Colorizer     :=> Val v        ) = colorizer ?~ v
+      step (ColorizerType :=> Val v        ) = colorizer ?~ v
       step p                                 = stepBase p
 
     setProps sym@Mapnik.Shield{} = foldr step sym  where
       step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
-      step (TextPlacements :=> v) = placements ?~ v
+      step (TextPlacementsType :=> v) = placements ?~ v
       step (ImageTransform :=> v) = imageTransform ?~ v
       step (ShieldDx       :=> v) = dx ?~ v
       step (ShieldDy       :=> v) = dy ?~ v
@@ -354,7 +350,7 @@ instance HasProperties Mapnik.Symbolizer Properties where
 
     setProps sym@Mapnik.Text{} = foldr step sym  where
       step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
-      step (TextPlacements :=> v) = placements ?~ v
+      step (TextPlacementsType :=> v) = placements ?~ v
       step (HaloCompOp     :=> v) = haloCompOp ?~ v
       step (HaloRasterizer :=> v) = haloRasterizer ?~ v
       step (HaloTransform  :=> v) = haloTransform ?~ v
@@ -393,7 +389,7 @@ instance HasProperties Mapnik.Symbolizer Properties where
       step (NumColumns      :=> v) = numColumns ?~ v
       step (StartColumn     :=> v) = startColumn ?~ v
       step (RepeatKey       :=> v) = repeatKey ?~ v
-      step (TextPlacements  :=> v) = placements ?~ v
+      step (TextPlacementsType  :=> v) = placements ?~ v
       step p                       = stepBase p
 
     setProps sym@Mapnik.Debug{} = foldr step sym  where
@@ -497,11 +493,11 @@ instance HasProperties Mapnik.Symbolizer Properties where
         , fmap ((FilterFactor  :=>) . Val) (sym^?!filterFactor)
         , fmap ((MeshSize      :=>) . Val) (sym^?!meshSize)
         , fmap ((Premultiplied :=>) . Val) (sym^?!preMultiplied)
-        , fmap ((Colorizer     :=>) . Val) (sym^?!colorizer)
+        , fmap ((ColorizerType :=>) . Val) (sym^?!colorizer)
         , GET_BASE_PROPS
         ]
       Mapnik.Shield{} ->
-        [ fmap (TextPlacements    :=>) (sym^?!placements)
+        [ fmap (TextPlacementsType    :=>) (sym^?!placements)
         , fmap (GeometryTransform :=>) (sym^?!imageTransform)
         , fmap (ShieldDx          :=>) (sym^?!dx)
         , fmap (ShieldDy          :=>) (sym^?!dy)
@@ -512,7 +508,7 @@ instance HasProperties Mapnik.Symbolizer Properties where
         , GET_BASE_PROPS
         ]
       Mapnik.Text{} ->
-        [ fmap (TextPlacements    :=>) (sym^?!placements)
+        [ fmap (TextPlacementsType    :=>) (sym^?!placements)
         , fmap (HaloCompOp        :=>) (sym^?!haloCompOp)
         , fmap (HaloRasterizer    :=>) (sym^?!haloRasterizer)
         , fmap (GeometryTransform :=>) (sym^?!haloTransform)
@@ -548,7 +544,7 @@ instance HasProperties Mapnik.Symbolizer Properties where
         , fmap (NumColumns      :=>) (sym^?!numColumns)
         , fmap (StartColumn     :=>) (sym^?!startColumn)
         , fmap (RepeatKey       :=>) (sym^?!repeatKey)
-        , fmap (TextPlacements  :=>) (sym^?!placements)
+        , fmap (TextPlacementsType  :=>) (sym^?!placements)
         , GET_BASE_PROPS
         ]
       Mapnik.Debug{} ->
@@ -580,9 +576,6 @@ instance HasGetProp Double where
 instance HasSetProp Double where
   setProp (keyIndex -> k) (realToFrac -> v) s = 
     [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = $(double v);}|]
-
-instance HasSetProp () where setProp _ _ _ = return ()
-instance HasGetProp () where getProp _ _ = return Nothing
 
 instance HasGetProp Mapnik.Color where
   getProp (keyIndex -> k) sym = newMaybe $ \(has,ret) ->
@@ -706,6 +699,15 @@ instance HasSetProp (Either DebugMode RasterMode) where setProp key val sym = un
 instance HasGetProp Mapnik.TextPlacements where getProp key sym = return Nothing --TODO
 instance HasSetProp Mapnik.TextPlacements where setProp key val sym = undefined
 
+instance HasGetProp Mapnik.Colorizer where getProp key sym = return Nothing --TODO
+instance HasSetProp Mapnik.Colorizer where setProp key val sym = undefined
+
+instance HasGetProp Mapnik.FontFeatureSettings where getProp key sym = return Nothing --TODO
+instance HasSetProp Mapnik.FontFeatureSettings where setProp key val sym = undefined
+
+instance HasGetProp Mapnik.GroupProperties where getProp key sym = return Nothing --TODO
+instance HasSetProp Mapnik.GroupProperties where setProp key val sym = undefined
+
 #define HAS_GET_PROP_ENUM(HS,CPP) \
 instance HasGetProp HS where {\
   getProp (keyIndex -> k) sym = fmap (fmap (toEnum . fromIntegral)) <$> newMaybe $ \(has,p) -> \
@@ -824,12 +826,12 @@ keyIndex Smooth = [C.pure|keys{keys::smooth}|]
 keyIndex SimplifyAlgorithm = [C.pure|keys{keys::simplify_algorithm}|]
 keyIndex SimplifyTolerance = [C.pure|keys{keys::simplify_tolerance}|]
 keyIndex HaloRasterizer = [C.pure|keys{keys::halo_rasterizer}|]
-keyIndex TextPlacements = [C.pure|keys{keys::text_placements_}|]
+keyIndex TextPlacementsType = [C.pure|keys{keys::text_placements_}|]
 keyIndex LabelPlacement = [C.pure|keys{keys::label_placement}|]
 keyIndex MarkersPlacementType = [C.pure|keys{keys::markers_placement_type}|]
 keyIndex MarkersMultipolicy = [C.pure|keys{keys::markers_multipolicy}|]
 keyIndex PointPlacementType = [C.pure|keys{keys::point_placement_type}|]
-keyIndex Colorizer = [C.pure|keys{keys::colorizer}|]
+keyIndex ColorizerType = [C.pure|keys{keys::colorizer}|]
 keyIndex HaloTransform = [C.pure|keys{keys::halo_transform}|]
 keyIndex NumColumns = [C.pure|keys{keys::num_columns}|]
 keyIndex StartColumn = [C.pure|keys{keys::start_column}|]
