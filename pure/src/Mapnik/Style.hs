@@ -9,10 +9,11 @@ import Mapnik.Imports
 import Mapnik.Rule
 import Data.Default
 import Data.Text
+import qualified Data.HashMap.Strict as M
 
 type StyleName = Text
 
-type Styles = [(StyleName, Style)]
+type Styles = M.HashMap StyleName Style
 
 data Style = Style
   { opacity             :: !(Maybe Double)

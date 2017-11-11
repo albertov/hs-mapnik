@@ -45,9 +45,9 @@ stringMapBridge = do
   doCheck typeParameters isStringMap
   [_,x] <- psTypeParameters
   return TypeInfo
-    { _typePackage = "hs-mapnik-purs"
-    , _typeModule = "Data.StringMap"
-    , _typeName = "StringMap"
+    { _typePackage = "purescript-maps"
+    , _typeModule = "Data.StrMap"
+    , _typeName = "StrMap"
     , _typeParameters = [x]
     }
 

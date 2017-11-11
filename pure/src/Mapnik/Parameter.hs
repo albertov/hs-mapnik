@@ -9,6 +9,7 @@ import           Mapnik.Imports
 
 import           Data.Text (Text)
 import           Data.String(IsString(..))
+import qualified Data.HashMap.Strict as M
 
 
 data ParamValue = StringParam !Text
@@ -39,4 +40,4 @@ k .= v = (fromString k, toParam v)
 instance IsString ParamValue where
   fromString = StringParam . fromString
 
-type Parameters = [(Text, ParamValue)]
+type Parameters = M.HashMap Text ParamValue
