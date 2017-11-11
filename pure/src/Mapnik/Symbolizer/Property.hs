@@ -87,10 +87,6 @@ data TextProperties = TextProperties
   , horizontalAlignment    :: !(PropValue HorizontalAlignment)
   , justifyAlignment       :: !(PropValue JustifyAlignment)
   , verticalAlignment      :: !(PropValue VerticalAlignment)
-  , maxCharAngleDelta      :: !(PropValue Double)
-  , allowOverlap           :: !(PropValue Bool)
-  , largestBoxOnly         :: !(PropValue Bool)
-  , upright                :: !(PropValue Upright)
   , direction              :: !(PropValue PlacementDirection)
   } deriving (Eq, Show, Generic, Default)
 deriveMapnikJSON ''TextProperties
