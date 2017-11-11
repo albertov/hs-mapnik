@@ -41,6 +41,6 @@ empty = Map
   , bufferSize             = Nothing
   , maximumExtent          = Nothing
   , fontDirectory          = Nothing
-  , styles                = mempty
+  , styles                 = mempty
   , layers                 = mempty
   }

@@ -107,7 +107,7 @@ data Symbolizer
     }
   | Raster
     { rasterMode    :: !(Maybe RasterMode)
-    , scaling       :: !(Maybe Scaling)
+    , scaling       :: !(Maybe ScalingMethod)
     , rasterOpacity :: !(Maybe Double)
     , filterFactor  :: !(Maybe Double)
     , meshSize      :: !(Maybe Int)

@@ -20,8 +20,10 @@ class HasDx s a | s -> a where dx :: ApLens' s a
 class HasDy s a | s -> a where dy :: ApLens' s a
 
 makeMapnikFields ''TextProperties
+makeMapnikFields ''TextPlacements
 makeMapnikFields ''FormatProperties
 makeMapnikFields ''TextLayoutProperties
 makeMapnikFields ''Symbolizer
 makePrisms ''Symbolizer
 makePrisms ''Prop
+makePrisms ''TextPlacements

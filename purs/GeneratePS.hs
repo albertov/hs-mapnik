@@ -84,8 +84,6 @@ myTypes = [ mkSumType (Proxy :: Proxy Map)
           , mkSumType (Proxy :: Proxy Dash)
           , mkSumType (Proxy :: Proxy Datasource)
           , mkSumType (Proxy :: Proxy ParamValue)
-          --, mkSumType (Proxy :: Proxy DashArray)
-          --, mkSumType (Proxy :: Proxy Proj4)
           , mkSumType (Proxy :: Proxy (Prop A))
 
           -- Enums

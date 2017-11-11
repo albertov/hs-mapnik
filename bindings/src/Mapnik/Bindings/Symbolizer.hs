@@ -250,7 +250,7 @@ data Key a where
     ShieldDy :: Key Double
     UnlockImage :: Key Bool
     Mode :: Key (Either DebugMode RasterMode)
-    Scaling :: Key Scaling
+    Scaling :: Key ScalingMethod
     FilterFactor :: Key Double
     MeshSize :: Key Int
     Premultiplied :: Key Bool
@@ -703,6 +703,9 @@ instance HasGetProp Mapnik.DashArray where
 instance HasGetProp (Either DebugMode RasterMode) where getProp key sym = return Nothing --TODO
 instance HasSetProp (Either DebugMode RasterMode) where setProp key val sym = undefined
 
+instance HasGetProp Mapnik.TextPlacements where getProp key sym = return Nothing --TODO
+instance HasSetProp Mapnik.TextPlacements where setProp key val sym = undefined
+
 #define HAS_GET_PROP_ENUM(HS,CPP) \
 instance HasGetProp HS where {\
   getProp (keyIndex -> k) sym = fmap (fmap (toEnum . fromIntegral)) <$> newMaybe $ \(has,p) -> \
@@ -739,6 +742,8 @@ HAS_GET_PROP_ENUM(JustifyAlignment,justify_alignment_enum)
 HAS_GET_PROP_ENUM(Upright,text_upright_enum)
 HAS_GET_PROP_ENUM(Direction,direction_enum)
 HAS_GET_PROP_ENUM(GammaMethod,gamma_method_enum)
+HAS_GET_PROP_ENUM(ScalingMethod,scaling_method_e)
+HAS_GET_PROP_ENUM(SimplifyAlgorithm,simplify_algorithm_e)
 
 
 getProperty :: (HasSetProp a, HasGetProp a)

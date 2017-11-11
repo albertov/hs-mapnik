@@ -215,3 +215,32 @@ data RasterMode
   | RasterBar
   deriving (Eq, Show, Bounded, Enum, Generic)
 deriveMapnikJSON ''RasterMode
+
+data SimplifyAlgorithm
+  = RadialDistance
+  | DouglasPeucker
+  | VisvalingamWhyatt
+  | ZhaoSaalfeld
+  deriving (Eq, Show, Bounded, Enum, Generic)
+deriveMapnikJSON ''SimplifyAlgorithm
+
+data ScalingMethod
+  = Near
+  | Bilinear
+  | Bicubic
+  | Spline16
+  | Spline36
+  | Hanning
+  | Hamming
+  | Hermite
+  | Kaiser
+  | Quadric
+  | Catrom
+  | Gaussian
+  | Bessel
+  | Mitchell
+  | Sinc
+  | Lanczos
+  | Blackman
+  deriving (Eq, Show, Bounded, Enum, Generic)
+deriveMapnikJSON ''ScalingMethod
