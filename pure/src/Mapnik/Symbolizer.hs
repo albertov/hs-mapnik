@@ -101,8 +101,7 @@ data Symbolizer
     , BASE_PROPS
     }
   | Raster
-    { rasterMode    :: !(Maybe RasterMode)
-    , scaling       :: !(Maybe ScalingMethod)
+    { scaling       :: !(Maybe ScalingMethod)
     , rasterOpacity :: !(Maybe Double)
     , filterFactor  :: !(Maybe Double)
     , meshSize      :: !(Maybe Int)
@@ -162,7 +161,7 @@ data Symbolizer
     , BASE_PROPS
     }
   | Debug
-    { debugMode :: !(Maybe DebugMode)
+    { mode            :: !(Maybe DebugMode)
     , BASE_PROPS
     }
   | Dot
@@ -222,8 +221,7 @@ polygonPattern = PolygonPattern
   , BASE_PROPS_DEFS
   }
 raster = Raster
-  { rasterMode    = Nothing
-  , scaling       = Nothing
+  { scaling       = Nothing
   , rasterOpacity = Nothing
   , filterFactor  = Nothing
   , meshSize      = Nothing
@@ -283,7 +281,7 @@ group = Group
   , BASE_PROPS_DEFS
   }
 debug = Debug
-  { debugMode = Nothing
+  { mode = Nothing
   , BASE_PROPS_DEFS
   }
 dot = Dot

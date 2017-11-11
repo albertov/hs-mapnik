@@ -248,7 +248,7 @@ data Key a where
     ShieldDx :: Key Double
     ShieldDy :: Key Double
     UnlockImage :: Key Bool
-    Mode :: Key (Either DebugMode RasterMode)
+    Mode :: Key DebugMode
     Scaling :: Key ScalingMethod
     FilterFactor :: Key Double
     MeshSize :: Key Int
@@ -330,7 +330,6 @@ instance HasProperties Mapnik.Symbolizer Properties where
 
     setProps sym@Mapnik.Raster{} = foldr step sym  where
       step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
-      step (Mode          :=> Val (Right v)) = rasterMode ?~ v
       step (Scaling       :=> Val v        ) = scaling ?~ v
       step (Opacity       :=> Val v        ) = rasterOpacity ?~ v
       step (FilterFactor  :=> Val v        ) = filterFactor ?~ v
@@ -397,8 +396,8 @@ instance HasProperties Mapnik.Symbolizer Properties where
 
     setProps sym@Mapnik.Debug{} = foldr step sym  where
       step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
-      step (Mode :=> Val (Left v)) = debugMode ?~ v
-      step p                       = stepBase p
+      step (Mode :=> Val v) = mode ?~ v
+      step p                = stepBase p
 
     setProps sym@Mapnik.Dot{} = foldr step sym  where
       step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
@@ -490,8 +489,7 @@ instance HasProperties Mapnik.Symbolizer Properties where
         , GET_BASE_PROPS
         ]
       Mapnik.Raster{} ->
-        [ fmap ((Mode :=>) . Val . Right)  (sym^?!rasterMode)
-        , fmap ((Scaling       :=>) . Val) (sym^?!scaling)
+        [ fmap ((Scaling       :=>) . Val) (sym^?!scaling)
         , fmap ((Opacity       :=>) . Val) (sym^?!rasterOpacity)
         , fmap ((FilterFactor  :=>) . Val) (sym^?!filterFactor)
         , fmap ((MeshSize      :=>) . Val) (sym^?!meshSize)
@@ -551,7 +549,7 @@ instance HasProperties Mapnik.Symbolizer Properties where
         , GET_BASE_PROPS
         ]
       Mapnik.Debug{} ->
-        [ fmap ((Mode :=>) . Val . Left)  (sym^?!debugMode)
+        [ fmap ((Mode :=>) . Val)  (sym^?!mode)
         , GET_BASE_PROPS
         ]
       Mapnik.Dot{} ->
@@ -670,7 +668,7 @@ instance HasGetProp Mapnik.Transform where
       }|]
 
 instance HasSetProp Mapnik.DashArray where
-  setProp (keyIndex -> k) dashes s = undefined
+  setProp (keyIndex -> k) dashes s = undefined --TODO
 
 instance HasGetProp Mapnik.DashArray where
   getProp (keyIndex -> k) sym = do
@@ -696,20 +694,17 @@ instance HasGetProp Mapnik.DashArray where
       Just <$> V.freeze (VM.unsafeFromForeignPtr0 fp len)
     else return Nothing
 
-instance HasGetProp (Either DebugMode RasterMode) where getProp key sym = return Nothing --TODO
-instance HasSetProp (Either DebugMode RasterMode) where setProp key val sym = undefined
-
 instance HasGetProp Mapnik.TextPlacements where getProp key sym = return Nothing --TODO
-instance HasSetProp Mapnik.TextPlacements where setProp key val sym = undefined
+instance HasSetProp Mapnik.TextPlacements where setProp key val sym = undefined --TODO
 
 instance HasGetProp Mapnik.Colorizer where getProp key sym = return Nothing --TODO
-instance HasSetProp Mapnik.Colorizer where setProp key val sym = undefined
+instance HasSetProp Mapnik.Colorizer where setProp key val sym = undefined --TODO
 
 instance HasGetProp Mapnik.FontFeatureSettings where getProp key sym = return Nothing --TODO
-instance HasSetProp Mapnik.FontFeatureSettings where setProp key val sym = undefined
+instance HasSetProp Mapnik.FontFeatureSettings where setProp key val sym = undefined --TODO
 
 instance HasGetProp Mapnik.GroupProperties where getProp key sym = return Nothing --TODO
-instance HasSetProp Mapnik.GroupProperties where setProp key val sym = undefined
+instance HasSetProp Mapnik.GroupProperties where setProp key val sym = undefined --TODO
 
 #define HAS_GET_PROP_ENUM(HS,CPP) \
 instance HasGetProp HS where {\
