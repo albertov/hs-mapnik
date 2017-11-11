@@ -20,6 +20,7 @@ import           Mapnik.Bindings.Transform as Transform
 import           Mapnik.Bindings.Expression as Expression
 import           Mapnik.Bindings.Datasource as Datasource
 import           Mapnik.Bindings.Symbolizer as Symbolizer
+import           Mapnik.Bindings.TextPlacements as TextPlacements
 import           Mapnik.Bindings.FromMapnik
 import           Control.Lens hiding ((.=))
 import           Control.Monad (void)
@@ -277,6 +278,12 @@ spec = beforeAll_ registerDefaults $ do
               . L.strokeDashArray
               . _Just . L._Val
       m^?lns `shouldBe` Just [Dash 8 4, Dash 2 2, Dash 2 2]
+
+  describe "TextPlacements" $ do
+    it "can create Dummy" $ do
+      let ps = Mapnik.dummyPlacements
+      ps' <- TextPlacements.unCreate =<< TextPlacements.create ps
+      ps `shouldBe` ps'
 
 loadFixture :: Map -> IO ()
 loadFixture m = do

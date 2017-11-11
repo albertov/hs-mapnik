@@ -286,9 +286,6 @@ data Key a where
     FfSettings :: Key Mapnik.FontFeatureSettings
 
 
-class HasProperties s a | s -> a where
-  properties :: Lens' s a
-
 instance HasProperties Mapnik.Symbolizer Properties where
   properties = lens getProps setProps where
     setProps sym@Mapnik.Point{} = foldr step sym  where

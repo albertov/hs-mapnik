@@ -15,6 +15,7 @@ module Mapnik.Bindings.TextPlacements (
 import qualified Mapnik
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
+import qualified Mapnik.Bindings.TextSymProperties as Props
 import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
 
@@ -41,10 +42,12 @@ unsafeNewMaybe = mkUnsafeNewMaybe TextPlacements destroyTextPlacements
 
 --TODO
 create :: Mapnik.TextPlacements -> IO TextPlacements
-create _ = unsafeNew $ \p ->
+create (Mapnik.Dummy defs) = unsafeNew $ \p -> do
+  defaults <- Props.create defs
   [C.block|void {
     auto placements = std::make_shared<text_placements_dummy>();
     *$(text_placements_ptr **p) = new text_placements_ptr(placements);
+    placements->defaults = *$fptr-ptr:(text_symbolizer_properties *defaults);
   }|]
 
 --TODO

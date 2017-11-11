@@ -16,10 +16,14 @@ module Mapnik.Bindings (
 , Transform (..)
 , TextPlacements (..)
 , TextProperties (..)
+, TextLayoutProperties (..)
+, TextFormatProperties (..)
+, TextSymProperties (..)
 , GroupProperties (..)
 , FontSet(..)
 , Color(..)
 , Colorizer(..)
+, Format (..)
 , Stop(..)
 , Box (..)
 , Datasource (..)
@@ -62,6 +66,10 @@ fptr(Stop)
 fptr(FontSet)
 fptr(GroupProperties)
 fptr(TextProperties)
+fptr(TextFormatProperties)
+fptr(TextLayoutProperties)
+fptr(TextSymProperties)
+fptr(Format)
 
 #ifdef BIGINT
 type MapnikInt = C.CLong
@@ -96,6 +104,10 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "group_symbolizer_properties_ptr", [t| GroupProperties |])
       , (C.TypeName "raster_colorizer_ptr", [t| Colorizer |])
       , (C.TypeName "colorizer_stop", [t| Stop |])
-      , (C.TypeName "text_symbolizer_properties", [t| TextProperties |])
+      , (C.TypeName "text_symbolizer_properties", [t| TextSymProperties |])
+      , (C.TypeName "text_properties_expressions", [t| TextProperties |])
+      , (C.TypeName "text_layout_properties", [t| TextLayoutProperties |])
+      , (C.TypeName "format_properties", [t| TextFormatProperties |])
+      , (C.TypeName "node_ptr", [t| Format |])
       ]
     }
