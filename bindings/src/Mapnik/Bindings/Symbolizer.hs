@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -26,42 +27,34 @@ import           Mapnik ( Transform(..), Prop (..) )
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()
+import           Mapnik.Bindings.SymbolizerValue (SymValue(..))
 import qualified Mapnik.Bindings.Expression as Expression
 import qualified Mapnik.Bindings.Transform as Transform
-import qualified Mapnik.Bindings.Colorizer as Colorizer
-import qualified Mapnik.Bindings.TextPlacements as TextPlacements
-import qualified Mapnik.Bindings.GroupProperties as GroupProperties
 
 import           Control.Exception
 import           Control.Lens hiding (has)
 import           Data.Maybe (catMaybes)
 import           Data.Text (Text, unpack)
-import           Data.Text.Encoding (encodeUtf8)
-import           Data.String (fromString)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
-import           Foreign.Ptr (Ptr, castPtr)
-import           Foreign.Marshal.Utils (with)
-import           Foreign.Marshal.Alloc (finalizerFree)
-import qualified Data.Vector.Storable.Mutable as VM
-import qualified Data.Vector.Storable         as V
+import           Foreign.Ptr (Ptr, nullPtr)
 
 import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Cpp.Exceptions as C
 
 
 C.context mapnikCtx
 
 C.include "<string>"
 C.include "<mapnik/symbolizer.hpp>"
+C.include "<mapnik/symbolizer_base.hpp>"
 C.include "<mapnik/symbolizer_utils.hpp>"
 C.include "<mapnik/symbolizer_keys.hpp>"
 C.include "<mapnik/expression_string.hpp>"
 C.include "<mapnik/expression_evaluator.hpp>"
-C.include "<mapnik/transform_processor.hpp>"
 C.include "<mapnik/text/font_feature_settings.hpp>"
 C.include "symbolizer_util.hpp"
 
 C.using "namespace mapnik"
+C.verbatim "typedef symbolizer_base::value_type sym_value_type;"
 
 --
 -- * Symbolizer
@@ -211,9 +204,13 @@ castSym Mapnik.Dot{} p =
 
 class HasSetProp a where
   setProp :: Key a -> a -> Ptr SymbolizerBase -> IO ()
+  default setProp :: SymValue a => Key a -> a -> Ptr SymbolizerBase -> IO ()
+  setProp = setSymVal
 
 class HasGetProp a where
   getProp :: Key a -> Ptr SymbolizerBase -> IO (Maybe a)
+  default getProp :: SymValue a => Key a -> Ptr SymbolizerBase -> IO (Maybe a)
+  getProp = getSymVal
 
 data Property where
   (:=>) :: HasSetProp v => Key v -> Prop v -> Property
@@ -562,264 +559,97 @@ instance HasProperties Mapnik.Symbolizer Properties where
         , fmap (CompOp  :=>) (sym^?!compOp)
         ]
 
-
-
-instance HasGetProp Double where
-  getProp (keyIndex -> k) sym = fmap (fmap realToFrac) <$> newMaybe $ \(has,p) ->
-    [C.block|void {
-    auto val = get_optional<double>(*$(symbolizer_base *sym), $(keys k));
-    if (val) {
-      *$(int *has) = 1;
-      *$(double *p) = *val;
+getSymVal :: SymValue a => Key a -> Ptr SymbolizerBase -> IO (Maybe a)
+getSymVal (keyIndex -> k) sym = do
+  p <- C.withPtr_ $ \p -> [C.block|void {
+    symbolizer_base::cont_type const& props =
+      $(symbolizer_base *sym)->properties;
+    auto search = props.find($(keys k));
+    if (search != props.end()) {
+      *$(sym_value_type **p) = const_cast<sym_value_type*>(&search->second);
     } else {
-      *$(int *has) = 0;
+      *$(sym_value_type **p) = nullptr;
     }
-    }|]
-
-instance HasSetProp Double where
-  setProp (keyIndex -> k) (realToFrac -> v) s = 
-    [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = $(double v);}|]
-
-instance HasGetProp Mapnik.Color where
-  getProp (keyIndex -> k) sym = newMaybe $ \(has,ret) ->
-    [C.block|void {
-    auto val = get_optional<color>(*$(symbolizer_base *sym), $(keys k));
-    if (val) {
-      *$(int *has) = 1;
-      *$(color *ret) = *val;
-    } else {
-      *$(int *has) = 0;
-    }
-    }|]
-
-instance HasSetProp Mapnik.Color where
-  setProp (keyIndex -> k) c s = with c $ \cPtr ->
-    [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = *$(color *cPtr);}|]
-
-instance HasGetProp Int where
-  getProp (keyIndex -> k) sym = fmap (fmap fromIntegral) <$> newMaybe $ \(has,p) ->
-    [C.block|void {
-    auto val = get_optional<int>(*$(symbolizer_base *sym), $(keys k));
-    if (val) {
-      *$(int *has) = 1;
-      *$(int *p) = *val;
-    } else {
-      *$(int *has) = 0;
-    }
-    }|]
-
-instance HasSetProp Int where
-  setProp (keyIndex -> k) (fromIntegral -> v) s =
-    [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = $(int v);}|]
-
-instance HasGetProp Text where
-  getProp (keyIndex -> k) sym = newTextMaybe $ \(ptr,len) ->
-    [C.block|void {
-    auto val = get_optional<std::string>(*$(symbolizer_base *sym), $(keys k));
-    if (val) {
-      *$(char **ptr) = strdup(val->c_str());
-      *$(int *len) = val->size();
-    } else {
-      *$(char **ptr) = NULL;
-    }
-    }|]
-
-instance HasSetProp Text where
-  setProp (keyIndex -> k) (encodeUtf8 -> v) s =
-    [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = std::string($bs-ptr:v, $bs-len:v);}|]
-
-instance HasGetProp String where
-  getProp (keyIndex -> k) sym = fmap (fmap unpack) $ newTextMaybe $ \(ptr,len) ->
-    [C.block|void {
-    auto val = get_optional<std::string>(*$(symbolizer_base *sym), $(keys k));
-    if (val) {
-      *$(char **ptr) = strdup(val->c_str());
-      *$(int *len) = val->size();
-    } else {
-      *$(char **ptr) = NULL;
-    }
-    }|]
-
-instance HasSetProp String where
-  setProp (keyIndex -> k) (fromString -> v) s =
-    [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = std::string($bs-ptr:v, $bs-len:v);}|]
+  }|]
+  if p==nullPtr then return Nothing else peekSv p
 
 
-instance HasGetProp Mapnik.Expression where getProp = getPropExpression
-instance HasSetProp Mapnik.Expression where setProp = setPropExpression
-
-instance HasSetProp Mapnik.Transform where
-  setProp (keyIndex -> k) (Mapnik.Transform expr) s =
-    case Transform.parse expr of
-      Right v ->
-        [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = *$fptr-ptr:(transform_type *v);}|]
-      Left e -> throwIO (userError e)
-
-instance HasGetProp Mapnik.Transform where
-  getProp (keyIndex -> k) sym =
-    fmap (fmap Mapnik.Transform) $ newTextMaybe $ \(ptr, len) ->
-      [C.block|void {
-      auto expr = get_optional<transform_type>(*$(symbolizer_base *sym), $(keys k));
-      if (expr && *expr) {
-        std::string s = transform_processor_type::to_string(**expr);
-        *$(char** ptr) = strdup(s.c_str());
-        *$(int* len) = s.length();
-      } else {
-        *$(char** ptr) = NULL;
-      }
-      }|]
-
-instance HasSetProp Mapnik.DashArray where
-  setProp (keyIndex -> k) dashes s =
-    [C.block|void {
-      std::vector<dash_t> dashes($vec-len:dashes);
-      for (int i=0; i<$vec-len:dashes; i++) {
-        dashes.emplace_back($vec-ptr:(dash_t *dashes)[i]);
-      }
-      $(symbolizer_base *s)->properties[$(keys k)] = dashes;
-    }|]
+setSymVal :: SymValue a => Key a -> a -> Ptr SymbolizerBase -> IO ()
+setSymVal (keyIndex -> k) (flip pokeSv -> cb) sym =
+  [C.block|void {
+    sym_value_type val;
+    $fun:(void (*cb)(sym_value_type*))(&val);
+    $(symbolizer_base *sym)->properties[$(keys k)] = val;
+  }|]
 
 
-instance HasGetProp Mapnik.DashArray where
-  getProp (keyIndex -> k) sym = do
-    (has, fromIntegral -> len, castPtr -> ptr) <- C.withPtrs_ $ \(has, len,ptr) ->
-      [C.block|void{
-      auto arr = get_optional<dash_array>(*$(symbolizer_base *sym), $(keys k));
-      if (arr) {
-        *$(int *has) = 1;
-        *$(size_t *len) = arr->size();
-        dash_t *dashes = *$(dash_t **ptr) =
-          static_cast<dash_t *>(malloc(arr->size()*sizeof(dash_t)));
-        int i=0;
-        for (dash_array::const_iterator it=arr->begin(); it!=arr->end(); ++it, ++i) {
-          dashes[i] = *it;
-        }
-      } else {
-        *$(int *has) = 0;
-      }
-      }|]
-    if has==1 then do
-      fp <- newForeignPtr finalizerFree ptr
-      Just <$> V.freeze (VM.unsafeFromForeignPtr0 fp len)
-    else return Nothing
 
-instance HasGetProp Mapnik.TextPlacements where
-  getProp (keyIndex -> k) sym = mapM TextPlacements.unCreate =<<
-    TextPlacements.unsafeNewMaybe (\p ->
-      [C.block|void {
-      auto val = get_optional<text_placements_ptr>(*$(symbolizer_base *sym), $(keys k));
-      if (val) {
-        *$(text_placements_ptr **p) = new text_placements_ptr(*val);
-      } else {
-        *$(text_placements_ptr **p) = NULL;
-      }
-      }|])
-
-instance HasSetProp Mapnik.TextPlacements where
-  setProp (keyIndex -> k) v s = do
-    t <- TextPlacements.create v
-    [C.block|void {
-      $(symbolizer_base *s)->properties[$(keys k)] = *$fptr-ptr:(text_placements_ptr *t);
-    }|]
-
-instance HasGetProp Mapnik.Colorizer where
-  getProp (keyIndex -> k) sym = mapM Colorizer.unCreate =<<
-    Colorizer.unsafeNewMaybe (\p ->
-      [C.block|void {
-      auto val = get_optional<raster_colorizer_ptr>(*$(symbolizer_base *sym), $(keys k));
-      if (val) {
-        *$(raster_colorizer_ptr **p) = new raster_colorizer_ptr(*val);
-      } else {
-        *$(raster_colorizer_ptr **p) = NULL;
-      }
-      }|])
-    
-
-instance HasSetProp Mapnik.Colorizer where
-  setProp (keyIndex -> k) v s = do
-    c <- Colorizer.create v
-    [C.block|void {
-      $(symbolizer_base *s)->properties[$(keys k)] = *$fptr-ptr:(raster_colorizer_ptr *c);
-    }|]
-
-instance HasGetProp Mapnik.FontFeatureSettings where
-  getProp (keyIndex -> k) sym =
-    fmap (fmap Mapnik.FontFeatureSettings) $ newTextMaybe $ \(ptr, len) ->
-      [C.block|void {
-      auto v = get_optional<font_feature_settings>(*$(symbolizer_base *sym), $(keys k));
-      if (v) {
-        std::string s = v->to_string();
-        *$(char** ptr) = strdup(s.c_str());
-        *$(int* len) = s.length();
-      } else {
-        *$(char** ptr) = NULL;
-      }
-      }|]
-
-instance HasSetProp Mapnik.FontFeatureSettings where
-  setProp (keyIndex -> k) (Mapnik.FontFeatureSettings (encodeUtf8 -> v)) s =
-    [C.catchBlock|
-      $(symbolizer_base *s)->properties[$(keys k)] =
-        font_feature_settings(std::string($bs-ptr:v, $bs-len:v));
-    |]
-
-instance HasGetProp Mapnik.GroupProperties where
-  getProp (keyIndex -> k) sym = mapM GroupProperties.unCreate =<<
-    GroupProperties.unsafeNewMaybe (\p ->
-      [C.block|void {
-      auto val = get_optional<group_symbolizer_properties_ptr>(*$(symbolizer_base *sym), $(keys k));
-      if (val) {
-        *$(group_symbolizer_properties_ptr **p) = new group_symbolizer_properties_ptr(*val);
-      } else {
-        *$(group_symbolizer_properties_ptr **p) = NULL;
-      }
-      }|])
-
-instance HasSetProp Mapnik.GroupProperties where
-  setProp (keyIndex -> k) v s = do
-    t <- GroupProperties.create v
-    [C.block|void {
-      $(symbolizer_base *s)->properties[$(keys k)] = *$fptr-ptr:(group_symbolizer_properties_ptr *t);
-    }|]
-
-#define HAS_GET_PROP_ENUM(HS,CPP) \
-instance HasGetProp HS where {\
-  getProp (keyIndex -> k) sym = fmap (fmap (toEnum . fromIntegral)) <$> newMaybe $ \(has,p) -> \
-    [C.block|void { \
-    auto val = get_optional<CPP>(*$(symbolizer_base *sym), $(keys k)); \
-    if (val) { \
-      *$(int *has) = 1; \
-      *$(int *p) = static_cast<int>(*val); \
-    } else { \
-      *$(int *has) = 0; \
-    } \
-    }|] \
-};\
-instance HasSetProp HS where \
-  setProp (keyIndex -> k) (fromIntegral . fromEnum -> v) s = \
-    [C.block|void {$(symbolizer_base *s)->properties[$(keys k)] = enumeration_wrapper(static_cast<CPP>($(int v)));}|]
-
-HAS_GET_PROP_ENUM(Bool,bool)
-HAS_GET_PROP_ENUM(CompositeMode,composite_mode_e)
-HAS_GET_PROP_ENUM(LineCap,line_cap_enum)
-HAS_GET_PROP_ENUM(LineJoin,line_join_enum)
-HAS_GET_PROP_ENUM(LineRasterizer,line_rasterizer_enum)
-HAS_GET_PROP_ENUM(HaloRasterizer,halo_rasterizer_enum)
-HAS_GET_PROP_ENUM(PointPlacement,point_placement_enum)
-HAS_GET_PROP_ENUM(PatternAlignment,pattern_alignment_enum)
-HAS_GET_PROP_ENUM(DebugMode,debug_symbolizer_mode_enum)
-HAS_GET_PROP_ENUM(MarkerPlacement,marker_placement_enum)
-HAS_GET_PROP_ENUM(MarkerMultiPolicy,marker_multi_policy_enum)
-HAS_GET_PROP_ENUM(TextTransform,text_transform_enum)
-HAS_GET_PROP_ENUM(LabelPlacement,label_placement_enum)
-HAS_GET_PROP_ENUM(VerticalAlignment,vertical_alignment_enum)
-HAS_GET_PROP_ENUM(HorizontalAlignment,horizontal_alignment_enum)
-HAS_GET_PROP_ENUM(JustifyAlignment,justify_alignment_enum)
-HAS_GET_PROP_ENUM(Upright,text_upright_enum)
-HAS_GET_PROP_ENUM(Direction,direction_enum)
-HAS_GET_PROP_ENUM(GammaMethod,gamma_method_enum)
-HAS_GET_PROP_ENUM(ScalingMethod,scaling_method_e)
-HAS_GET_PROP_ENUM(SimplifyAlgorithm,simplify_algorithm_e)
+instance HasGetProp Mapnik.Color
+instance HasSetProp Mapnik.Color
+instance HasSetProp Mapnik.Transform
+instance HasGetProp Mapnik.Transform
+instance HasSetProp Mapnik.DashArray
+instance HasGetProp Mapnik.DashArray
+instance HasGetProp Mapnik.Expression
+instance HasSetProp Mapnik.Expression
+instance HasGetProp Text
+instance HasSetProp Text
+instance HasGetProp String
+instance HasSetProp String
+instance HasGetProp Mapnik.TextPlacements
+instance HasSetProp Mapnik.TextPlacements
+instance HasGetProp Double
+instance HasSetProp Double
+instance HasGetProp Int
+instance HasSetProp Int
+instance HasGetProp Mapnik.Colorizer
+instance HasSetProp Mapnik.Colorizer
+instance HasGetProp Mapnik.FontFeatureSettings
+instance HasSetProp Mapnik.FontFeatureSettings
+instance HasGetProp Mapnik.GroupProperties
+instance HasSetProp Mapnik.GroupProperties
+instance HasGetProp Bool
+instance HasSetProp Bool
+instance HasGetProp CompositeMode
+instance HasSetProp CompositeMode
+instance HasGetProp LineCap
+instance HasSetProp LineCap
+instance HasGetProp LineJoin
+instance HasSetProp LineJoin
+instance HasGetProp LineRasterizer
+instance HasSetProp LineRasterizer
+instance HasGetProp HaloRasterizer
+instance HasSetProp HaloRasterizer
+instance HasGetProp PointPlacement
+instance HasSetProp PointPlacement
+instance HasGetProp PatternAlignment
+instance HasSetProp PatternAlignment
+instance HasGetProp DebugMode
+instance HasSetProp DebugMode
+instance HasGetProp MarkerPlacement
+instance HasSetProp MarkerPlacement
+instance HasGetProp MarkerMultiPolicy
+instance HasSetProp MarkerMultiPolicy
+instance HasGetProp TextTransform
+instance HasSetProp TextTransform
+instance HasGetProp LabelPlacement
+instance HasSetProp LabelPlacement
+instance HasGetProp VerticalAlignment
+instance HasSetProp VerticalAlignment
+instance HasGetProp HorizontalAlignment
+instance HasSetProp HorizontalAlignment
+instance HasGetProp JustifyAlignment
+instance HasSetProp JustifyAlignment
+instance HasGetProp Upright
+instance HasSetProp Upright
+instance HasGetProp Direction
+instance HasSetProp Direction
+instance HasGetProp GammaMethod
+instance HasSetProp GammaMethod
+instance HasGetProp ScalingMethod
+instance HasSetProp ScalingMethod
+instance HasGetProp SimplifyAlgorithm
+instance HasSetProp SimplifyAlgorithm
 
 
 getProperty :: (HasSetProp a, HasGetProp a)

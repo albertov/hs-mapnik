@@ -11,20 +11,21 @@ module Mapnik.Bindings (
 , Style (..)
 , Rule (..)
 , Symbolizer (..)
-, SymbolizerBase (..)
+, SymbolizerBase
+, SymbolizerValue (..)
 , Expression (..)
 , Transform (..)
 , TextPlacements (..)
-, TextProperties (..)
-, TextLayoutProperties (..)
-, TextFormatProperties (..)
+, TextProperties
+, TextLayoutProperties
+, TextFormatProperties
+, Format
+, Stop
 , TextSymProperties (..)
 , GroupProperties (..)
 , FontSet(..)
 , Color(..)
 , Colorizer(..)
-, Format (..)
-, Stop(..)
 , Box (..)
 , Datasource (..)
 , Parameters (..)
@@ -69,6 +70,7 @@ fptr(TextProperties)
 fptr(TextFormatProperties)
 fptr(TextLayoutProperties)
 fptr(TextSymProperties)
+fptr(SymbolizerValue)
 fptr(Format)
 
 #ifdef BIGINT
@@ -109,5 +111,7 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "text_layout_properties", [t| TextLayoutProperties |])
       , (C.TypeName "format_properties", [t| TextFormatProperties |])
       , (C.TypeName "node_ptr", [t| Format |])
+      , (C.TypeName "sym_value_type", [t| SymbolizerValue |])
+      , (C.TypeName "bool", [t| Bool |])
       ]
     }
