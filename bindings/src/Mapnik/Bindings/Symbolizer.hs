@@ -1,4 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -27,12 +29,13 @@ import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()
 import           Mapnik.Bindings.SymbolizerValue (SymValue(..))
 
+import           Data.IORef
 import           Control.Exception
 import           Control.Lens hiding (has)
 import           Data.Maybe (catMaybes)
 import           Data.Text (Text, unpack)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
-import           Foreign.Ptr (Ptr, nullPtr)
+import           Foreign.Ptr (Ptr)
 
 import qualified Language.C.Inline.Cpp as C
 
@@ -70,76 +73,32 @@ create sym = bracket alloc dealloc $ \p -> do
     dealloc p = [C.block|void { delete $(symbolizer_base *p);}|]
 
 unCreate :: Symbolizer -> IO Mapnik.Symbolizer
-unCreate sym' = bracket alloc dealloc $ \sym -> do
-  props <- catMaybes <$> sequence
-    [ getProperty Gamma sym
-    , getProperty GammaMethod sym
-    , getProperty Opacity sym
-    , getProperty Alignment sym
-    , getProperty Offset sym
-    , getProperty CompOp sym
-    , getProperty Clip sym
-    , getProperty Fill sym
-    , getProperty FillOpacity sym
-    , getProperty Stroke sym
-    , getProperty StrokeWidth sym
-    , getProperty StrokeOpacity sym
-    , getProperty StrokeLinejoin sym
-    , getProperty StrokeLinecap sym
-    , getProperty StrokeGamma sym
-    , getProperty StrokeGammaMethod sym
-    , getProperty StrokeDashoffset sym
-    , getProperty StrokeDasharray sym
-    , getProperty StrokeMiterlimit sym
-    , getProperty GeometryTransform sym
-    , getProperty LineRasterizer sym
-    , getProperty ImageTransform sym
-    , getProperty Spacing sym
-    , getProperty MaxError sym
-    , getProperty AllowOverlap sym
-    , getProperty IgnorePlacement sym
-    , getProperty Width sym
-    , getProperty Height sym
-    , getProperty File sym
-    , getProperty ShieldDx sym
-    , getProperty ShieldDy sym
-    , getProperty UnlockImage sym
-    , getProperty Mode sym
-    , getProperty Scaling sym
-    , getProperty FilterFactor sym
-    , getProperty MeshSize sym
-    , getProperty Premultiplied sym
-    , getProperty Smooth sym
-    , getProperty SimplifyAlgorithm sym
-    , getProperty SimplifyTolerance sym
-    , getProperty HaloRasterizer sym
-    , getProperty TextPlacementsKey sym
-    , getProperty LabelPlacement sym
-    , getProperty MarkersPlacementKey sym
-    , getProperty MarkersMultipolicy sym
-    , getProperty PointPlacementKey sym
-    , getProperty ColorizerKey sym
-    , getProperty HaloTransform sym
-    , getProperty NumColumns sym
-    , getProperty StartColumn sym
-    , getProperty RepeatKey sym
-    , getProperty GroupPropertiesKey sym
-    , getProperty LargestBoxOnly sym
-    , getProperty MinimumPathLength sym
-    , getProperty HaloCompOp sym
-    , getProperty TextTransform sym
-    , getProperty HorizontalAlignment sym
-    , getProperty JustifyAlignment sym
-    , getProperty VerticalAlignment sym
-    , getProperty Upright sym
-    , getProperty Direction sym
-    , getProperty AvoidEdges sym
-    , getProperty FfSettings sym
-    ]
-  symName <- getName sym'
+unCreate sym = do
+  symName <- getName sym
   case defFromName symName of
-    Just s -> return (s & symbolizerProps .~ props)
+    Just s -> do
+      props <- getProperties sym
+      return (s & symbolizerProps .~ props)
     Nothing -> throwIO (userError ("Unexpected symbolizer name: " ++ unpack symName))
+
+getProperties :: Symbolizer -> IO [Property]
+getProperties sym' = bracket alloc dealloc $ \sym -> do
+  ret <- newIORef []
+  let cb :: Ptr SymbolizerValue -> C.CUChar -> IO ()
+      cb p = withKey $ \k -> do
+               v <- peekSv p
+               case v of
+                 Just prop -> modifyIORef ret ((k :=> prop):)
+                 Nothing   -> throwIO (userError "Unexpected type")
+  [C.block|void {
+    symbolizer_base::cont_type const& props =
+      $(symbolizer_base *sym)->properties;
+    for (auto it=props.begin(); it!=props.end(); ++it) {
+      $fun:(void (*cb)(sym_value_type *, unsigned char))(const_cast<sym_value_type*>(&(it->second)),
+                                                         static_cast<unsigned char>(it->first));
+    }
+    }|]
+  readIORef ret
   where
     alloc = [C.exp|symbolizer_base * { get_symbolizer_base(*$fptr-ptr:(symbolizer *sym')) }|]
     dealloc p = [C.block|void { delete $(symbolizer_base *p);}|]
@@ -545,23 +504,6 @@ symbolizerProps = lens getProps setProps where
       , fmap (CompOp  :=>) (sym^?!compOp)
       ]
 
-getProperty :: SymValue a
-            => Key a -> Ptr SymbolizerBase -> IO (Maybe Property)
-getProperty k sym = do
-  let k' = keyIndex k
-  p <- C.withPtr_ $ \p -> [C.block|void {
-    symbolizer_base::cont_type const& props =
-      $(symbolizer_base *sym)->properties;
-    auto search = props.find($(keys k'));
-    if (search != props.end()) {
-      *$(sym_value_type **p) = const_cast<sym_value_type*>(&search->second);
-    } else {
-      *$(sym_value_type **p) = nullptr;
-    }
-  }|]
-  if p==nullPtr then return Nothing else fmap (k:=>) <$> peekSv p
-
-
 setProperty :: Property -> Ptr SymbolizerBase -> IO ()
 setProperty ((keyIndex -> k) :=> (flip pokeSv -> cb)) sym =
   [C.block|void {
@@ -570,6 +512,71 @@ setProperty ((keyIndex -> k) :=> (flip pokeSv -> cb)) sym =
     $(symbolizer_base *sym)->properties[$(keys k)] = val;
   }|]
 
+withKey :: (forall a. SymValue a => Key a -> IO b) -> C.CUChar -> IO b
+withKey f = \k -> if
+  | k == [C.pure|keys{keys::gamma}|] -> f Gamma
+  | k == [C.pure|keys{keys::gamma_method}|] -> f GammaMethod
+  | k == [C.pure|keys{keys::opacity}|] -> f Opacity
+  | k == [C.pure|keys{keys::alignment}|] -> f Alignment
+  | k == [C.pure|keys{keys::offset}|] -> f Offset
+  | k == [C.pure|keys{keys::comp_op}|] -> f CompOp
+  | k == [C.pure|keys{keys::clip}|] -> f Clip
+  | k == [C.pure|keys{keys::fill}|] -> f Fill
+  | k == [C.pure|keys{keys::fill_opacity}|] -> f FillOpacity
+  | k == [C.pure|keys{keys::stroke}|] -> f Stroke
+  | k == [C.pure|keys{keys::stroke_width}|] -> f StrokeWidth
+  | k == [C.pure|keys{keys::stroke_opacity}|] -> f StrokeOpacity
+  | k == [C.pure|keys{keys::stroke_linejoin}|] -> f StrokeLinejoin
+  | k == [C.pure|keys{keys::stroke_linecap}|] -> f StrokeLinecap
+  | k == [C.pure|keys{keys::stroke_gamma}|] -> f StrokeGamma
+  | k == [C.pure|keys{keys::stroke_gamma_method}|] -> f StrokeGammaMethod
+  | k == [C.pure|keys{keys::stroke_dashoffset}|] -> f StrokeDashoffset
+  | k == [C.pure|keys{keys::stroke_dasharray}|] -> f StrokeDasharray
+  | k == [C.pure|keys{keys::stroke_miterlimit}|] -> f StrokeMiterlimit
+  | k == [C.pure|keys{keys::geometry_transform}|] -> f GeometryTransform
+  | k == [C.pure|keys{keys::line_rasterizer}|] -> f LineRasterizer
+  | k == [C.pure|keys{keys::image_transform}|] -> f ImageTransform
+  | k == [C.pure|keys{keys::spacing}|] -> f Spacing
+  | k == [C.pure|keys{keys::max_error}|] -> f MaxError
+  | k == [C.pure|keys{keys::allow_overlap}|] -> f AllowOverlap
+  | k == [C.pure|keys{keys::ignore_placement}|] -> f IgnorePlacement
+  | k == [C.pure|keys{keys::width}|] -> f Width
+  | k == [C.pure|keys{keys::height}|] -> f Height
+  | k == [C.pure|keys{keys::file}|] -> f File
+  | k == [C.pure|keys{keys::shield_dx}|] -> f ShieldDx
+  | k == [C.pure|keys{keys::shield_dy}|] -> f ShieldDy
+  | k == [C.pure|keys{keys::unlock_image}|] -> f UnlockImage
+  | k == [C.pure|keys{keys::mode}|] -> f Mode
+  | k == [C.pure|keys{keys::scaling}|] -> f Scaling
+  | k == [C.pure|keys{keys::filter_factor}|] -> f FilterFactor
+  | k == [C.pure|keys{keys::mesh_size}|] -> f MeshSize
+  | k == [C.pure|keys{keys::premultiplied}|] -> f Premultiplied
+  | k == [C.pure|keys{keys::smooth}|] -> f Smooth
+  | k == [C.pure|keys{keys::simplify_algorithm}|] -> f SimplifyAlgorithm
+  | k == [C.pure|keys{keys::simplify_tolerance}|] -> f SimplifyTolerance
+  | k == [C.pure|keys{keys::halo_rasterizer}|] -> f HaloRasterizer
+  | k == [C.pure|keys{keys::text_placements_}|] -> f TextPlacementsKey
+  | k == [C.pure|keys{keys::label_placement}|] -> f LabelPlacement
+  | k == [C.pure|keys{keys::markers_placement_type}|] -> f MarkersPlacementKey
+  | k == [C.pure|keys{keys::markers_multipolicy}|] -> f MarkersMultipolicy
+  | k == [C.pure|keys{keys::point_placement_type}|] -> f PointPlacementKey
+  | k == [C.pure|keys{keys::colorizer}|] -> f ColorizerKey
+  | k == [C.pure|keys{keys::halo_transform}|] -> f HaloTransform
+  | k == [C.pure|keys{keys::num_columns}|] -> f NumColumns
+  | k == [C.pure|keys{keys::start_column}|] -> f StartColumn
+  | k == [C.pure|keys{keys::repeat_key}|] -> f RepeatKey
+  | k == [C.pure|keys{keys::group_properties}|] -> f GroupPropertiesKey
+  | k == [C.pure|keys{keys::largest_box_only}|] -> f LargestBoxOnly
+  | k == [C.pure|keys{keys::minimum_path_length}|] -> f MinimumPathLength
+  | k == [C.pure|keys{keys::halo_comp_op}|] -> f HaloCompOp
+  | k == [C.pure|keys{keys::text_transform}|] -> f TextTransform
+  | k == [C.pure|keys{keys::horizontal_alignment}|] -> f HorizontalAlignment
+  | k == [C.pure|keys{keys::justify_alignment}|] -> f JustifyAlignment
+  | k == [C.pure|keys{keys::vertical_alignment}|] -> f VerticalAlignment
+  | k == [C.pure|keys{keys::upright}|] -> f Upright
+  | k == [C.pure|keys{keys::direction}|] -> f Direction
+  | k == [C.pure|keys{keys::avoid_edges}|] -> f AvoidEdges
+  | k == [C.pure|keys{keys::ff_settings}|] -> f FfSettings
 
 keyIndex :: Key a -> C.CUChar
 keyIndex Gamma = [C.pure|keys{keys::gamma}|]
