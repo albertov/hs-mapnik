@@ -13,8 +13,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 module Mapnik.Bindings.Symbolizer (
-  Symbolizer
-, create
+  create
 , unCreate
 , unsafeNew
 ) where

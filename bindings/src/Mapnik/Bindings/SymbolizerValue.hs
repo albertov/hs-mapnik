@@ -180,11 +180,11 @@ instance SymValue Mapnik.Expression where
         *$(char** ret) = nullptr;
       }
       }|]
-  pokeSv p (Mapnik.Expression (Expression.parse -> Right v)) =
-    [C.block|void{
-      *$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(expression_ptr *v));
-    }|]
-  pokeSv _ _ = throwIO (userError "pokeSv(Expression): Could not parse")
+  pokeSv p (Mapnik.Expression expr) =
+    case Expression.parse expr of
+      Right v ->
+        [C.block|void{ *$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(expression_ptr *v)); }|]
+      Left e -> throwIO (userError e)
 
 instance SymValue Mapnik.FontFeatureSettings where
   peekSv p =
