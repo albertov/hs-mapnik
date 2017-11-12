@@ -19,7 +19,7 @@ module Mapnik.Bindings (
 , TextProperties
 , TextLayoutProperties
 , TextFormatProperties
-, Format
+, Format (..)
 , Stop
 , TextSymProperties (..)
 , GroupProperties (..)

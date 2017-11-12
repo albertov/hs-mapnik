@@ -78,6 +78,10 @@ MAPNIK_DECL void hs_mapnik_destroy_TextSymProperties(void *p) {
   delete static_cast<mapnik::text_symbolizer_properties*>(p);
 }
 
+MAPNIK_DECL void hs_mapnik_destroy_Format(void *p) {
+  delete static_cast<mapnik::formatting::node_ptr*>(p);
+}
+
 MAPNIK_DECL void hs_mapnik_destroy_SymbolizerValue(void *p) {
   delete static_cast<mapnik::symbolizer_base::value_type*>(p);
 }
