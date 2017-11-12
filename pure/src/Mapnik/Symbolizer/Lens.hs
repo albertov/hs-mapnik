@@ -19,7 +19,7 @@ class HasDirection s a | s -> a where direction :: ApLens' s a
 class HasDx s a | s -> a where dx :: ApLens' s a
 class HasDy s a | s -> a where dy :: ApLens' s a
 
-makeMapnikFields ''TextPlacements
+makeMapnikFields ''Format
 makeMapnikFields ''TextProperties
 makeMapnikFields ''TextFormatProperties
 makeMapnikFields ''TextLayoutProperties
@@ -29,5 +29,4 @@ makeMapnikFields ''Colorizer
 makeMapnikFields ''Stop
 makePrisms ''Symbolizer
 makePrisms ''Prop
-makePrisms ''TextPlacements
 makePrisms ''Format

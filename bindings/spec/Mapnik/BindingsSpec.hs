@@ -281,7 +281,7 @@ spec = beforeAll_ registerDefaults $ do
 
   describe "TextPlacements" $ do
     it "can create Dummy" $ do
-      let ps = Mapnik.dummyPlacements
+      let ps = Mapnik.def
       ps' <- TextPlacements.unCreate =<< TextPlacements.create ps
       ps `shouldBe` ps'
 

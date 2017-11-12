@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
@@ -103,7 +105,21 @@ deriveMapnikJSON ''TextLayoutProperties
 data Format
   = FormatExp    !Expression
   | FormatList   ![Format]
-  | Format       !TextFormatProperties !Format
+  | Format
+    { faceName         :: !(Maybe Text)
+    , fontSet          :: !(Maybe FontSet)
+    , textSize         :: !(PropValue Double)
+    , characterSpacing :: !(PropValue Double)
+    , lineSpacing      :: !(PropValue Double)
+    , wrapBefore       :: !(PropValue Bool)
+    , repeatWrapChar   :: !(PropValue Bool)
+    , textTransform    :: !(PropValue TextTransform)
+    , fill             :: !(PropValue Color)
+    , haloFill         :: !(PropValue Color)
+    , haloRadius       :: !(PropValue Double)
+    , ffSettings       :: !(PropValue FontFeatureSettings)
+    , next             :: !Format
+    }
   | FormatLayout !TextLayoutProperties !Format
   | NullFormat
   deriving (Eq, Show, Generic)
@@ -119,31 +135,8 @@ data TextSymProperties = TextSymProperties
   } deriving (Eq, Show, Generic, Default)
 deriveMapnikJSON ''TextSymProperties
 
-data SimplePlacementPosition = SimplePlacementPosition
-  { textSizes            :: ![Int]
-  , directions           :: ![PlacementDirection]
-  } deriving (Eq, Show, Generic, Default)
-deriveMapnikJSON ''SimplePlacementPosition
 
-
-data TextPlacements
-  = Simple
-    { defaults  :: !TextSymProperties
-    , positions :: !(PropValue [SimplePlacementPosition])
-    }
-  | List
-    { defaults :: !TextSymProperties
-    , placements :: ![TextSymProperties]
-    }
-  | Dummy
-    { defaults :: !TextSymProperties
-    }
-  deriving (Eq, Show, Generic)
+newtype TextPlacements = Dummy TextSymProperties
+  deriving (Generic)
+  deriving newtype (Eq, Show, Default)
 deriveMapnikJSON ''TextPlacements
-
-simplePlacements, listPlacements, dummyPlacements :: TextPlacements
-simplePlacements = Simple def def
-listPlacements = List def def
-dummyPlacements = Dummy def
-
-instance Default TextPlacements where def = dummyPlacements

@@ -33,6 +33,7 @@ C.include "<string>"
 C.include "<mapnik/text/text_properties.hpp>"
 C.include "<mapnik/text/formatting/base.hpp>"
 C.include "<mapnik/text/formatting/text.hpp>"
+C.include "<mapnik/text/formatting/list.hpp>"
 
 C.using "namespace mapnik"
 C.using "namespace mapnik::formatting"
@@ -50,23 +51,36 @@ unsafeNew = mkUnsafeNew TextSymProperties destroyTextSymProperties
 unsafeNewMaybe :: (Ptr (Ptr TextSymProperties) -> IO ()) -> IO (Maybe TextSymProperties)
 unsafeNewMaybe = mkUnsafeNewMaybe TextSymProperties destroyTextSymProperties
 
+unsafeNewFormat :: (Ptr (Ptr Format) -> IO ()) -> IO Format
+unsafeNewFormat = mkUnsafeNew Format destroyFormat
+
 parseExp :: Mapnik.Expression -> Either String Expression
 parseExp (Mapnik.Expression e) = Expression.parse e
 
-withFormat :: Mapnik.Format -> (Ptr Format -> IO a) -> IO a
-withFormat (Mapnik.FormatExp (parseExp -> Right e)) = bracket alloc dealloc
-  where
-    alloc = [C.block|node_ptr * {
-      auto node = std::make_shared<text_node>(*$fptr-ptr:(expression_ptr *e));
-      new node_ptr(node);
+createFormat :: Mapnik.Format -> IO Format
+createFormat f = unsafeNewFormat $ \p ->
+  case f of
+    Mapnik.FormatExp e' ->
+      case parseExp e' of
+        Right e ->
+          [C.block|void {
+          auto node = std::make_shared<text_node>(*$fptr-ptr:(expression_ptr *e));
+          *$(node_ptr **p) = new node_ptr(node);
+          }|]
+        Left e -> throwIO (userError ("Could not parse format expression" ++ e))
+    Mapnik.NullFormat ->
+      [C.block|void { *$(node_ptr **p) = new node_ptr(nullptr); }|]
+    Mapnik.FormatList fs -> do
+      [C.block|void {
+      auto node = std::make_shared<list_node>();
+      *$(node_ptr **p) = new node_ptr(node);
       }|]
-    dealloc p = [C.exp|void{delete $(node_ptr *p)}|]
-withFormat (Mapnik.FormatExp _) =
-  const (throwIO (userError "Could not parse format expression"))
-withFormat Mapnik.NullFormat = bracket alloc dealloc
-  where 
-    alloc = [C.exp|node_ptr * { nullptr }|]
-    dealloc = const (return ())
+      forM_ fs $ \f' -> do
+        f'' <- createFormat f'
+        [C.block|void {
+          auto parent = static_cast<list_node*>((*$(node_ptr **p))->get());
+          parent->push_back(*$fptr-ptr:(node_ptr *f''));
+          }|]
 
 
 #define SET_PROP_T(HS,CPP) forM_ HS (\v -> (`pokeSv` v) =<< [C.exp|sym_value_type *{ &$(text_properties_expressions *p)->CPP}|])
@@ -140,7 +154,7 @@ withLayoutProperties Mapnik.TextLayoutProperties{..} = bracket alloc dealloc . e
 
 create :: Mapnik.TextSymProperties -> IO TextSymProperties
 create Mapnik.TextSymProperties{..} = unsafeNew $ \p ->
-  withFormat format $ \fmt ->
+  createFormat format >>= \(Format fp) -> withForeignPtr fp (\fmt ->
   withTextProperties properties $ \props ->
   withFormatProperties formatProperties $ \formatProps ->
   withLayoutProperties layoutProperties $ \layoutProps ->
@@ -153,10 +167,10 @@ create Mapnik.TextSymProperties{..} = unsafeNew $ \p ->
       if ($(node_ptr *fmt)) {
         props->set_format_tree(*$(node_ptr *fmt));
       }
-    }|]
+    }|])
 
-unCreate :: TextSymProperties -> IO Mapnik.TextSymProperties
-unCreate (TextSymProperties props) = withForeignPtr props $ \ps -> do
+unCreate :: Ptr TextSymProperties -> IO Mapnik.TextSymProperties
+unCreate ps = do
   format <- unFormat =<< unsafeNewFormat (\p ->
     [C.block|void {
       *$(node_ptr **p) = new node_ptr($(text_symbolizer_properties *ps)->format_tree());
@@ -173,7 +187,7 @@ unCreate (TextSymProperties props) = withForeignPtr props $ \ps -> do
   return Mapnik.TextSymProperties{..}
 
 unFormat :: Format -> IO Mapnik.Format
-unFormat = undefined
+unFormat = const (return Mapnik.NullFormat) --TODO
 
 readPropWith
   :: SymValue a
@@ -185,7 +199,7 @@ readPropWith f = do
 #define GET_PROP(PS, HS, CPP) \
   HS <- readPropWith $ \(has,ret) -> \
     [C.block|void { \
-    static const PS def;\
+    const PS def;\
     auto v = *$(sym_value_type **ret) = &$(PS *p)->CPP;\
     *$(int *has) = *v != def.CPP;\
     }|]
@@ -195,7 +209,7 @@ unFormatProperties :: Ptr TextFormatProperties -> IO Mapnik.TextFormatProperties
 unFormatProperties p = do
   faceName <- newTextMaybe $ \(ret,len) ->
     [C.block|void {
-    static const format_properties def;
+    const format_properties def;
     auto v = $(format_properties *p)->face_name;
     if (v != def.face_name) {
       *$(char **ret) = strdup(v.c_str());
@@ -234,7 +248,7 @@ unLayoutProperties p = do
   GET_PROP_L(verticalAlignment,valign)
   direction <- fmap (fmap (toEnum . fromIntegral)) $ newMaybe $ \(has,ret) ->
     [C.block|void {
-    static const text_layout_properties def;
+    const text_layout_properties def;
     auto v = $(text_layout_properties *p)->dir;
     if (*$(int *has) = v != def.dir) {
       *$(int *ret) = static_cast<int>(v);
@@ -259,6 +273,3 @@ unProperties p = do
   GET_PROP_T(largestBoxOnly,largest_bbox_only)
   GET_PROP_T(upright,upright)
   return Mapnik.TextProperties{..}
-
-unsafeNewFormat :: (Ptr (Ptr Format) -> IO ()) -> IO Format
-unsafeNewFormat = mkUnsafeNew Format destroyFormat

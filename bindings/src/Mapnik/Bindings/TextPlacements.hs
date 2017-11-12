@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -17,8 +17,10 @@ import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.SymbolizerValue (SymValue(..))
 import qualified Mapnik.Bindings.TextSymProperties as Props
-import           Foreign.ForeignPtr (FinalizerPtr)
-import           Foreign.Ptr (Ptr)
+import           Control.Exception (throwIO)
+import           Control.Monad (when)
+import           Foreign.ForeignPtr (FinalizerPtr, withForeignPtr)
+import           Foreign.Ptr (Ptr, nullPtr)
 
 import qualified Language.C.Inline.Cpp as C
 
@@ -26,7 +28,10 @@ C.context mapnikCtx
 
 C.include "<string>"
 C.include "<mapnik/symbolizer_base.hpp>"
+C.include "<mapnik/text/placements/base.hpp>"
 C.include "<mapnik/text/placements/dummy.hpp>"
+C.include "<mapnik/text/placements/simple.hpp>"
+C.include "<mapnik/text/placements/list.hpp>"
 
 C.using "namespace mapnik"
 C.verbatim "typedef symbolizer_base::value_type sym_value_type;"
@@ -52,9 +57,20 @@ create (Mapnik.Dummy defs) = unsafeNew $ \p -> do
     placements->defaults = *$fptr-ptr:(text_symbolizer_properties *defaults);
   }|]
 
---TODO
 unCreate :: TextPlacements -> IO Mapnik.TextPlacements
-unCreate = const (return Mapnik.dummyPlacements)
+unCreate (TextPlacements fp) = withForeignPtr fp $ \p -> do
+  ptr <- C.withPtr_ $ \ptr -> [C.block|void {
+    // Cannot dynamic_cast on simple or list placements since they're not exposed
+    *$(text_placements **ptr) =
+      dynamic_cast<text_placements_dummy *>($(text_placements_ptr *p)->get());
+    }|]
+  when (ptr == nullPtr) $
+    throwIO (userError "Unsupported placement type")
+  fmap Mapnik.Dummy . Props.unCreate =<< [C.exp|text_symbolizer_properties * {
+    // Assumes p is not null since ptr isnt
+    &$(text_placements *ptr)->defaults
+  }|]
+
 
 instance SymValue Mapnik.TextPlacements where
   peekSv p = mapM unCreate =<<
