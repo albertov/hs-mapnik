@@ -68,8 +68,8 @@ data TextProperties = TextProperties
 deriveMapnikJSON ''TextProperties
 
 data TextFormatProperties = TextFormatProperties
-  { faceName         :: !(PropValue Text)
-  , fontSet          :: !(PropValue FontSet)
+  { faceName         :: !(Maybe Text)
+  , fontSet          :: !(Maybe FontSet)
   , textSize         :: !(PropValue Double)
   , characterSpacing :: !(PropValue Double)
   , lineSpacing      :: !(PropValue Double)
@@ -96,11 +96,7 @@ data TextLayoutProperties = TextLayoutProperties
   , horizontalAlignment :: !(PropValue HorizontalAlignment)
   , justifyAlignment    :: !(PropValue JustifyAlignment)
   , verticalAlignment   :: !(PropValue VerticalAlignment)
-  , maxCharAngleDelta   :: !(PropValue Double)
-  , allowOverlap        :: !(PropValue Bool)
-  , largestBoxOnly      :: !(PropValue Bool)
-  , upright             :: !(PropValue Upright)
-  , direction           :: !(PropValue PlacementDirection)
+  , direction           :: !(Maybe PlacementDirection)
   } deriving (Eq, Show, Generic, Default)
 deriveMapnikJSON ''TextLayoutProperties
 

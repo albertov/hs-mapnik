@@ -15,6 +15,7 @@ module Mapnik.Bindings.TextPlacements (
 import qualified Mapnik
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
+import           Mapnik.Bindings.SymbolizerValue (SymValue(..))
 import qualified Mapnik.Bindings.TextSymProperties as Props
 import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
@@ -28,6 +29,7 @@ C.include "<mapnik/symbolizer_base.hpp>"
 C.include "<mapnik/text/placements/dummy.hpp>"
 
 C.using "namespace mapnik"
+C.verbatim "typedef symbolizer_base::value_type sym_value_type;"
 
 -- * TextPlacements
 
@@ -53,3 +55,18 @@ create (Mapnik.Dummy defs) = unsafeNew $ \p -> do
 --TODO
 unCreate :: TextPlacements -> IO Mapnik.TextPlacements
 unCreate = const (return Mapnik.dummyPlacements)
+
+instance SymValue Mapnik.TextPlacements where
+  peekSv p = mapM unCreate =<<
+    unsafeNewMaybe (\ret ->
+      [C.block|void {
+      try {
+        *$(text_placements_ptr **ret) =
+          new text_placements_ptr(util::get<text_placements_ptr>(*$(sym_value_type *p)));
+      } catch (std::exception) {
+        *$(text_placements_ptr **ret) = nullptr;
+      }
+      }|])
+  pokeSv p v' = do
+    v <- create v'
+    [C.block|void { *$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(text_placements_ptr *v)); }|]

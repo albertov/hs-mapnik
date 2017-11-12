@@ -13,7 +13,6 @@ import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 import qualified Mapnik.Bindings.GroupProperties as GroupProperties
 import qualified Mapnik.Bindings.Colorizer as Colorizer
-import qualified Mapnik.Bindings.TextPlacements as TextPlacements
 import qualified Mapnik.Bindings.Expression as Expression
 import qualified Mapnik.Bindings.Transform as Transform
 import           Mapnik.Bindings.Orphans ()
@@ -75,7 +74,6 @@ instance SymValue Mapnik.HS where {\
     }|];}\
 };
 
-SYM_VAL_PTR(TextPlacements,text_placements_ptr)
 SYM_VAL_PTR(Colorizer,raster_colorizer_ptr)
 SYM_VAL_PTR(GroupProperties,group_symbolizer_properties_ptr)
 

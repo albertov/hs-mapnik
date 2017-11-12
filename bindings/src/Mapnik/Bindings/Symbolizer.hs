@@ -28,6 +28,7 @@ import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()
 import           Mapnik.Bindings.SymbolizerValue (SymValue(..))
+import           Mapnik.Bindings.TextPlacements ()
 
 import           Data.IORef
 import           Control.Exception
