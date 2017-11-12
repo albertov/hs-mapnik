@@ -1,4 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE QuasiQuotes #-}
 module Mapnik.TH (
     deriveMapnikJSON
   , makeMapnikFields
@@ -7,13 +9,20 @@ module Mapnik.TH (
 
 
 import Data.Aeson.Types
-import Data.Aeson.TH
 import Data.Char (toUpper)
 import Control.Lens
 import Language.Haskell.TH
 
+-- We don't use Aeson's TH From/ToJSONderivation because it
+-- doesn't seem to respect omitNothingFields=True
 deriveMapnikJSON :: Name -> DecsQ
-deriveMapnikJSON = deriveJSON mapnikOptions
+deriveMapnikJSON name = [d|
+  instance FromJSON $(return (ConT name)) where
+    parseJSON = genericParseJSON mapnikOptions
+  instance ToJSON $(return (ConT name)) where
+    toJSON = genericToJSON mapnikOptions
+    toEncoding = genericToEncoding mapnikOptions
+  |]
 
 mapnikOptions :: Options
 mapnikOptions = defaultOptions

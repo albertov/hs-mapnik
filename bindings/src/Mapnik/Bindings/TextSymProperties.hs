@@ -16,24 +16,27 @@ module Mapnik.Bindings.TextSymProperties (
 import qualified Mapnik
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
-import           Mapnik.Bindings.SymbolizerValue (SymValue(..))
+import           Mapnik.Bindings.SymbolizerValue (SymValue(..), withSv)
 import qualified Mapnik.Bindings.Expression as Expression
 
 import           Control.Exception (bracket, throwIO)
 import           Control.Monad (forM_)
 import           Data.Text.Encoding (encodeUtf8)
 import           Foreign.ForeignPtr (FinalizerPtr, withForeignPtr)
-import           Foreign.Ptr (Ptr)
+import           Foreign.Ptr (Ptr, nullPtr)
 
 import qualified Language.C.Inline.Cpp as C
 
 C.context mapnikCtx
 
 C.include "<string>"
+C.include "<mapnik/expression_string.hpp>"
 C.include "<mapnik/text/text_properties.hpp>"
 C.include "<mapnik/text/formatting/base.hpp>"
 C.include "<mapnik/text/formatting/text.hpp>"
 C.include "<mapnik/text/formatting/list.hpp>"
+C.include "<mapnik/text/formatting/format.hpp>"
+C.include "<mapnik/text/formatting/layout.hpp>"
 
 C.using "namespace mapnik"
 C.using "namespace mapnik::formatting"
@@ -54,33 +57,72 @@ unsafeNewMaybe = mkUnsafeNewMaybe TextSymProperties destroyTextSymProperties
 unsafeNewFormat :: (Ptr (Ptr Format) -> IO ()) -> IO Format
 unsafeNewFormat = mkUnsafeNew Format destroyFormat
 
-parseExp :: Mapnik.Expression -> Either String Expression
-parseExp (Mapnik.Expression e) = Expression.parse e
+#define SET_NODE_PROP(TY,HS,CPP) \
+    forM_ HS $ \v -> withSv v $ \v' -> [C.block|void { \
+      auto node = dynamic_cast<TY*>((*$(node_ptr **p))->get()); \
+      node->CPP = *$(sym_value_type *v'); \
+      }|]
 
 createFormat :: Mapnik.Format -> IO Format
-createFormat f = unsafeNewFormat $ \p ->
-  case f of
-    Mapnik.FormatExp e' ->
-      case parseExp e' of
-        Right e ->
-          [C.block|void {
-          auto node = std::make_shared<text_node>(*$fptr-ptr:(expression_ptr *e));
-          *$(node_ptr **p) = new node_ptr(node);
-          }|]
-        Left e -> throwIO (userError ("Could not parse format expression" ++ e))
-    Mapnik.NullFormat ->
-      [C.block|void { *$(node_ptr **p) = new node_ptr(nullptr); }|]
-    Mapnik.FormatList fs -> do
-      [C.block|void {
-      auto node = std::make_shared<list_node>();
-      *$(node_ptr **p) = new node_ptr(node);
-      }|]
-      forM_ fs $ \f' -> do
-        f'' <- createFormat f'
+createFormat f = unsafeNewFormat $ \p -> case f of
+  Mapnik.FormatExp (Mapnik.Expression e') ->
+    case Expression.parse e' of
+      Right e ->
         [C.block|void {
-          auto parent = static_cast<list_node*>((*$(node_ptr **p))->get());
-          parent->push_back(*$fptr-ptr:(node_ptr *f''));
-          }|]
+        auto node = std::make_shared<text_node>(*$fptr-ptr:(expression_ptr *e));
+        *$(node_ptr **p) = new node_ptr(node);
+        }|]
+      Left e -> throwIO (userError ("Could not parse format expression" ++ e))
+  Mapnik.NullFormat ->
+    [C.block|void { *$(node_ptr **p) = new node_ptr(nullptr); }|]
+  Mapnik.FormatList fs -> do
+    [C.block|void {
+    auto node = std::make_shared<list_node>();
+    *$(node_ptr **p) = new node_ptr(node);
+    }|]
+    forM_ fs $ \f' -> do
+      f'' <- createFormat f'
+      [C.block|void {
+        auto parent = static_cast<list_node*>((*$(node_ptr **p))->get());
+        parent->push_back(*$fptr-ptr:(node_ptr *f''));
+        }|]
+  Mapnik.Format {..} -> do
+    next' <- createFormat next
+    [C.block|void {
+    auto node = std::make_shared<format_node>();
+    node->set_child(*$fptr-ptr:(node_ptr *next'));
+    *$(node_ptr **p) = new node_ptr(node);
+    }|]
+    SET_NODE_PROP(format_node, textSize, text_size)
+    SET_NODE_PROP(format_node, characterSpacing, character_spacing)
+    SET_NODE_PROP(format_node, lineSpacing, line_spacing)
+    SET_NODE_PROP(format_node, wrapBefore, wrap_before)
+    SET_NODE_PROP(format_node, repeatWrapChar, repeat_wrap_char)
+    SET_NODE_PROP(format_node, textTransform, text_transform)
+    SET_NODE_PROP(format_node, fill, fill)
+    SET_NODE_PROP(format_node, haloFill, halo_fill)
+    SET_NODE_PROP(format_node, haloRadius, halo_radius)
+    SET_NODE_PROP(format_node, ffSettings, ff_settings)
+
+  Mapnik.FormatLayout {..} -> do
+    next' <- createFormat next
+    [C.block|void {
+    auto node = std::make_shared<layout_node>();
+    node->set_child(*$fptr-ptr:(node_ptr *next'));
+    *$(node_ptr **p) = new node_ptr(node);
+    }|]
+    SET_NODE_PROP(layout_node, dx, dx)
+    SET_NODE_PROP(layout_node, dy, dy)
+    SET_NODE_PROP(layout_node, orientation, orientation)
+    SET_NODE_PROP(layout_node, textRatio, text_ratio)
+    SET_NODE_PROP(layout_node, wrapWidth, wrap_width)
+    SET_NODE_PROP(layout_node, wrapChar, wrap_char)
+    SET_NODE_PROP(layout_node, wrapBefore, wrap_before)
+    SET_NODE_PROP(layout_node, repeatWrapChar, repeat_wrap_char)
+    SET_NODE_PROP(layout_node, rotateDisplacement, rotate_displacement)
+    SET_NODE_PROP(layout_node, horizontalAlignment, halign)
+    SET_NODE_PROP(layout_node, justifyAlignment, jalign)
+    SET_NODE_PROP(layout_node, verticalAlignment, valign)
 
 
 #define SET_PROP_T(HS,CPP) forM_ HS (\v -> (`pokeSv` v) =<< [C.exp|sym_value_type *{ &$(text_properties_expressions *p)->CPP}|])
@@ -164,9 +206,7 @@ create Mapnik.TextSymProperties{..} = unsafeNew $ \p ->
       props->expressions     = *$(text_properties_expressions *props);
       props->layout_defaults = *$(text_layout_properties *layoutProps);
       props->format_defaults = *$(format_properties *formatProps);
-      if ($(node_ptr *fmt)) {
-        props->set_format_tree(*$(node_ptr *fmt));
-      }
+      props->set_format_tree(*$(node_ptr *fmt));
     }|])
 
 unCreate :: Ptr TextSymProperties -> IO Mapnik.TextSymProperties
@@ -187,7 +227,32 @@ unCreate ps = do
   return Mapnik.TextSymProperties{..}
 
 unFormat :: Format -> IO Mapnik.Format
-unFormat = const (return Mapnik.NullFormat) --TODO
+unFormat (Format fp) = withForeignPtr fp $ \p -> do
+  (ty,ptr) <- C.withPtrs_ $ \(ty,ptr) ->
+    [C.block|void { do {
+      node_ptr node = *$(node_ptr *p);
+      if (!node) {
+        *$(void **ptr) = nullptr;
+        break;
+      }
+
+      text_node *text = dynamic_cast<text_node*>(node.get());
+      if (text) {
+        *$(int *ty) = 0;
+        *$(void **ptr) = text;
+        break;
+      }
+
+    } while(0);}|]
+  if ptr == nullPtr then return Mapnik.NullFormat else case ty of
+    0 -> fmap (Mapnik.FormatExp . Mapnik.Expression) $ newText $ \(ret,len) ->
+        [C.block|void {
+          text_node *text = static_cast<text_node*>($(void *ptr));
+          auto exp = text->get_text();
+          std::string s = to_expression_string(*exp);
+          *$(char** ret) = strdup(s.c_str());
+          *$(int* len) = s.length();
+        }|]
 
 readPropWith
   :: SymValue a

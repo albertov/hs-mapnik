@@ -5,7 +5,12 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Mapnik.Bindings.SymbolizerValue (unsafeNew, unsafeNewMaybe, SymValue(..)) where
+module Mapnik.Bindings.SymbolizerValue (
+  SymValue(..)
+, unsafeNew
+, unsafeNewMaybe
+, withSv
+) where
 
 import qualified Mapnik
 import           Mapnik.Enums
@@ -17,7 +22,7 @@ import qualified Mapnik.Bindings.Expression as Expression
 import qualified Mapnik.Bindings.Transform as Transform
 import           Mapnik.Bindings.Orphans ()
 
-import           Control.Exception (throwIO)
+import           Control.Exception (throwIO, bracket)
 import           Data.Text (Text, pack, unpack)
 import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Vector.Storable.Mutable as VM
@@ -50,6 +55,15 @@ unsafeNew = mkUnsafeNew SymbolizerValue destroySymbolizerValue
 
 unsafeNewMaybe :: (Ptr (Ptr SymbolizerValue) -> IO ()) -> IO (Maybe SymbolizerValue)
 unsafeNewMaybe = mkUnsafeNewMaybe SymbolizerValue destroySymbolizerValue
+
+withSv :: SymValue a => a -> (Ptr SymbolizerValue -> IO b) -> IO b
+withSv v f = allocaSv (\p -> pokeSv p v >> f p)
+
+allocaSv :: (Ptr SymbolizerValue -> IO a) -> IO a
+allocaSv = bracket alloc dealloc where
+  alloc = [C.exp|sym_value_type * { new sym_value_type }|]
+  dealloc p = [C.exp|void { delete $(sym_value_type *p)}|]
+
 
 class SymValue a where
   pokeSv :: Ptr SymbolizerValue -> a -> IO ()

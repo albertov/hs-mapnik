@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -110,7 +111,7 @@ data Symbolizer
     , BASE_PROPS
     }
   | Shield
-    { placements      :: !(PropValue TextPlacements)
+    { placements      :: !(Maybe TextPlacements)
     , imageTransform  :: !(PropValue Transform)
     , dx              :: !(PropValue Double)
     , dy              :: !(PropValue Double)
@@ -121,7 +122,7 @@ data Symbolizer
     , BASE_PROPS
     }
   | Text
-    { placements     :: !(PropValue TextPlacements)
+    { placements     :: !(Maybe TextPlacements)
     , haloCompOp     :: !(PropValue CompositeMode)
     , haloRasterizer :: !(PropValue HaloRasterizer)
     , haloTransform  :: !(PropValue Transform)
@@ -157,7 +158,7 @@ data Symbolizer
     , numColumns      :: !(PropValue Int)
     , startColumn     :: !(PropValue Int)
     , repeatKey       :: !(PropValue Expression)
-    , placements      :: !(PropValue TextPlacements)
+    , placements      :: !(Maybe TextPlacements)
     , BASE_PROPS
     }
   | Debug
@@ -172,14 +173,8 @@ data Symbolizer
     , compOp  :: !(PropValue CompositeMode)
     }
   deriving (Eq, Show, Generic)
+deriveMapnikJSON ''Symbolizer
 
--- We don't use TH From/ToJSONderivation here because it
--- doesn't respect omitNothingFields=True
-instance ToJSON Symbolizer where
-  toJSON = genericToJSON mapnikOptions
-  toEncoding = genericToEncoding mapnikOptions
-instance FromJSON Symbolizer where
-  parseJSON = genericParseJSON mapnikOptions
 
 point, line, linePattern, polygon, polygonPattern, raster :: Symbolizer
 shield, text, building, markers, group, debug, dot :: Symbolizer

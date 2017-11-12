@@ -285,7 +285,7 @@ symbolizerProps = lens getProps setProps where
 
   setProps sym@Mapnik.Shield{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
-    step (TextPlacementsKey :=> v) = placements ?~ v
+    step (TextPlacementsKey :=> Val v) = placements ?~ v
     step (ImageTransform :=> v) = imageTransform ?~ v
     step (ShieldDx       :=> v) = dx ?~ v
     step (ShieldDy       :=> v) = dy ?~ v
@@ -297,7 +297,7 @@ symbolizerProps = lens getProps setProps where
 
   setProps sym@Mapnik.Text{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
-    step (TextPlacementsKey :=> v) = placements ?~ v
+    step (TextPlacementsKey :=> Val v) = placements ?~ v
     step (HaloCompOp     :=> v) = haloCompOp ?~ v
     step (HaloRasterizer :=> v) = haloRasterizer ?~ v
     step (HaloTransform  :=> v) = haloTransform ?~ v
@@ -336,7 +336,7 @@ symbolizerProps = lens getProps setProps where
     step (NumColumns      :=> v) = numColumns ?~ v
     step (StartColumn     :=> v) = startColumn ?~ v
     step (RepeatKey       :=> v) = repeatKey ?~ v
-    step (TextPlacementsKey  :=> v) = placements ?~ v
+    step (TextPlacementsKey :=> Val v) = placements ?~ v
     step p                       = stepBase p
 
   setProps sym@Mapnik.Debug{} = foldr step sym  where
@@ -443,7 +443,7 @@ symbolizerProps = lens getProps setProps where
       , GET_BASE_PROPS
       ]
     Mapnik.Shield{} ->
-      [ fmap (TextPlacementsKey    :=>) (sym^?!placements)
+      [ fmap ((TextPlacementsKey :=>) . Val) (sym^?!placements)
       , fmap (GeometryTransform :=>) (sym^?!imageTransform)
       , fmap (ShieldDx          :=>) (sym^?!dx)
       , fmap (ShieldDy          :=>) (sym^?!dy)
@@ -454,7 +454,7 @@ symbolizerProps = lens getProps setProps where
       , GET_BASE_PROPS
       ]
     Mapnik.Text{} ->
-      [ fmap (TextPlacementsKey    :=>) (sym^?!placements)
+      [ fmap ((TextPlacementsKey :=>) . Val) (sym^?!placements)
       , fmap (HaloCompOp        :=>) (sym^?!haloCompOp)
       , fmap (HaloRasterizer    :=>) (sym^?!haloRasterizer)
       , fmap (GeometryTransform :=>) (sym^?!haloTransform)
@@ -490,7 +490,7 @@ symbolizerProps = lens getProps setProps where
       , fmap (NumColumns      :=>) (sym^?!numColumns)
       , fmap (StartColumn     :=>) (sym^?!startColumn)
       , fmap (RepeatKey       :=>) (sym^?!repeatKey)
-      , fmap (TextPlacementsKey  :=>) (sym^?!placements)
+      , fmap ((TextPlacementsKey :=>) . Val) (sym^?!placements)
       , GET_BASE_PROPS
       ]
     Mapnik.Debug{} ->

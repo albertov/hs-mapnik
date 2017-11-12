@@ -22,7 +22,11 @@ import Data.Default (Default(def))
 data Prop a = Exp Expression
             | Val a
   deriving (Eq, Show, Functor, Generic)
-deriveMapnikJSON ''Prop
+instance FromJSON a => FromJSON (Prop a) where
+  parseJSON = genericParseJSON mapnikOptions
+instance ToJSON a => ToJSON (Prop a) where
+  toJSON = genericToJSON mapnikOptions
+  toEncoding = genericToEncoding mapnikOptions
 
 type PropValue a = Maybe (Prop a)
 
@@ -120,7 +124,21 @@ data Format
     , ffSettings       :: !(PropValue FontFeatureSettings)
     , next             :: !Format
     }
-  | FormatLayout !TextLayoutProperties !Format
+  | FormatLayout
+    { dx                  :: !(PropValue Double)
+    , dy                  :: !(PropValue Double)
+    , orientation         :: !(PropValue Double)
+    , textRatio           :: !(PropValue Double)
+    , wrapWidth           :: !(PropValue Double)
+    , wrapChar            :: !(PropValue Text)
+    , wrapBefore          :: !(PropValue Bool)
+    , repeatWrapChar      :: !(PropValue Bool)
+    , rotateDisplacement  :: !(PropValue Double)
+    , horizontalAlignment :: !(PropValue HorizontalAlignment)
+    , justifyAlignment    :: !(PropValue JustifyAlignment)
+    , verticalAlignment   :: !(PropValue VerticalAlignment)
+    , next                :: !Format
+    }
   | NullFormat
   deriving (Eq, Show, Generic)
 deriveMapnikJSON ''Format
