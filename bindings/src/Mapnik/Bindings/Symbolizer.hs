@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -29,7 +28,6 @@ import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()
 import           Mapnik.Bindings.SymbolizerValue (SymValue(..))
 import qualified Mapnik.Bindings.Expression as Expression
-import qualified Mapnik.Bindings.Transform as Transform
 
 import           Control.Exception
 import           Control.Lens hiding (has)
@@ -202,18 +200,8 @@ castSym Mapnik.Dot{} p =
   [C.block|symbolizer *{ new symbolizer(*static_cast<dot_symbolizer*>($(symbolizer_base *p)));}|]
 
 
-class HasSetProp a where
-  setProp :: Key a -> a -> Ptr SymbolizerBase -> IO ()
-  default setProp :: SymValue a => Key a -> a -> Ptr SymbolizerBase -> IO ()
-  setProp = setSymVal
-
-class HasGetProp a where
-  getProp :: Key a -> Ptr SymbolizerBase -> IO (Maybe a)
-  default getProp :: SymValue a => Key a -> Ptr SymbolizerBase -> IO (Maybe a)
-  getProp = getSymVal
-
 data Property where
-  (:=>) :: HasSetProp v => Key v -> Prop v -> Property
+  (:=>) :: SymValue v => Key v -> Prop v -> Property
 
 type Properties = [Property]
 
@@ -583,85 +571,16 @@ setSymVal (keyIndex -> k) (flip pokeSv -> cb) sym =
   }|]
 
 
-
-instance HasGetProp Mapnik.Color
-instance HasSetProp Mapnik.Color
-instance HasSetProp Mapnik.Transform
-instance HasGetProp Mapnik.Transform
-instance HasSetProp Mapnik.DashArray
-instance HasGetProp Mapnik.DashArray
-instance HasGetProp Mapnik.Expression
-instance HasSetProp Mapnik.Expression
-instance HasGetProp Text
-instance HasSetProp Text
-instance HasGetProp String
-instance HasSetProp String
-instance HasGetProp Mapnik.TextPlacements
-instance HasSetProp Mapnik.TextPlacements
-instance HasGetProp Double
-instance HasSetProp Double
-instance HasGetProp Int
-instance HasSetProp Int
-instance HasGetProp Mapnik.Colorizer
-instance HasSetProp Mapnik.Colorizer
-instance HasGetProp Mapnik.FontFeatureSettings
-instance HasSetProp Mapnik.FontFeatureSettings
-instance HasGetProp Mapnik.GroupProperties
-instance HasSetProp Mapnik.GroupProperties
-instance HasGetProp Bool
-instance HasSetProp Bool
-instance HasGetProp CompositeMode
-instance HasSetProp CompositeMode
-instance HasGetProp LineCap
-instance HasSetProp LineCap
-instance HasGetProp LineJoin
-instance HasSetProp LineJoin
-instance HasGetProp LineRasterizer
-instance HasSetProp LineRasterizer
-instance HasGetProp HaloRasterizer
-instance HasSetProp HaloRasterizer
-instance HasGetProp PointPlacement
-instance HasSetProp PointPlacement
-instance HasGetProp PatternAlignment
-instance HasSetProp PatternAlignment
-instance HasGetProp DebugMode
-instance HasSetProp DebugMode
-instance HasGetProp MarkerPlacement
-instance HasSetProp MarkerPlacement
-instance HasGetProp MarkerMultiPolicy
-instance HasSetProp MarkerMultiPolicy
-instance HasGetProp TextTransform
-instance HasSetProp TextTransform
-instance HasGetProp LabelPlacement
-instance HasSetProp LabelPlacement
-instance HasGetProp VerticalAlignment
-instance HasSetProp VerticalAlignment
-instance HasGetProp HorizontalAlignment
-instance HasSetProp HorizontalAlignment
-instance HasGetProp JustifyAlignment
-instance HasSetProp JustifyAlignment
-instance HasGetProp Upright
-instance HasSetProp Upright
-instance HasGetProp Direction
-instance HasSetProp Direction
-instance HasGetProp GammaMethod
-instance HasSetProp GammaMethod
-instance HasGetProp ScalingMethod
-instance HasSetProp ScalingMethod
-instance HasGetProp SimplifyAlgorithm
-instance HasSetProp SimplifyAlgorithm
-
-
-getProperty :: (HasSetProp a, HasGetProp a)
+getProperty :: SymValue a
             => Key a -> Ptr SymbolizerBase -> IO (Maybe Property)
 getProperty k p = do
   eVal <- getPropExpression k p
   case eVal of
-    Nothing -> fmap ((k :=>) . Val) <$> getProp k p
+    Nothing -> fmap ((k :=>) . Val) <$> getSymVal k p
     Just e -> return (Just (k :=> Exp e))
 
 setProperty :: Property -> Ptr SymbolizerBase -> IO ()
-setProperty (k :=> Val v) = setProp k v
+setProperty (k :=> Val v) = setSymVal k v
 setProperty (k :=> Exp v) = setPropExpression k v
 
 setPropExpression :: Key a
