@@ -167,12 +167,16 @@ instance SymValue Mapnik.Expression where
   peekSv p = 
     fmap (fmap Mapnik.Expression) $ newTextMaybe $ \(ret, len) ->
       [C.block|void {
-      auto expr = util::get<expression_ptr>(*$(sym_value_type *p));
-      if (expr) {
-        std::string s = to_expression_string(*expr);
-        *$(char** ret) = strdup(s.c_str());
-        *$(int* len) = s.length();
-      } else {
+      try {
+        auto expr = util::get<expression_ptr>(*$(sym_value_type *p));
+        if (expr) {
+          std::string s = to_expression_string(*expr);
+          *$(char** ret) = strdup(s.c_str());
+          *$(int* len) = s.length();
+        } else {
+          *$(char** ret) = nullptr;
+        }
+      } catch (std::exception) {
         *$(char** ret) = nullptr;
       }
       }|]
