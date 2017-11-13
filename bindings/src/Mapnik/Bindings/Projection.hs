@@ -23,6 +23,7 @@ import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
 import           Foreign.Marshal.Utils (with)
 
+import qualified Language.C.Inline.Unsafe as CU
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
 
@@ -58,7 +59,7 @@ foreign import ccall "&hs_mapnik_destroy_ProjTransform" destroyProjTransform :: 
 
 projTransform :: Projection -> Projection -> ProjTransform
 projTransform src dst = unsafePerformIO $ do
-  ptr <- [C.exp|proj_transform * {
+  ptr <- [CU.exp|proj_transform * {
     new proj_transform(*$fptr-ptr:(projection *src), *$fptr-ptr:(projection *dst))
     }|]
   ProjTransform <$> newForeignPtr destroyProjTransform ptr
@@ -66,7 +67,7 @@ projTransform src dst = unsafePerformIO $ do
   
 toText :: Projection -> Text
 toText pr = unsafePerformIO $ newText $ \(ptr,len) ->
-    [C.block|void {
+    [CU.block|void {
     std::string const &s = $fptr-ptr:(projection *pr)->params();
     *$(char** ptr) = strdup(s.c_str());
     *$(int* len) = s.length();
@@ -79,14 +80,14 @@ class CanTransform p where
 instance CanTransform Box where
   forward p box =
     unsafePerformIO $ with box $ \boxPtr -> C.withPtr_ $ \ret ->
-      [C.block|void {
+      [CU.block|void {
       auto res = *$(bbox *boxPtr);
       $fptr-ptr:(proj_transform *p)->forward(res);
       *$(bbox *ret) = res;
     }|]
   backward p box =
     unsafePerformIO $ with box $ \boxPtr -> C.withPtr_ $ \ret ->
-      [C.block|void {
+      [CU.block|void {
       auto res = *$(bbox *boxPtr);
       $fptr-ptr:(proj_transform *p)->backward(res);
       *$(bbox *ret) = res;

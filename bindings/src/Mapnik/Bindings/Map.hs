@@ -62,6 +62,7 @@ import           Foreign.C.String (CString)
 import           Foreign.Storable (poke)
 import           Foreign.Marshal.Utils (with)
 
+import qualified Language.C.Inline.Unsafe as CU
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
 
@@ -89,7 +90,7 @@ unsafeNew = mkUnsafeNew Map destroyMap
 
 create :: Int -> Int -> IO Map
 create (fromIntegral -> width) (fromIntegral -> height) =
-  unsafeNew $ \p -> [C.block|void{*$(Map** p) = new Map($(int width), $(int height));}|]
+  unsafeNew $ \p -> [CU.block|void{*$(Map** p) = new Map($(int width), $(int height));}|]
 
 loadXmlFile :: Map -> FilePath -> IO ()
 loadXmlFile m (fromString -> path) =
@@ -105,7 +106,7 @@ loadXml m str =
 
 getBackground :: Map -> IO (Maybe Color)
 getBackground m = newMaybe $ \(has,p) ->
-  [C.block|void {
+  [CU.block|void {
   auto mColor = $fptr-ptr:(Map *m)->background();
   if (mColor) {
     *$(int *has) = 1;
@@ -117,19 +118,19 @@ getBackground m = newMaybe $ \(has,p) ->
 
 setBackground :: Map -> Color -> IO ()
 setBackground m col = with col $ \colPtr ->
-  [C.block|void {
+  [CU.block|void {
   $fptr-ptr:(Map *m)->set_background(*$(color *colPtr));
   }|]
 
 setBackgroundImage :: Map -> FilePath -> IO ()
 setBackgroundImage m (fromString -> path) =
-  [C.block| void {
+  [CU.block| void {
   $fptr-ptr:(Map *m)->set_background_image(std::string($bs-ptr:path, $bs-len:path));
   }|]
 
 getBackgroundImage :: Map -> IO (Maybe FilePath)
 getBackgroundImage m = fmap (fmap unpack) $ newTextMaybe $ \(p,len) ->
-  [C.block| void {
+  [CU.block| void {
   auto mPath = $fptr-ptr:(Map *m)->background_image();
   if (mPath) {
     *$(int *len) = mPath->size();
@@ -142,14 +143,14 @@ getBackgroundImage m = fmap (fmap unpack) $ newTextMaybe $ \(p,len) ->
 
 setBackgroundImageCompOp :: Map -> CompositeMode -> IO ()
 setBackgroundImageCompOp m (fromIntegral . fromEnum -> v) =
-  [C.block| void {
+  [CU.block| void {
   $fptr-ptr:(Map *m)->set_background_image_comp_op(static_cast<composite_mode_e>($(int v)));
   }|]
 
 getBackgroundImageCompOp :: Map -> IO (Maybe CompositeMode)
 getBackgroundImageCompOp m =
   fmap (fmap (toEnum . fromIntegral) ) $ newMaybe $ \(has, p) ->
-    [C.block| void {
+    [CU.block| void {
     composite_mode_e mode = $fptr-ptr:(Map *m)->background_image_comp_op();
     Map def;
     if (mode != def.background_image_comp_op()) {
@@ -162,29 +163,29 @@ getBackgroundImageCompOp m =
 
 setBackgroundImageOpacity :: Map -> Double -> IO ()
 setBackgroundImageOpacity m (realToFrac -> opacity) =
-  [C.block| void {
+  [CU.block| void {
   $fptr-ptr:(Map *m)->set_background_image_opacity($(double opacity));
   }|]
 
 getBackgroundImageOpacity :: Map -> IO Double
 getBackgroundImageOpacity m = realToFrac <$>
-  [C.exp| float { $fptr-ptr:(Map *m)->background_image_opacity() }|]
+  [CU.exp| float { $fptr-ptr:(Map *m)->background_image_opacity() }|]
 
 setBasePath :: Map -> FilePath -> IO ()
 setBasePath m (fromString -> path) =
-  [C.block| void {
+  [CU.block| void {
   $fptr-ptr:(Map *m)->set_base_path(std::string($bs-ptr:path, $bs-len:path));
   }|]
 
 setFontDirectory :: Map -> FilePath -> IO ()
 setFontDirectory m (fromString -> path) =
-  [C.block| void {
+  [CU.block| void {
   $fptr-ptr:(Map *m)->set_font_directory(std::string($bs-ptr:path, $bs-len:path));
   }|]
 
 getFontDirectory :: Map -> IO (Maybe FilePath)
 getFontDirectory m = fmap (fmap unpack) $ newTextMaybe $ \(p,len) ->
-  [C.block| void {
+  [CU.block| void {
   auto mPath = $fptr-ptr:(Map *m)->font_directory();
   if (mPath) {
     *$(int *len) = mPath->size();
@@ -196,10 +197,10 @@ getFontDirectory m = fmap (fmap unpack) $ newTextMaybe $ \(p,len) ->
   
 setSrs :: Map -> Text -> IO ()
 setSrs m (encodeUtf8 -> srs) =
-  [C.block|void { $fptr-ptr:(Map *m)->set_srs(std::string($bs-ptr:srs, $bs-len:srs));}|]
+  [CU.block|void { $fptr-ptr:(Map *m)->set_srs(std::string($bs-ptr:srs, $bs-len:srs));}|]
 
 getSrs :: Map -> IO Text
-getSrs m = newText $ \(p,len) -> [C.block|void {
+getSrs m = newText $ \(p,len) -> [CU.block|void {
   std::string const &srs = $fptr-ptr:(Map *m)->srs();
   *$(int *len) = srs.size();
   *$(char **p) = strdup (srs.c_str());
@@ -207,29 +208,29 @@ getSrs m = newText $ \(p,len) -> [C.block|void {
 
 setAspectFixMode :: Map -> AspectFixMode -> IO ()
 setAspectFixMode m (fromIntegral . fromEnum  -> v) =
-  [C.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(static_cast<Map::aspect_fix_mode>($(int v)));}|]
+  [CU.block|void { $fptr-ptr:(Map *m)->set_aspect_fix_mode(static_cast<Map::aspect_fix_mode>($(int v)));}|]
 
 setBufferSize :: Map -> Int -> IO ()
 setBufferSize m (fromIntegral -> size) =
-  [C.block|void {$fptr-ptr:(Map *m)->set_buffer_size($(int size));}|]
+  [CU.block|void {$fptr-ptr:(Map *m)->set_buffer_size($(int size));}|]
 
 getBufferSize :: Map -> IO Int
-getBufferSize m = fromIntegral <$> [C.exp|int { $fptr-ptr:(Map *m)->buffer_size() }|]
+getBufferSize m = fromIntegral <$> [CU.exp|int { $fptr-ptr:(Map *m)->buffer_size() }|]
 
 resize :: Map -> Int -> Int -> IO ()
 resize m (fromIntegral -> width) (fromIntegral -> height) =
-  [C.block|void {$fptr-ptr:(Map *m)->resize($(int width), $(int height));}|]
+  [CU.block|void {$fptr-ptr:(Map *m)->resize($(int width), $(int height));}|]
 
 zoom :: Map -> Double -> IO ()
 zoom m (realToFrac -> z) =
-  [C.block|void {$fptr-ptr:(Map *m)->zoom($(double z));}|]
+  [CU.block|void {$fptr-ptr:(Map *m)->zoom($(double z));}|]
 
 zoomAll :: Map -> IO ()
 zoomAll m = [C.catchBlock|$fptr-ptr:(Map *m)->zoom_all();|]
 
 zoomToBox :: Map -> Box -> IO ()
 zoomToBox m box = with box $ \boxPtr -> 
-  [C.block|void {$fptr-ptr:(Map *m)->zoom_to_box(*$(bbox *boxPtr));}|]
+  [CU.block|void {$fptr-ptr:(Map *m)->zoom_to_box(*$(bbox *boxPtr));}|]
 
 render :: Map -> Double -> IO Image
 render m (realToFrac -> scale) = Image.unsafeNew $ \ptr ->
@@ -247,7 +248,7 @@ render m (realToFrac -> scale) = Image.unsafeNew $ \ptr ->
   |]
 
 addLayer :: Map -> Layer -> IO ()
-addLayer m l = [C.block|void {
+addLayer m l = [CU.block|void {
   $fptr-ptr:(Map *m)->add_layer(*$fptr-ptr:(layer *l));
   }|]
 
@@ -286,7 +287,7 @@ getStyles m = do
 
 
 insertStyle :: Map -> StyleName -> Style -> IO ()
-insertStyle m (encodeUtf8 -> n) l = [C.block|void {
+insertStyle m (encodeUtf8 -> n) l = [CU.block|void {
   $fptr-ptr:(Map *m)->insert_style(
       std::string($bs-ptr:n, $bs-len:n), *$fptr-ptr:(feature_type_style *l)
       );
@@ -294,11 +295,11 @@ insertStyle m (encodeUtf8 -> n) l = [C.block|void {
 
 removeAllLayers :: Map -> IO ()
 removeAllLayers m =
-  [C.block| void { $fptr-ptr:(Map *m)->layers().clear(); }|]
+  [CU.block| void { $fptr-ptr:(Map *m)->layers().clear(); }|]
 
 getMaxExtent :: Map -> IO (Maybe Box)
 getMaxExtent m =  newMaybe $ \(has, p) ->
-  [C.block|void {
+  [CU.block|void {
     auto res = $fptr-ptr:(Map *m)->maximum_extent();
     if (res) {
       *$(bbox *p)  = *res;
@@ -310,4 +311,4 @@ getMaxExtent m =  newMaybe $ \(has, p) ->
 
 setMaxExtent :: Map -> Box -> IO ()
 setMaxExtent m box = with box $ \boxPtr ->
-  [C.block|void { $fptr-ptr:(Map *m)->set_maximum_extent(*$(bbox *boxPtr)); }|]
+  [CU.block|void { $fptr-ptr:(Map *m)->set_maximum_extent(*$(bbox *boxPtr)); }|]

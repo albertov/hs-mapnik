@@ -35,6 +35,7 @@ import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
 
 import qualified Language.C.Inline.Cpp as C
+import qualified Language.C.Inline.Unsafe as CU
 
 
 C.context mapnikCtx
@@ -56,37 +57,37 @@ unsafeNew :: (Ptr (Ptr Rule) -> IO ()) -> IO Rule
 unsafeNew = mkUnsafeNew Rule destroyRule
 
 create :: IO Rule
-create  = unsafeNew $ \p -> [C.block|void {*$(rule** p) = new rule();}|]
+create  = unsafeNew $ \p -> [CU.block|void {*$(rule** p) = new rule();}|]
 
 setName :: Rule -> Text -> IO ()
 setName l (encodeUtf8 -> s) =
-  [C.block|void { $fptr-ptr:(rule *l)->set_name(std::string($bs-ptr:s, $bs-len:s)); }|]
+  [CU.block|void { $fptr-ptr:(rule *l)->set_name(std::string($bs-ptr:s, $bs-len:s)); }|]
 
 getName :: Rule -> IO Text
 getName r = newText $ \(ptr,len) ->
-    [C.block|void {
+    [CU.block|void {
     std::string const &s = $fptr-ptr:(rule *r)->get_name();
     *$(char** ptr) = strdup(s.c_str());
     *$(int* len) = s.length();
     }|]
 
 getMinScale :: Rule -> IO Double
-getMinScale r = realToFrac <$> [C.exp|double { $fptr-ptr:(rule *r)->get_min_scale()}|]
+getMinScale r = realToFrac <$> [CU.exp|double { $fptr-ptr:(rule *r)->get_min_scale()}|]
 
 setMinScale :: Rule -> Double -> IO ()
 setMinScale r (realToFrac -> s) =
-  [C.block|void { $fptr-ptr:(rule *r)->set_min_scale($(double s)); }|]
+  [CU.block|void { $fptr-ptr:(rule *r)->set_min_scale($(double s)); }|]
 
 setMaxScale :: Rule -> Double -> IO ()
 setMaxScale r (realToFrac -> s) =
-  [C.block|void { $fptr-ptr:(rule *r)->set_max_scale($(double s)); }|]
+  [CU.block|void { $fptr-ptr:(rule *r)->set_max_scale($(double s)); }|]
 
 getMaxScale :: Rule -> IO Double
-getMaxScale r = realToFrac <$> [C.exp|double { $fptr-ptr:(rule *r)->get_max_scale()}|]
+getMaxScale r = realToFrac <$> [CU.exp|double { $fptr-ptr:(rule *r)->get_max_scale()}|]
 
 
 appendSymbolizer :: Rule -> Symbolizer -> IO ()
-appendSymbolizer r s = [C.block| void {
+appendSymbolizer r s = [CU.block| void {
   symbolizer sym(*$fptr-ptr:(symbolizer *s));
   $fptr-ptr:(rule *r)->append(std::move(sym));
   }|]
@@ -106,13 +107,13 @@ getSymbolizers r = do
   reverse <$> readIORef symsRef
 
 setFilter :: Rule -> Expression -> IO ()
-setFilter r s = [C.block| void {
+setFilter r s = [CU.block| void {
   expression_ptr const& filter(*$fptr-ptr:(expression_ptr *s));
   $fptr-ptr:(rule *r)->set_filter(filter);
   }|]
 
 getFilter :: Rule -> IO (Maybe Expression)
-getFilter r = Expression.unsafeNewMaybe $ \p -> [C.block| void {
+getFilter r = Expression.unsafeNewMaybe $ \p -> [CU.block| void {
   rule dfl;
   expression_ptr const& expr = $fptr-ptr:(rule *r)->get_filter();
   std::string filter = mapnik::to_expression_string(*expr);
@@ -125,15 +126,15 @@ getFilter r = Expression.unsafeNewMaybe $ \p -> [C.block| void {
   }|]
 
 hasElseFilter :: Rule -> IO Bool
-hasElseFilter r = toEnum . fromIntegral <$> [C.exp|int { $fptr-ptr:(rule *r)->has_else_filter()}|]
+hasElseFilter r = toEnum . fromIntegral <$> [CU.exp|int { $fptr-ptr:(rule *r)->has_else_filter()}|]
 
 setElse :: Rule -> Bool -> IO ()
 setElse r (fromIntegral . fromEnum -> q) =
-  [C.block|void { $fptr-ptr:(rule *r)->set_else($(int q)); }|]
+  [CU.block|void { $fptr-ptr:(rule *r)->set_else($(int q)); }|]
 
 hasAlsoFilter :: Rule -> IO Bool
-hasAlsoFilter r = toEnum . fromIntegral <$> [C.exp|int { $fptr-ptr:(rule *r)->has_also_filter()}|]
+hasAlsoFilter r = toEnum . fromIntegral <$> [CU.exp|int { $fptr-ptr:(rule *r)->has_also_filter()}|]
 
 setAlso :: Rule -> Bool -> IO ()
 setAlso r (fromIntegral . fromEnum -> q) =
-  [C.block|void { $fptr-ptr:(rule *r)->set_also($(int q)); }|]
+  [CU.block|void { $fptr-ptr:(rule *r)->set_also($(int q)); }|]

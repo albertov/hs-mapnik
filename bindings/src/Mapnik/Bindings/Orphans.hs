@@ -13,6 +13,7 @@ import           Mapnik.Bindings
 import           Foreign.Storable
 
 import qualified Language.C.Inline.Cpp as C
+import qualified Language.C.Inline.Unsafe as CU
 
 C.context mapnikCtx
 
@@ -27,14 +28,14 @@ C.verbatim "typedef box2d<double> bbox;"
 
 
 instance Storable Mapnik.Color where
-  sizeOf _ = fromIntegral [C.pure|size_t { sizeof(color) }|]
-  alignment _ = fromIntegral [C.pure|size_t { alignof (color) }|]
+  sizeOf _ = fromIntegral [CU.pure|size_t { sizeof(color) }|]
+  alignment _ = fromIntegral [CU.pure|size_t { alignof (color) }|]
   peek p = do
     (   fromIntegral -> r
       , fromIntegral -> g
       , fromIntegral -> b
       , fromIntegral -> a
-      ) <- C.withPtrs_ $ \(r,g,b,a) -> [C.block|void {
+      ) <- C.withPtrs_ $ \(r,g,b,a) -> [CU.block|void {
       color const& c = *$(color *p);
       *$(unsigned char *r) = c.red();
       *$(unsigned char *g) = c.green();
@@ -44,19 +45,19 @@ instance Storable Mapnik.Color where
     return (Mapnik.RGBA r g b a)
 
   poke p (Mapnik.RGBA (fromIntegral ->r) (fromIntegral -> g) (fromIntegral -> b) (fromIntegral -> a)) =
-    [C.block|void{
+    [CU.block|void{
       *$(color* p) = color($(unsigned char r), $(unsigned char g), $(unsigned char b), $(unsigned char a));
       }|]
 
 instance Storable Mapnik.Box where
-  sizeOf _ = fromIntegral [C.pure|size_t { sizeof(bbox) }|]
-  alignment _ = fromIntegral [C.pure|size_t { alignof (bbox) }|]
+  sizeOf _ = fromIntegral [CU.pure|size_t { sizeof(bbox) }|]
+  alignment _ = fromIntegral [CU.pure|size_t { alignof (bbox) }|]
   peek p = do
     (   realToFrac -> minx
       , realToFrac -> miny
       , realToFrac -> maxx
       , realToFrac -> maxy
-      ) <- C.withPtrs_ $ \(minx,miny,maxx,maxy) -> [C.block|void {
+      ) <- C.withPtrs_ $ \(minx,miny,maxx,maxy) -> [CU.block|void {
       bbox const& c = *$(bbox *p);
       *$(double *minx) = c.minx();
       *$(double *miny) = c.miny();
@@ -66,6 +67,6 @@ instance Storable Mapnik.Box where
     return Mapnik.Box{..}
 
   poke p (Mapnik.Box (realToFrac -> minx) (realToFrac -> miny) (realToFrac -> maxx) (realToFrac -> maxy)) =
-    [C.block|void{
+    [CU.block|void{
       *$(bbox* p) = bbox($(double minx), $(double miny), $(double maxx), $(double maxy));
       }|]

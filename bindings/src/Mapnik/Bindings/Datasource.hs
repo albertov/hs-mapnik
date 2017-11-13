@@ -43,7 +43,7 @@ import qualified GHC.Exts as Exts
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
-import Foreign.C.Types (CDouble)
+import qualified Language.C.Inline.Unsafe as CU
 
 
 C.context mapnikCtx
@@ -115,7 +115,7 @@ createHsDatasource _ = unsafeNew $ \ ptr -> do
     return ()
   featuresAtPoint <- $(C.mkFunPtr [t|Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ()|]) $ \fs x y tol -> do
     return ()
-  [C.block|void {
+  [CU.block|void {
   datasource_ptr p = std::make_shared<hs_datasource>(
     "hs_layer",
     datasource::Vector, 
@@ -133,7 +133,7 @@ unsafeNewParams = mkUnsafeNew Parameters destroyParameters
 
 getParameters :: Datasource -> IO Parameters
 getParameters ds = unsafeNewParams $ \ ptr ->
-  [C.block|void{
+  [CU.block|void{
   *$(parameters** ptr) = new parameters((*$fptr-ptr:(datasource_ptr *ds))->params());
   }|]
 
@@ -148,35 +148,35 @@ fromList ps = unsafePerformIO $ do
   forM_ ps $ \(encodeUtf8 -> k, value) ->
     case value of
       StringParam (encodeUtf8 -> v) ->
-        [C.block|void {
+        [CU.block|void {
           std::string k($bs-ptr:k, $bs-len:k);
           std::string v($bs-ptr:v, $bs-len:v);
           (*$fptr-ptr:(parameters *p))[k] = value_holder(v);
         }|]
       DoubleParam (realToFrac -> v) ->
-        [C.block|void {
+        [CU.block|void {
           std::string k($bs-ptr:k, $bs-len:k);
           (*$fptr-ptr:(parameters *p))[k] = value_holder($(double v));
         }|]
       IntParam (fromIntegral -> v) ->
-        [C.block|void {
+        [CU.block|void {
           std::string k($bs-ptr:k, $bs-len:k);
           (*$fptr-ptr:(parameters *p))[k] = value_holder($(value_integer v));
         }|]
       BoolParam (fromIntegral . fromEnum -> v) ->
-        [C.block|void {
+        [CU.block|void {
           std::string k($bs-ptr:k, $bs-len:k);
           (*$fptr-ptr:(parameters *p))[k] = value_holder($(int v)?true:false);
         }|]
       NullParam ->
-        [C.block|void {
+        [CU.block|void {
           std::string k($bs-ptr:k, $bs-len:k);
           (*$fptr-ptr:(parameters *p))[k] = value_null();
         }|]
   return p
 
 emptyParams :: IO Parameters
-emptyParams = fmap Parameters . newForeignPtr destroyParameters =<< [C.exp|parameters *{ new parameters }|]
+emptyParams = fmap Parameters . newForeignPtr destroyParameters =<< [CU.exp|parameters *{ new parameters }|]
 
 
 toList :: Parameters -> [(Text,ParamValue)]

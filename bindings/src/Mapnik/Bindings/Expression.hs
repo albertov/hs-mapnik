@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -22,6 +21,7 @@ import           Foreign.Ptr (Ptr)
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
+import qualified Language.C.Inline.Unsafe as CU
 
 import           System.IO.Unsafe (unsafePerformIO)
 
@@ -55,7 +55,7 @@ parse (encodeUtf8 -> s) =
 
 toText :: Expression -> Text
 toText expr = unsafePerformIO $ newText $ \(ptr,len) ->
-  [C.block|void {
+  [CU.block|void {
   std::string s = to_expression_string(**$fptr-ptr:(expression_ptr *expr));
   *$(char** ptr) = strdup(s.c_str());
   *$(int* len) = s.length();

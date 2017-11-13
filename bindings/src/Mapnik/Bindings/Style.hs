@@ -25,6 +25,7 @@ import           Foreign.Ptr (Ptr)
 import           Foreign.Storable (poke)
 
 import qualified Language.C.Inline.Cpp as C
+import qualified Language.C.Inline.Unsafe as CU
 
 
 C.context mapnikCtx
@@ -46,25 +47,25 @@ unsafeNew = fmap Style . newForeignPtr destroyStyle <=< C.withPtr_
 
 create :: IO Style
 create  = unsafeNew $ \p ->
-  [C.block|void {*$(feature_type_style** p) = new feature_type_style();}|]
+  [CU.block|void {*$(feature_type_style** p) = new feature_type_style();}|]
 
 getOpacity :: Style -> IO Double
-getOpacity s = realToFrac <$> [C.exp| float { $fptr-ptr:(feature_type_style *s)->get_opacity() }|]
+getOpacity s = realToFrac <$> [CU.exp| float { $fptr-ptr:(feature_type_style *s)->get_opacity() }|]
 
 setOpacity :: Style -> Double -> IO ()
 setOpacity s (realToFrac -> v) =
-  [C.block|void { $fptr-ptr:(feature_type_style *s)->set_opacity($(double v)); }|]
+  [CU.block|void { $fptr-ptr:(feature_type_style *s)->set_opacity($(double v)); }|]
 
 getImageFiltersInflate :: Style -> IO Bool
-getImageFiltersInflate s = toEnum . fromIntegral <$> [C.exp|int { $fptr-ptr:(feature_type_style *s)->image_filters_inflate() }|]
+getImageFiltersInflate s = toEnum . fromIntegral <$> [CU.exp|int { $fptr-ptr:(feature_type_style *s)->image_filters_inflate() }|]
 
 
 setImageFiltersInflate :: Style -> Bool -> IO ()
 setImageFiltersInflate l (fromIntegral . fromEnum -> q) =
-  [C.block|void { $fptr-ptr:(feature_type_style *l)->set_image_filters_inflate($(int q)); }|]
+  [CU.block|void { $fptr-ptr:(feature_type_style *l)->set_image_filters_inflate($(int q)); }|]
 
 addRule :: Style -> Rule -> IO ()
-addRule s r = [C.block| void {
+addRule s r = [CU.block| void {
   rule rule(*$fptr-ptr:(rule *r));
   $fptr-ptr:(feature_type_style *s)->add_rule(std::move(rule));
   }|]
@@ -74,7 +75,7 @@ getRules s = do
   rulesRef <- newIORef []
   let callback :: Ptr Rule -> IO ()
       callback ptr = do
-        rule <- Rule.unsafeNew (flip poke ptr)
+        rule <- Rule.unsafeNew (`poke` ptr)
         modifyIORef' rulesRef (rule:)
   [C.block|void {
   typedef std::vector<rule> rule_list;

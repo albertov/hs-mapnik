@@ -39,6 +39,7 @@ import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
 
 import qualified Language.C.Inline.Cpp as C
+import qualified Language.C.Inline.Unsafe as CU
 
 
 C.context mapnikCtx
@@ -70,8 +71,8 @@ create sym = bracket alloc dealloc $ \p -> do
   mapM_ (`setProperty` p) (sym^.symbolizerProps)
   unsafeNew =<< castSym sym p
   where
-    alloc = [C.exp|symbolizer_base * { new symbolizer_base() }|]
-    dealloc p = [C.block|void { delete $(symbolizer_base *p);}|]
+    alloc = [CU.exp|symbolizer_base * { new symbolizer_base() }|]
+    dealloc p = [CU.block|void { delete $(symbolizer_base *p);}|]
 
 unCreate :: Symbolizer -> IO Mapnik.Symbolizer
 unCreate sym = do
@@ -101,12 +102,12 @@ getProperties sym' = bracket alloc dealloc $ \sym -> do
     }|]
   readIORef ret
   where
-    alloc = [C.exp|symbolizer_base * { get_symbolizer_base(*$fptr-ptr:(symbolizer *sym')) }|]
-    dealloc p = [C.block|void { delete $(symbolizer_base *p);}|]
+    alloc = [CU.exp|symbolizer_base * { get_symbolizer_base(*$fptr-ptr:(symbolizer *sym')) }|]
+    dealloc p = [CU.block|void { delete $(symbolizer_base *p);}|]
 
 getName :: Symbolizer -> IO Text
 getName s = newText $ \(ptr, len) ->
-  [C.block|void {
+  [CU.block|void {
   std::string s = symbolizer_name(*$fptr-ptr:(symbolizer *s));
   *$(char** ptr)= strdup(s.c_str());
   *$(int* len) = s.length();
@@ -131,31 +132,31 @@ defFromName _                          = Nothing
 castSym :: Mapnik.Symbolizer
         -> Ptr SymbolizerBase -> IO (Ptr Symbolizer)
 castSym Mapnik.Point{} p =
-  [C.block|symbolizer *{ new symbolizer(*static_cast<point_symbolizer*>($(symbolizer_base *p)));}|]
+  [CU.block|symbolizer *{ new symbolizer(*static_cast<point_symbolizer*>($(symbolizer_base *p)));}|]
 castSym Mapnik.Line{} p =
-  [C.block|symbolizer *{ new symbolizer(*static_cast<line_symbolizer*>($(symbolizer_base *p)));}|]
+  [CU.block|symbolizer *{ new symbolizer(*static_cast<line_symbolizer*>($(symbolizer_base *p)));}|]
 castSym Mapnik.LinePattern{} p =
-  [C.block|symbolizer *{ new symbolizer(*static_cast<line_pattern_symbolizer*>($(symbolizer_base *p)));}|]
+  [CU.block|symbolizer *{ new symbolizer(*static_cast<line_pattern_symbolizer*>($(symbolizer_base *p)));}|]
 castSym Mapnik.Polygon{} p =
-  [C.block|symbolizer *{ new symbolizer(*static_cast<polygon_symbolizer*>($(symbolizer_base *p)));}|]
+  [CU.block|symbolizer *{ new symbolizer(*static_cast<polygon_symbolizer*>($(symbolizer_base *p)));}|]
 castSym Mapnik.PolygonPattern{} p =
-  [C.block|symbolizer *{ new symbolizer(*static_cast<polygon_pattern_symbolizer*>($(symbolizer_base *p)));}|]
+  [CU.block|symbolizer *{ new symbolizer(*static_cast<polygon_pattern_symbolizer*>($(symbolizer_base *p)));}|]
 castSym Mapnik.Raster{} p =
-  [C.block|symbolizer *{ new symbolizer(*static_cast<raster_symbolizer*>($(symbolizer_base *p)));}|]
+  [CU.block|symbolizer *{ new symbolizer(*static_cast<raster_symbolizer*>($(symbolizer_base *p)));}|]
 castSym Mapnik.Shield{} p =
-  [C.block|symbolizer *{ new symbolizer(*static_cast<shield_symbolizer*>($(symbolizer_base *p)));}|]
+  [CU.block|symbolizer *{ new symbolizer(*static_cast<shield_symbolizer*>($(symbolizer_base *p)));}|]
 castSym Mapnik.Text{} p =
-  [C.block|symbolizer *{ new symbolizer(*static_cast<text_symbolizer*>($(symbolizer_base *p)));}|]
+  [CU.block|symbolizer *{ new symbolizer(*static_cast<text_symbolizer*>($(symbolizer_base *p)));}|]
 castSym Mapnik.Building{} p =
-  [C.block|symbolizer *{ new symbolizer(*static_cast<building_symbolizer*>($(symbolizer_base *p)));}|]
+  [CU.block|symbolizer *{ new symbolizer(*static_cast<building_symbolizer*>($(symbolizer_base *p)));}|]
 castSym Mapnik.Markers{} p =
-  [C.block|symbolizer *{ new symbolizer(*static_cast<markers_symbolizer*>($(symbolizer_base *p)));}|]
+  [CU.block|symbolizer *{ new symbolizer(*static_cast<markers_symbolizer*>($(symbolizer_base *p)));}|]
 castSym Mapnik.Group{} p =
-  [C.block|symbolizer *{ new symbolizer(*static_cast<group_symbolizer*>($(symbolizer_base *p)));}|]
+  [CU.block|symbolizer *{ new symbolizer(*static_cast<group_symbolizer*>($(symbolizer_base *p)));}|]
 castSym Mapnik.Debug{} p =
-  [C.block|symbolizer *{ new symbolizer(*static_cast<debug_symbolizer*>($(symbolizer_base *p)));}|]
+  [CU.block|symbolizer *{ new symbolizer(*static_cast<debug_symbolizer*>($(symbolizer_base *p)));}|]
 castSym Mapnik.Dot{} p =
-  [C.block|symbolizer *{ new symbolizer(*static_cast<dot_symbolizer*>($(symbolizer_base *p)));}|]
+  [CU.block|symbolizer *{ new symbolizer(*static_cast<dot_symbolizer*>($(symbolizer_base *p)));}|]
 
 
 data Property where
@@ -515,131 +516,131 @@ setProperty ((keyIndex -> k) :=> (flip pokeSv -> cb)) sym =
 
 withKey :: (forall a. SymValue a => Key a -> IO b) -> C.CUChar -> IO b
 withKey f = \k -> if
-  | k == [C.pure|keys{keys::gamma}|] -> f Gamma
-  | k == [C.pure|keys{keys::gamma_method}|] -> f GammaMethod
-  | k == [C.pure|keys{keys::opacity}|] -> f Opacity
-  | k == [C.pure|keys{keys::alignment}|] -> f Alignment
-  | k == [C.pure|keys{keys::offset}|] -> f Offset
-  | k == [C.pure|keys{keys::comp_op}|] -> f CompOp
-  | k == [C.pure|keys{keys::clip}|] -> f Clip
-  | k == [C.pure|keys{keys::fill}|] -> f Fill
-  | k == [C.pure|keys{keys::fill_opacity}|] -> f FillOpacity
-  | k == [C.pure|keys{keys::stroke}|] -> f Stroke
-  | k == [C.pure|keys{keys::stroke_width}|] -> f StrokeWidth
-  | k == [C.pure|keys{keys::stroke_opacity}|] -> f StrokeOpacity
-  | k == [C.pure|keys{keys::stroke_linejoin}|] -> f StrokeLinejoin
-  | k == [C.pure|keys{keys::stroke_linecap}|] -> f StrokeLinecap
-  | k == [C.pure|keys{keys::stroke_gamma}|] -> f StrokeGamma
-  | k == [C.pure|keys{keys::stroke_gamma_method}|] -> f StrokeGammaMethod
-  | k == [C.pure|keys{keys::stroke_dashoffset}|] -> f StrokeDashoffset
-  | k == [C.pure|keys{keys::stroke_dasharray}|] -> f StrokeDasharray
-  | k == [C.pure|keys{keys::stroke_miterlimit}|] -> f StrokeMiterlimit
-  | k == [C.pure|keys{keys::geometry_transform}|] -> f GeometryTransform
-  | k == [C.pure|keys{keys::line_rasterizer}|] -> f LineRasterizer
-  | k == [C.pure|keys{keys::image_transform}|] -> f ImageTransform
-  | k == [C.pure|keys{keys::spacing}|] -> f Spacing
-  | k == [C.pure|keys{keys::max_error}|] -> f MaxError
-  | k == [C.pure|keys{keys::allow_overlap}|] -> f AllowOverlap
-  | k == [C.pure|keys{keys::ignore_placement}|] -> f IgnorePlacement
-  | k == [C.pure|keys{keys::width}|] -> f Width
-  | k == [C.pure|keys{keys::height}|] -> f Height
-  | k == [C.pure|keys{keys::file}|] -> f File
-  | k == [C.pure|keys{keys::shield_dx}|] -> f ShieldDx
-  | k == [C.pure|keys{keys::shield_dy}|] -> f ShieldDy
-  | k == [C.pure|keys{keys::unlock_image}|] -> f UnlockImage
-  | k == [C.pure|keys{keys::mode}|] -> f Mode
-  | k == [C.pure|keys{keys::scaling}|] -> f Scaling
-  | k == [C.pure|keys{keys::filter_factor}|] -> f FilterFactor
-  | k == [C.pure|keys{keys::mesh_size}|] -> f MeshSize
-  | k == [C.pure|keys{keys::premultiplied}|] -> f Premultiplied
-  | k == [C.pure|keys{keys::smooth}|] -> f Smooth
-  | k == [C.pure|keys{keys::simplify_algorithm}|] -> f SimplifyAlgorithm
-  | k == [C.pure|keys{keys::simplify_tolerance}|] -> f SimplifyTolerance
-  | k == [C.pure|keys{keys::halo_rasterizer}|] -> f HaloRasterizer
-  | k == [C.pure|keys{keys::text_placements_}|] -> f TextPlacementsKey
-  | k == [C.pure|keys{keys::label_placement}|] -> f LabelPlacement
-  | k == [C.pure|keys{keys::markers_placement_type}|] -> f MarkersPlacementKey
-  | k == [C.pure|keys{keys::markers_multipolicy}|] -> f MarkersMultipolicy
-  | k == [C.pure|keys{keys::point_placement_type}|] -> f PointPlacementKey
-  | k == [C.pure|keys{keys::colorizer}|] -> f ColorizerKey
-  | k == [C.pure|keys{keys::halo_transform}|] -> f HaloTransform
-  | k == [C.pure|keys{keys::num_columns}|] -> f NumColumns
-  | k == [C.pure|keys{keys::start_column}|] -> f StartColumn
-  | k == [C.pure|keys{keys::repeat_key}|] -> f RepeatKey
-  | k == [C.pure|keys{keys::group_properties}|] -> f GroupPropertiesKey
-  | k == [C.pure|keys{keys::largest_box_only}|] -> f LargestBoxOnly
-  | k == [C.pure|keys{keys::minimum_path_length}|] -> f MinimumPathLength
-  | k == [C.pure|keys{keys::halo_comp_op}|] -> f HaloCompOp
-  | k == [C.pure|keys{keys::text_transform}|] -> f TextTransform
-  | k == [C.pure|keys{keys::horizontal_alignment}|] -> f HorizontalAlignment
-  | k == [C.pure|keys{keys::justify_alignment}|] -> f JustifyAlignment
-  | k == [C.pure|keys{keys::vertical_alignment}|] -> f VerticalAlignment
-  | k == [C.pure|keys{keys::upright}|] -> f Upright
-  | k == [C.pure|keys{keys::direction}|] -> f Direction
-  | k == [C.pure|keys{keys::avoid_edges}|] -> f AvoidEdges
-  | k == [C.pure|keys{keys::ff_settings}|] -> f FfSettings
+  | k == [CU.pure|keys{keys::gamma}|] -> f Gamma
+  | k == [CU.pure|keys{keys::gamma_method}|] -> f GammaMethod
+  | k == [CU.pure|keys{keys::opacity}|] -> f Opacity
+  | k == [CU.pure|keys{keys::alignment}|] -> f Alignment
+  | k == [CU.pure|keys{keys::offset}|] -> f Offset
+  | k == [CU.pure|keys{keys::comp_op}|] -> f CompOp
+  | k == [CU.pure|keys{keys::clip}|] -> f Clip
+  | k == [CU.pure|keys{keys::fill}|] -> f Fill
+  | k == [CU.pure|keys{keys::fill_opacity}|] -> f FillOpacity
+  | k == [CU.pure|keys{keys::stroke}|] -> f Stroke
+  | k == [CU.pure|keys{keys::stroke_width}|] -> f StrokeWidth
+  | k == [CU.pure|keys{keys::stroke_opacity}|] -> f StrokeOpacity
+  | k == [CU.pure|keys{keys::stroke_linejoin}|] -> f StrokeLinejoin
+  | k == [CU.pure|keys{keys::stroke_linecap}|] -> f StrokeLinecap
+  | k == [CU.pure|keys{keys::stroke_gamma}|] -> f StrokeGamma
+  | k == [CU.pure|keys{keys::stroke_gamma_method}|] -> f StrokeGammaMethod
+  | k == [CU.pure|keys{keys::stroke_dashoffset}|] -> f StrokeDashoffset
+  | k == [CU.pure|keys{keys::stroke_dasharray}|] -> f StrokeDasharray
+  | k == [CU.pure|keys{keys::stroke_miterlimit}|] -> f StrokeMiterlimit
+  | k == [CU.pure|keys{keys::geometry_transform}|] -> f GeometryTransform
+  | k == [CU.pure|keys{keys::line_rasterizer}|] -> f LineRasterizer
+  | k == [CU.pure|keys{keys::image_transform}|] -> f ImageTransform
+  | k == [CU.pure|keys{keys::spacing}|] -> f Spacing
+  | k == [CU.pure|keys{keys::max_error}|] -> f MaxError
+  | k == [CU.pure|keys{keys::allow_overlap}|] -> f AllowOverlap
+  | k == [CU.pure|keys{keys::ignore_placement}|] -> f IgnorePlacement
+  | k == [CU.pure|keys{keys::width}|] -> f Width
+  | k == [CU.pure|keys{keys::height}|] -> f Height
+  | k == [CU.pure|keys{keys::file}|] -> f File
+  | k == [CU.pure|keys{keys::shield_dx}|] -> f ShieldDx
+  | k == [CU.pure|keys{keys::shield_dy}|] -> f ShieldDy
+  | k == [CU.pure|keys{keys::unlock_image}|] -> f UnlockImage
+  | k == [CU.pure|keys{keys::mode}|] -> f Mode
+  | k == [CU.pure|keys{keys::scaling}|] -> f Scaling
+  | k == [CU.pure|keys{keys::filter_factor}|] -> f FilterFactor
+  | k == [CU.pure|keys{keys::mesh_size}|] -> f MeshSize
+  | k == [CU.pure|keys{keys::premultiplied}|] -> f Premultiplied
+  | k == [CU.pure|keys{keys::smooth}|] -> f Smooth
+  | k == [CU.pure|keys{keys::simplify_algorithm}|] -> f SimplifyAlgorithm
+  | k == [CU.pure|keys{keys::simplify_tolerance}|] -> f SimplifyTolerance
+  | k == [CU.pure|keys{keys::halo_rasterizer}|] -> f HaloRasterizer
+  | k == [CU.pure|keys{keys::text_placements_}|] -> f TextPlacementsKey
+  | k == [CU.pure|keys{keys::label_placement}|] -> f LabelPlacement
+  | k == [CU.pure|keys{keys::markers_placement_type}|] -> f MarkersPlacementKey
+  | k == [CU.pure|keys{keys::markers_multipolicy}|] -> f MarkersMultipolicy
+  | k == [CU.pure|keys{keys::point_placement_type}|] -> f PointPlacementKey
+  | k == [CU.pure|keys{keys::colorizer}|] -> f ColorizerKey
+  | k == [CU.pure|keys{keys::halo_transform}|] -> f HaloTransform
+  | k == [CU.pure|keys{keys::num_columns}|] -> f NumColumns
+  | k == [CU.pure|keys{keys::start_column}|] -> f StartColumn
+  | k == [CU.pure|keys{keys::repeat_key}|] -> f RepeatKey
+  | k == [CU.pure|keys{keys::group_properties}|] -> f GroupPropertiesKey
+  | k == [CU.pure|keys{keys::largest_box_only}|] -> f LargestBoxOnly
+  | k == [CU.pure|keys{keys::minimum_path_length}|] -> f MinimumPathLength
+  | k == [CU.pure|keys{keys::halo_comp_op}|] -> f HaloCompOp
+  | k == [CU.pure|keys{keys::text_transform}|] -> f TextTransform
+  | k == [CU.pure|keys{keys::horizontal_alignment}|] -> f HorizontalAlignment
+  | k == [CU.pure|keys{keys::justify_alignment}|] -> f JustifyAlignment
+  | k == [CU.pure|keys{keys::vertical_alignment}|] -> f VerticalAlignment
+  | k == [CU.pure|keys{keys::upright}|] -> f Upright
+  | k == [CU.pure|keys{keys::direction}|] -> f Direction
+  | k == [CU.pure|keys{keys::avoid_edges}|] -> f AvoidEdges
+  | k == [CU.pure|keys{keys::ff_settings}|] -> f FfSettings
 
 keyIndex :: Key a -> C.CUChar
-keyIndex Gamma = [C.pure|keys{keys::gamma}|]
-keyIndex GammaMethod = [C.pure|keys{keys::gamma_method}|]
-keyIndex Opacity = [C.pure|keys{keys::opacity}|]
-keyIndex Alignment = [C.pure|keys{keys::alignment}|]
-keyIndex Offset = [C.pure|keys{keys::offset}|]
-keyIndex CompOp = [C.pure|keys{keys::comp_op}|]
-keyIndex Clip = [C.pure|keys{keys::clip}|]
-keyIndex Fill = [C.pure|keys{keys::fill}|]
-keyIndex FillOpacity = [C.pure|keys{keys::fill_opacity}|]
-keyIndex Stroke = [C.pure|keys{keys::stroke}|]
-keyIndex StrokeWidth = [C.pure|keys{keys::stroke_width}|]
-keyIndex StrokeOpacity = [C.pure|keys{keys::stroke_opacity}|]
-keyIndex StrokeLinejoin = [C.pure|keys{keys::stroke_linejoin}|]
-keyIndex StrokeLinecap = [C.pure|keys{keys::stroke_linecap}|]
-keyIndex StrokeGamma = [C.pure|keys{keys::stroke_gamma}|]
-keyIndex StrokeGammaMethod = [C.pure|keys{keys::stroke_gamma_method}|]
-keyIndex StrokeDashoffset = [C.pure|keys{keys::stroke_dashoffset}|]
-keyIndex StrokeDasharray = [C.pure|keys{keys::stroke_dasharray}|]
-keyIndex StrokeMiterlimit = [C.pure|keys{keys::stroke_miterlimit}|]
-keyIndex GeometryTransform = [C.pure|keys{keys::geometry_transform}|]
-keyIndex LineRasterizer = [C.pure|keys{keys::line_rasterizer}|]
-keyIndex ImageTransform = [C.pure|keys{keys::image_transform}|]
-keyIndex Spacing = [C.pure|keys{keys::spacing}|]
-keyIndex MaxError = [C.pure|keys{keys::max_error}|]
-keyIndex AllowOverlap = [C.pure|keys{keys::allow_overlap}|]
-keyIndex IgnorePlacement = [C.pure|keys{keys::ignore_placement}|]
-keyIndex Width = [C.pure|keys{keys::width}|]
-keyIndex Height = [C.pure|keys{keys::height}|]
-keyIndex File = [C.pure|keys{keys::file}|]
-keyIndex ShieldDx = [C.pure|keys{keys::shield_dx}|]
-keyIndex ShieldDy = [C.pure|keys{keys::shield_dy}|]
-keyIndex UnlockImage = [C.pure|keys{keys::unlock_image}|]
-keyIndex Mode = [C.pure|keys{keys::mode}|]
-keyIndex Scaling = [C.pure|keys{keys::scaling}|]
-keyIndex FilterFactor = [C.pure|keys{keys::filter_factor}|]
-keyIndex MeshSize = [C.pure|keys{keys::mesh_size}|]
-keyIndex Premultiplied = [C.pure|keys{keys::premultiplied}|]
-keyIndex Smooth = [C.pure|keys{keys::smooth}|]
-keyIndex SimplifyAlgorithm = [C.pure|keys{keys::simplify_algorithm}|]
-keyIndex SimplifyTolerance = [C.pure|keys{keys::simplify_tolerance}|]
-keyIndex HaloRasterizer = [C.pure|keys{keys::halo_rasterizer}|]
-keyIndex TextPlacementsKey = [C.pure|keys{keys::text_placements_}|]
-keyIndex LabelPlacement = [C.pure|keys{keys::label_placement}|]
-keyIndex MarkersPlacementKey = [C.pure|keys{keys::markers_placement_type}|]
-keyIndex MarkersMultipolicy = [C.pure|keys{keys::markers_multipolicy}|]
-keyIndex PointPlacementKey = [C.pure|keys{keys::point_placement_type}|]
-keyIndex ColorizerKey = [C.pure|keys{keys::colorizer}|]
-keyIndex HaloTransform = [C.pure|keys{keys::halo_transform}|]
-keyIndex NumColumns = [C.pure|keys{keys::num_columns}|]
-keyIndex StartColumn = [C.pure|keys{keys::start_column}|]
-keyIndex RepeatKey = [C.pure|keys{keys::repeat_key}|]
-keyIndex GroupPropertiesKey = [C.pure|keys{keys::group_properties}|]
-keyIndex LargestBoxOnly = [C.pure|keys{keys::largest_box_only}|]
-keyIndex MinimumPathLength = [C.pure|keys{keys::minimum_path_length}|]
-keyIndex HaloCompOp = [C.pure|keys{keys::halo_comp_op}|]
-keyIndex TextTransform = [C.pure|keys{keys::text_transform}|]
-keyIndex HorizontalAlignment = [C.pure|keys{keys::horizontal_alignment}|]
-keyIndex JustifyAlignment = [C.pure|keys{keys::justify_alignment}|]
-keyIndex VerticalAlignment = [C.pure|keys{keys::vertical_alignment}|]
-keyIndex Upright = [C.pure|keys{keys::upright}|]
-keyIndex Direction = [C.pure|keys{keys::direction}|]
-keyIndex AvoidEdges = [C.pure|keys{keys::avoid_edges}|]
-keyIndex FfSettings = [C.pure|keys{keys::ff_settings}|]
+keyIndex Gamma = [CU.pure|keys{keys::gamma}|]
+keyIndex GammaMethod = [CU.pure|keys{keys::gamma_method}|]
+keyIndex Opacity = [CU.pure|keys{keys::opacity}|]
+keyIndex Alignment = [CU.pure|keys{keys::alignment}|]
+keyIndex Offset = [CU.pure|keys{keys::offset}|]
+keyIndex CompOp = [CU.pure|keys{keys::comp_op}|]
+keyIndex Clip = [CU.pure|keys{keys::clip}|]
+keyIndex Fill = [CU.pure|keys{keys::fill}|]
+keyIndex FillOpacity = [CU.pure|keys{keys::fill_opacity}|]
+keyIndex Stroke = [CU.pure|keys{keys::stroke}|]
+keyIndex StrokeWidth = [CU.pure|keys{keys::stroke_width}|]
+keyIndex StrokeOpacity = [CU.pure|keys{keys::stroke_opacity}|]
+keyIndex StrokeLinejoin = [CU.pure|keys{keys::stroke_linejoin}|]
+keyIndex StrokeLinecap = [CU.pure|keys{keys::stroke_linecap}|]
+keyIndex StrokeGamma = [CU.pure|keys{keys::stroke_gamma}|]
+keyIndex StrokeGammaMethod = [CU.pure|keys{keys::stroke_gamma_method}|]
+keyIndex StrokeDashoffset = [CU.pure|keys{keys::stroke_dashoffset}|]
+keyIndex StrokeDasharray = [CU.pure|keys{keys::stroke_dasharray}|]
+keyIndex StrokeMiterlimit = [CU.pure|keys{keys::stroke_miterlimit}|]
+keyIndex GeometryTransform = [CU.pure|keys{keys::geometry_transform}|]
+keyIndex LineRasterizer = [CU.pure|keys{keys::line_rasterizer}|]
+keyIndex ImageTransform = [CU.pure|keys{keys::image_transform}|]
+keyIndex Spacing = [CU.pure|keys{keys::spacing}|]
+keyIndex MaxError = [CU.pure|keys{keys::max_error}|]
+keyIndex AllowOverlap = [CU.pure|keys{keys::allow_overlap}|]
+keyIndex IgnorePlacement = [CU.pure|keys{keys::ignore_placement}|]
+keyIndex Width = [CU.pure|keys{keys::width}|]
+keyIndex Height = [CU.pure|keys{keys::height}|]
+keyIndex File = [CU.pure|keys{keys::file}|]
+keyIndex ShieldDx = [CU.pure|keys{keys::shield_dx}|]
+keyIndex ShieldDy = [CU.pure|keys{keys::shield_dy}|]
+keyIndex UnlockImage = [CU.pure|keys{keys::unlock_image}|]
+keyIndex Mode = [CU.pure|keys{keys::mode}|]
+keyIndex Scaling = [CU.pure|keys{keys::scaling}|]
+keyIndex FilterFactor = [CU.pure|keys{keys::filter_factor}|]
+keyIndex MeshSize = [CU.pure|keys{keys::mesh_size}|]
+keyIndex Premultiplied = [CU.pure|keys{keys::premultiplied}|]
+keyIndex Smooth = [CU.pure|keys{keys::smooth}|]
+keyIndex SimplifyAlgorithm = [CU.pure|keys{keys::simplify_algorithm}|]
+keyIndex SimplifyTolerance = [CU.pure|keys{keys::simplify_tolerance}|]
+keyIndex HaloRasterizer = [CU.pure|keys{keys::halo_rasterizer}|]
+keyIndex TextPlacementsKey = [CU.pure|keys{keys::text_placements_}|]
+keyIndex LabelPlacement = [CU.pure|keys{keys::label_placement}|]
+keyIndex MarkersPlacementKey = [CU.pure|keys{keys::markers_placement_type}|]
+keyIndex MarkersMultipolicy = [CU.pure|keys{keys::markers_multipolicy}|]
+keyIndex PointPlacementKey = [CU.pure|keys{keys::point_placement_type}|]
+keyIndex ColorizerKey = [CU.pure|keys{keys::colorizer}|]
+keyIndex HaloTransform = [CU.pure|keys{keys::halo_transform}|]
+keyIndex NumColumns = [CU.pure|keys{keys::num_columns}|]
+keyIndex StartColumn = [CU.pure|keys{keys::start_column}|]
+keyIndex RepeatKey = [CU.pure|keys{keys::repeat_key}|]
+keyIndex GroupPropertiesKey = [CU.pure|keys{keys::group_properties}|]
+keyIndex LargestBoxOnly = [CU.pure|keys{keys::largest_box_only}|]
+keyIndex MinimumPathLength = [CU.pure|keys{keys::minimum_path_length}|]
+keyIndex HaloCompOp = [CU.pure|keys{keys::halo_comp_op}|]
+keyIndex TextTransform = [CU.pure|keys{keys::text_transform}|]
+keyIndex HorizontalAlignment = [CU.pure|keys{keys::horizontal_alignment}|]
+keyIndex JustifyAlignment = [CU.pure|keys{keys::justify_alignment}|]
+keyIndex VerticalAlignment = [CU.pure|keys{keys::vertical_alignment}|]
+keyIndex Upright = [CU.pure|keys{keys::upright}|]
+keyIndex Direction = [CU.pure|keys{keys::direction}|]
+keyIndex AvoidEdges = [CU.pure|keys{keys::avoid_edges}|]
+keyIndex FfSettings = [CU.pure|keys{keys::ff_settings}|]

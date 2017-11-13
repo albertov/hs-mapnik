@@ -20,6 +20,7 @@ import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
 
 import qualified Language.C.Inline.Cpp as C
+import qualified Language.C.Inline.Unsafe as CU
 
 C.context mapnikCtx
 

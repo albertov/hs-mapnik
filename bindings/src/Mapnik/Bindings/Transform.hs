@@ -21,6 +21,7 @@ import           Foreign.Ptr (Ptr)
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
+import qualified Language.C.Inline.Unsafe as CU
 
 import           System.IO.Unsafe (unsafePerformIO)
 
@@ -55,7 +56,7 @@ parse (encodeUtf8 -> s) =
 
 toText :: Transform -> Text
 toText trans = unsafePerformIO $ newText $ \(ptr,len) ->
-  [C.block|void {
+  [CU.block|void {
   std::string s = transform_processor_type::to_string(**$fptr-ptr:(transform_type *trans));
   *$(char** ptr) = strdup(s.c_str());
   *$(int* len) = s.length();

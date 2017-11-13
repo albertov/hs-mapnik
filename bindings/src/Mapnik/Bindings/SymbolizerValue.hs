@@ -33,6 +33,7 @@ import           Foreign.Marshal.Alloc (finalizerFree)
 import           Foreign.Marshal.Utils (with)
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
+import qualified Language.C.Inline.Unsafe as CU
 
 
 C.context mapnikCtx
@@ -61,8 +62,8 @@ withSv v f = allocaSv (\p -> pokeSv p v >> f p)
 
 allocaSv :: (Ptr SymbolizerValue -> IO a) -> IO a
 allocaSv = bracket alloc dealloc where
-  alloc = [C.exp|sym_value_type * { new sym_value_type }|]
-  dealloc p = [C.exp|void { delete $(sym_value_type *p)}|]
+  alloc = [CU.exp|sym_value_type * { new sym_value_type }|]
+  dealloc p = [CU.exp|void { delete $(sym_value_type *p)}|]
 
 
 class SymValue a where
@@ -73,7 +74,7 @@ class SymValue a where
 instance SymValue Mapnik.HS where {\
   peekSv p = mapM HS.unCreate =<<\
     HS.unsafeNewMaybe (\ret ->\
-      [C.block|void {\
+      [CU.block|void {\
       try {\
         *$(CPP **ret) =\
           new CPP(util::get<CPP>(*$(sym_value_type *p)));\
@@ -83,7 +84,7 @@ instance SymValue Mapnik.HS where {\
       }|]) ;\
   pokeSv p v' = do {\
     v <-HS.create v';\
-    [C.block|void {\
+    [CU.block|void {\
       *$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(CPP *v));\
     }|];}\
 };
@@ -95,9 +96,9 @@ SYM_VAL_PTR(GroupProperties,group_symbolizer_properties_ptr)
 #define SYM_VAL(HS,CPP,FROM,TO) \
 instance SymValue HS where {\
   pokeSv p v' = FROM v' >>= \v -> \
-    [C.block|void { *$(sym_value_type *p) = sym_value_type($(CPP v)); }|]; \
+    [CU.block|void { *$(sym_value_type *p) = sym_value_type($(CPP v)); }|]; \
   peekSv p = mapM TO =<< newMaybe (\(has,ret) -> \
-    [C.block|void { \
+    [CU.block|void { \
     try { \
       *$(CPP *ret) = util::get<CPP>(*$(sym_value_type *p)); \
       *$(int *has) = 1; \
@@ -110,9 +111,9 @@ instance SymValue HS where {\
 #define SYM_VAL_ENUM(HS,CPP) \
 instance SymValue HS where {\
   pokeSv p (fromIntegral . fromEnum -> v) = \
-    [C.block|void { *$(sym_value_type *p) = enumeration_wrapper(static_cast<CPP>($(int v)));}|]; \
+    [CU.block|void { *$(sym_value_type *p) = enumeration_wrapper(static_cast<CPP>($(int v)));}|]; \
   peekSv p = fmap (fmap (toEnum . fromIntegral)) <$> newMaybe $ \(has,ret) -> \
-    [C.block|void { \
+    [CU.block|void { \
     try { \
       *$(int *ret) = static_cast<int>(util::get<enumeration_wrapper>(*$(sym_value_type *p))); \
       *$(int *has) = 1; \
@@ -157,7 +158,7 @@ instance SymValue a => SymValue (Mapnik.Prop a) where
 instance SymValue Text where
   peekSv p =
     newTextMaybe $ \(ptr, len) ->
-      [C.block|void {
+      [CU.block|void {
       try {
         auto v = util::get<std::string>(*$(sym_value_type *p));
         *$(char** ptr) = strdup(v.c_str());
@@ -178,7 +179,7 @@ instance SymValue String where
 instance SymValue Mapnik.Expression where
   peekSv p = 
     fmap (fmap Mapnik.Expression) $ newTextMaybe $ \(ret, len) ->
-      [C.block|void {
+      [CU.block|void {
       try {
         auto expr = util::get<expression_ptr>(*$(sym_value_type *p));
         if (expr) {
@@ -195,13 +196,13 @@ instance SymValue Mapnik.Expression where
   pokeSv p (Mapnik.Expression expr) =
     case Expression.parse expr of
       Right v ->
-        [C.block|void{ *$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(expression_ptr *v)); }|]
+        [CU.block|void{ *$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(expression_ptr *v)); }|]
       Left e -> throwIO (userError e)
 
 instance SymValue Mapnik.FontFeatureSettings where
   peekSv p =
     fmap (fmap Mapnik.FontFeatureSettings) $ newTextMaybe $ \(ptr, len) ->
-      [C.block|void {
+      [CU.block|void {
       try {
         auto v = util::get<font_feature_settings>(*$(sym_value_type *p));
         std::string s = v.to_string();
@@ -218,7 +219,7 @@ instance SymValue Mapnik.FontFeatureSettings where
 
 instance SymValue Mapnik.DashArray where
   pokeSv p dashes =
-    [C.block|void {
+    [CU.block|void {
       std::vector<dash_t> dashes($vec-len:dashes);
       for (int i=0; i<$vec-len:dashes; i++) {
         dashes.emplace_back($vec-ptr:(dash_t *dashes)[i]);
@@ -228,7 +229,7 @@ instance SymValue Mapnik.DashArray where
 
   peekSv p = do
     (fromIntegral -> len, castPtr -> ptr) <- C.withPtrs_ $ \(len,ptr) ->
-      [C.block|void{
+      [CU.block|void{
       try {
         auto arr = util::get<dash_array>(*$(sym_value_type *p));
         *$(size_t *len) = arr.size();
@@ -249,7 +250,7 @@ instance SymValue Mapnik.DashArray where
 
 instance SymValue Mapnik.Color where
   peekSv p = newMaybe $ \(has,ret) ->
-    [C.block|void {
+    [CU.block|void {
     try {
       *$(color *ret) = util::get<color>(*$(sym_value_type *p));
       *$(int *has) = 1;
@@ -258,18 +259,18 @@ instance SymValue Mapnik.Color where
     }
     }|]
   pokeSv p c = with c $ \cPtr ->
-    [C.block|void {*$(sym_value_type *p) = *$(color *cPtr);}|]
+    [CU.block|void {*$(sym_value_type *p) = *$(color *cPtr);}|]
 
 instance SymValue Mapnik.Transform where
   pokeSv p (Mapnik.Transform expr) =
     case Transform.parse expr of
       Right v ->
-        [C.block|void {*$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(transform_type *v));}|]
+        [CU.block|void {*$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(transform_type *v));}|]
       Left e -> throwIO (userError e)
 
   peekSv p =
     fmap (fmap Mapnik.Transform) $ newTextMaybe $ \(ptr, len) ->
-      [C.block|void {
+      [CU.block|void {
       try {
         auto t = util::get<transform_type>(*$(sym_value_type *p));
         if (t) {

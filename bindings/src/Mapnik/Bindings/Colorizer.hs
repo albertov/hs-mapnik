@@ -17,16 +17,16 @@ import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()
 import           Foreign.ForeignPtr (FinalizerPtr, withForeignPtr)
 import           Foreign.Marshal.Utils (with)
-import           Foreign.Ptr (Ptr)
+import           Foreign.Ptr (Ptr, nullPtr)
 
 import           Control.Exception (bracket)
 import           Control.Monad (forM_)
 import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.IORef
-import           Foreign.Ptr (nullPtr)
 import           Foreign.Storable (peek)
 import qualified Language.C.Inline.Cpp as C
+import qualified Language.C.Inline.Unsafe as CU
 
 
 
@@ -50,26 +50,26 @@ unsafeNewMaybe = mkUnsafeNewMaybe Colorizer destroyColorizer
 
 create :: Mapnik.Colorizer -> IO Colorizer
 create Mapnik.Colorizer{..} = unsafeNew $ \p -> do
-  ret <- [C.block|void *{
+  ret <- [CU.block|void *{
     *$(raster_colorizer_ptr **p) = new raster_colorizer_ptr(
       std::make_shared<raster_colorizer>()
       );
     (*$(raster_colorizer_ptr **p))->get();
   }|]
   forM_ mode $ \(fromIntegral . fromEnum -> m) ->
-    [C.block|void {
+    [CU.block|void {
     raster_colorizer *colorizer =
       static_cast<raster_colorizer*>($(void *ret));
     colorizer->set_default_mode(static_cast<colorizer_mode_enum>($(int m)));
     }|]
   forM_ color $ \c -> with c $ \cPtr ->
-    [C.block|void {
+    [CU.block|void {
     raster_colorizer *colorizer =
       static_cast<raster_colorizer*>($(void *ret));
     colorizer->set_default_color(*$(color *cPtr));
     }|]
   forM_ stops $ \stop -> withStop stop $ \s ->
-    [C.block|void {
+    [CU.block|void {
     raster_colorizer *colorizer =
       static_cast<raster_colorizer*>($(void *ret));
     colorizer->add_stop(*$(colorizer_stop *s));
@@ -82,19 +82,19 @@ withStop Mapnik.Stop
   } fun = with color $ \c -> bracket (alloc c) dealloc enter
   where
     alloc c =
-      [C.block|colorizer_stop * {
+      [CU.block|colorizer_stop * {
       auto ret = new colorizer_stop($(float value));
       ret->set_color(*$(color *c));
       ret;
       }|]
-    dealloc p = [C.exp|void { delete $(colorizer_stop *p) }|]
+    dealloc p = [CU.exp|void { delete $(colorizer_stop *p) }|]
     enter p = do
       forM_ label $ \(encodeUtf8 -> lbl) ->
-        [C.block|void {
+        [CU.block|void {
         $(colorizer_stop *p)->set_label(std::string($bs-ptr:lbl, $bs-len:lbl));
         }|]
       forM_ mode $ \(fromIntegral . fromEnum -> mode') ->
-        [C.block|void {
+        [CU.block|void {
         $(colorizer_stop *p)->set_mode(static_cast<colorizer_mode_enum>($(int mode')));
         }|]
       fun p
@@ -107,7 +107,7 @@ unCreateStop p = do
    , labelPtr
    , fromIntegral -> labelLen
    ) <- C.withPtrs_ $ \(value,col,mode,ptr,len) ->
-    [C.block|void {
+    [CU.block|void {
       const colorizer_stop &stop = *$(colorizer_stop *p);
       static const colorizer_stop def;
       *$(float *value) = stop.get_value();
@@ -152,7 +152,7 @@ getStops p = do
 unCreate :: Colorizer -> IO Mapnik.Colorizer
 unCreate (Colorizer colorizer) = withForeignPtr colorizer $ \p -> do
   (mMode, colorPtr) <- C.withPtrs_ $ \(mode,col) ->
-    [C.block|void {
+    [CU.block|void {
     const raster_colorizer *colorizer =
       (*$(raster_colorizer_ptr *p)).get();
     static const raster_colorizer def;

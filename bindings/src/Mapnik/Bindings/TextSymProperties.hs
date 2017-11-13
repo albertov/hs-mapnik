@@ -28,6 +28,7 @@ import           Foreign.Ptr (Ptr, nullPtr, castPtr)
 import           Foreign.Storable (peek, poke)
 
 import qualified Language.C.Inline.Cpp as C
+import qualified Language.C.Inline.Unsafe as CU
 
 C.context mapnikCtx
 
@@ -60,7 +61,7 @@ unsafeNewFormat :: (Ptr (Ptr Format) -> IO ()) -> IO Format
 unsafeNewFormat = mkUnsafeNew Format destroyFormat
 
 #define SET_NODE_PROP(TY,HS,CPP) \
-    forM_ HS $ \v -> withSv v $ \v' -> [C.block|void { \
+    forM_ HS $ \v -> withSv v $ \v' -> [CU.block|void { \
       auto node = dynamic_cast<TY*>((*$(node_ptr **p))->get()); \
       node->CPP = *$(sym_value_type *v'); \
       }|]
@@ -70,27 +71,27 @@ createFormat f = unsafeNewFormat $ \p -> case f of
   Mapnik.FormatExp (Mapnik.Expression e') ->
     case Expression.parse e' of
       Right e ->
-        [C.block|void {
+        [CU.block|void {
         auto node = std::make_shared<text_node>(*$fptr-ptr:(expression_ptr *e));
         *$(node_ptr **p) = new node_ptr(node);
         }|]
       Left e -> throwIO (userError ("Could not parse format expression" ++ e))
   Mapnik.NullFormat ->
-    [C.block|void { *$(node_ptr **p) = new node_ptr(nullptr); }|]
+    [CU.block|void { *$(node_ptr **p) = new node_ptr(nullptr); }|]
   Mapnik.FormatList fs -> do
-    [C.block|void {
+    [CU.block|void {
     auto node = std::make_shared<list_node>();
     *$(node_ptr **p) = new node_ptr(node);
     }|]
     forM_ fs $ \f' -> do
       f'' <- createFormat f'
-      [C.block|void {
+      [CU.block|void {
         auto parent = static_cast<list_node*>((*$(node_ptr **p))->get());
         parent->push_back(*$fptr-ptr:(node_ptr *f''));
         }|]
   Mapnik.Format {..} -> do
     next' <- createFormat next
-    [C.block|void {
+    [CU.block|void {
     auto node = std::make_shared<format_node>();
     node->set_child(*$fptr-ptr:(node_ptr *next'));
     *$(node_ptr **p) = new node_ptr(node);
@@ -108,7 +109,7 @@ createFormat f = unsafeNewFormat $ \p -> case f of
 
   Mapnik.FormatLayout {..} -> do
     next' <- createFormat next
-    [C.block|void {
+    [CU.block|void {
     auto node = std::make_shared<layout_node>();
     node->set_child(*$fptr-ptr:(node_ptr *next'));
     *$(node_ptr **p) = new node_ptr(node);
@@ -127,15 +128,15 @@ createFormat f = unsafeNewFormat $ \p -> case f of
     SET_NODE_PROP(layout_node, verticalAlignment, valign)
 
 
-#define SET_PROP_T(HS,CPP) forM_ HS (\v -> (`pokeSv` v) =<< [C.exp|sym_value_type *{ &$(text_properties_expressions *p)->CPP}|])
-#define SET_PROP_F(HS,CPP) forM_ HS (\v -> (`pokeSv` v) =<< [C.exp|sym_value_type *{ &$(format_properties *p)->CPP}|])
-#define SET_PROP_L(HS,CPP) forM_ HS (\v -> (`pokeSv` v) =<< [C.exp|sym_value_type *{ &$(text_layout_properties *p)->CPP}|])
+#define SET_PROP_T(HS,CPP) forM_ HS (\v -> (`pokeSv` v) =<< [CU.exp|sym_value_type *{ &$(text_properties_expressions *p)->CPP}|])
+#define SET_PROP_F(HS,CPP) forM_ HS (\v -> (`pokeSv` v) =<< [CU.exp|sym_value_type *{ &$(format_properties *p)->CPP}|])
+#define SET_PROP_L(HS,CPP) forM_ HS (\v -> (`pokeSv` v) =<< [CU.exp|sym_value_type *{ &$(text_layout_properties *p)->CPP}|])
 
 withTextProperties :: Mapnik.TextProperties -> (Ptr TextProperties -> IO a) -> IO a
 withTextProperties Mapnik.TextProperties{..} = bracket alloc dealloc . enter
   where
-    alloc = [C.exp|text_properties_expressions * { new text_properties_expressions() }|]
-    dealloc p = [C.exp|void{delete $(text_properties_expressions *p)}|]
+    alloc = [CU.exp|text_properties_expressions * { new text_properties_expressions() }|]
+    dealloc p = [CU.exp|void{delete $(text_properties_expressions *p)}|]
     enter f p = do
       SET_PROP_T(labelPlacement,label_placement)
       SET_PROP_T(labelSpacing,label_spacing)
@@ -154,11 +155,11 @@ withTextProperties Mapnik.TextProperties{..} = bracket alloc dealloc . enter
 withFormatProperties :: Mapnik.TextFormatProperties -> (Ptr TextFormatProperties -> IO a) -> IO a
 withFormatProperties Mapnik.TextFormatProperties{..} = bracket alloc dealloc . enter
   where
-    alloc = [C.exp|format_properties * { new format_properties() }|]
-    dealloc p = [C.exp|void{delete $(format_properties *p)}|]
+    alloc = [CU.exp|format_properties * { new format_properties() }|]
+    dealloc p = [CU.exp|void{delete $(format_properties *p)}|]
     enter f p = do
       forM_ faceName $ \(encodeUtf8 -> v) ->
-        [C.block|void {
+        [CU.block|void {
         $(format_properties *p)->face_name = std::string($bs-ptr:v, $bs-len:v);
         }|]
       --TODO fontSet
@@ -177,8 +178,8 @@ withFormatProperties Mapnik.TextFormatProperties{..} = bracket alloc dealloc . e
 withLayoutProperties :: Mapnik.TextLayoutProperties -> (Ptr TextLayoutProperties -> IO a) -> IO a
 withLayoutProperties Mapnik.TextLayoutProperties{..} = bracket alloc dealloc . enter
   where
-    alloc = [C.exp|text_layout_properties * { new text_layout_properties() }|]
-    dealloc p = [C.exp|void{delete $(text_layout_properties *p)}|]
+    alloc = [CU.exp|text_layout_properties * { new text_layout_properties() }|]
+    dealloc p = [CU.exp|void{delete $(text_layout_properties *p)}|]
     enter f p = do
       SET_PROP_L(dx,dx)
       SET_PROP_L(dy,dy)
@@ -193,7 +194,7 @@ withLayoutProperties Mapnik.TextLayoutProperties{..} = bracket alloc dealloc . e
       SET_PROP_L(justifyAlignment,jalign)
       SET_PROP_L(verticalAlignment,valign)
       forM_ direction $ \(fromIntegral . fromEnum -> v) ->
-        [C.block|void { $(text_layout_properties *p)->dir = static_cast<directions_e>($(int v)); }|]
+        [CU.block|void { $(text_layout_properties *p)->dir = static_cast<directions_e>($(int v)); }|]
       f p
 
 create :: Mapnik.TextSymProperties -> IO TextSymProperties
@@ -202,7 +203,7 @@ create Mapnik.TextSymProperties{..} = unsafeNew $ \p ->
   withTextProperties properties $ \props ->
   withFormatProperties formatProperties $ \formatProps ->
   withLayoutProperties layoutProperties $ \layoutProps ->
-    [C.block|void {
+    [CU.block|void {
       text_symbolizer_properties *props =
         *$(text_symbolizer_properties **p) = new text_symbolizer_properties();
       props->expressions     = *$(text_properties_expressions *props);
@@ -214,23 +215,23 @@ create Mapnik.TextSymProperties{..} = unsafeNew $ \p ->
 unCreate :: Ptr TextSymProperties -> IO Mapnik.TextSymProperties
 unCreate ps = do
   format <- unFormat =<< unsafeNewFormat (\p ->
-    [C.block|void {
+    [CU.block|void {
       *$(node_ptr **p) = new node_ptr($(text_symbolizer_properties *ps)->format_tree());
     }|])
-  properties <- unProperties =<< [C.exp|text_properties_expressions * {
+  properties <- unProperties =<< [CU.exp|text_properties_expressions * {
     &$(text_symbolizer_properties *ps)->expressions
     }|]
-  formatProperties <- unFormatProperties =<< [C.exp|format_properties * {
+  formatProperties <- unFormatProperties =<< [CU.exp|format_properties * {
     &$(text_symbolizer_properties *ps)->format_defaults
     }|]
-  layoutProperties <- unLayoutProperties =<< [C.exp|text_layout_properties * {
+  layoutProperties <- unLayoutProperties =<< [CU.exp|text_layout_properties * {
     &$(text_symbolizer_properties *ps)->layout_defaults
     }|]
   return Mapnik.TextSymProperties{..}
 
 #define GET_OPT_PROP(TY,HS,CPP) \
   HS <- readPropWith $ \(has, ret) -> \
-    [C.block|void{\
+    [CU.block|void{\
       auto val = $(TY *node)->CPP;\
       if (val) {\
         *$(int *has) = 1;\
@@ -243,7 +244,7 @@ unCreate ps = do
 unFormat :: Format -> IO Mapnik.Format
 unFormat (Format fp) = withForeignPtr fp $ \p -> do
   (ty,ptr) <- C.withPtrs_ $ \(ty,ptr) ->
-    [C.block|void { do {
+    [CU.block|void { do {
       node_ptr node = *$(node_ptr *p);
       if (!node) {
         *$(void **ptr) = nullptr;
@@ -282,7 +283,7 @@ unFormat (Format fp) = withForeignPtr fp $ \p -> do
   if ptr == nullPtr then return Mapnik.NullFormat else
     case ty of
       0 -> fmap (Mapnik.FormatExp . Mapnik.Expression) $ newText $ \(ret,len) ->
-          [C.block|void {
+          [CU.block|void {
             text_node *text = static_cast<text_node*>($(void *ptr));
             auto exp = text->get_text();
             std::string s = to_expression_string(*exp);
@@ -293,7 +294,7 @@ unFormat (Format fp) = withForeignPtr fp $ \p -> do
       1 -> do {
         node <- peek (castPtr ptr);
         faceName <- newTextMaybe $ \(ret,len) ->
-          [C.block|void {
+          [CU.block|void {
           auto v = $(format_node *node)->face_name;
           if (v) {
             *$(char **ret) = strdup(v->c_str());
@@ -314,7 +315,7 @@ unFormat (Format fp) = withForeignPtr fp $ \p -> do
         GET_OPT_PROP(format_node, haloRadius, halo_radius);
         GET_OPT_PROP(format_node, ffSettings, ff_settings);
 
-        next <- unFormat =<< unsafeNewFormat (\pf -> [C.block|void{
+        next <- unFormat =<< unsafeNewFormat (\pf -> [CU.block|void{
           *$(node_ptr **pf) =
             new node_ptr($(format_node *node)->get_child());
           }|]);
@@ -336,7 +337,7 @@ unFormat (Format fp) = withForeignPtr fp $ \p -> do
         GET_OPT_PROP(layout_node, justifyAlignment, jalign);
         GET_OPT_PROP(layout_node, verticalAlignment, valign);
 
-        next <- unFormat =<< unsafeNewFormat (\pf -> [C.block|void{
+        next <- unFormat =<< unsafeNewFormat (\pf -> [CU.block|void{
           *$(node_ptr **pf) =
             new node_ptr($(layout_node *node)->get_child());
           }|]);
@@ -372,7 +373,7 @@ readPropWith f = do
 
 #define GET_PROP(PS, HS, CPP) \
   HS <- readPropWith $ \(has,ret) -> \
-    [C.block|void { \
+    [CU.block|void { \
     const PS def;\
     auto v = *$(sym_value_type **ret) = &$(PS *p)->CPP;\
     *$(int *has) = *v != def.CPP;\
@@ -384,7 +385,7 @@ readPropWith f = do
 unFormatProperties :: Ptr TextFormatProperties -> IO Mapnik.TextFormatProperties
 unFormatProperties p = do
   faceName <- newTextMaybe $ \(ret,len) ->
-    [C.block|void {
+    [CU.block|void {
     const format_properties def;
     auto v = $(format_properties *p)->face_name;
     if (v != def.face_name) {
@@ -422,7 +423,7 @@ unLayoutProperties p = do
   GET_PROP_L(justifyAlignment,jalign)
   GET_PROP_L(verticalAlignment,valign)
   direction <- fmap (fmap (toEnum . fromIntegral)) $ newMaybe $ \(has,ret) ->
-    [C.block|void {
+    [CU.block|void {
     const text_layout_properties def;
     auto v = $(text_layout_properties *p)->dir;
     if (*$(int *has) = v != def.dir) {

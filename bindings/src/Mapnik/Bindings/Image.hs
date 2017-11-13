@@ -21,6 +21,7 @@ import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
 
 import qualified Language.C.Inline.Cpp as C
+import qualified Language.C.Inline.Unsafe as CU
 
 import           System.IO.Unsafe (unsafePerformIO)
 
@@ -46,7 +47,7 @@ unsafeNew = fmap Image . newForeignPtr destroyImage <=< C.withPtr_
 --      serialize :: Format -> Image -> ByteString
 serialize :: String -> Image -> Maybe ByteString
 serialize (fromString -> fmt) im = unsafePerformIO $ newByteStringMaybe $ \(ptr, len) ->
-  [C.block|void {
+  [CU.block|void {
   std::string fmt = std::string($bs-ptr:fmt, $bs-len:fmt);
   *$(char** ptr) = NULL;
   try {
@@ -68,7 +69,7 @@ toRgba8 :: Image -> (Size, ByteString)
 toRgba8 im = unsafePerformIO $ do
   ((fromIntegral -> w, fromIntegral -> h), bs) <- C.withPtrs $ \(w,h) ->
     newByteString $ \(ptr, len) ->
-      [C.block|void {
+      [CU.block|void {
       static char empty='\0';
       mapnik::image_rgba8 *im = $fptr-ptr:(image_rgba8 *im);
       int len = *$(int* len) = im->size();
@@ -90,7 +91,7 @@ fromRgba8 ((width, height), rgba8)
   | height < 0 || width < 0 = Nothing
   | width*height*4 /= BS.length rgba8 = Nothing
 fromRgba8 ((fromIntegral -> width, fromIntegral -> height), rgba8) = unsafePerformIO $ fmap Just $ unsafeNew $ \ptr ->
-  [C.block|void {
+  [CU.block|void {
   *$(image_rgba8 **ptr) =
     new mapnik::image_rgba8($(int width), $(int height), reinterpret_cast<unsigned char*>($bs-ptr:rgba8));
   }|]
