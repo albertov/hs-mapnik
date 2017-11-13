@@ -37,9 +37,9 @@ module Mapnik.Bindings (
 , ProjTransform (..)
 , C.CppException (..)
 , Dash(..)
-, FeatureList (..)
+, FeatureList
 , QueryPtr
-, FeaturePtr
+, FeaturePtr (..)
 , MapnikInt
 , mapnikCtx
 ) where

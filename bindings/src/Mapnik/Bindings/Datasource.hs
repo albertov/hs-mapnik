@@ -1,6 +1,7 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -11,6 +12,10 @@
 module Mapnik.Bindings.Datasource (
   Datasource
 , HsDatasource (..)
+, Pair (..)
+, Query (..)
+, Geometry (..)
+, Feature (..)
 , Parameters
 , unsafeNew
 , unsafeNewMaybe
@@ -25,9 +30,12 @@ module Mapnik.Bindings.Datasource (
 import           Mapnik.Parameter as X (ParamValue(..), Parameter, (.=))
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
-import           Control.Exception (throwIO)
+import           Mapnik.Bindings.Orphans ()
+import           Mapnik.Bindings.Feature
+
+import           System.IO
+import           Control.Exception (throwIO, catch, SomeException)
 import           Control.Monad (forM_)
-import           Data.ByteString (ByteString)
 import           Data.ByteString.Unsafe (unsafePackMallocCString)
 import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
@@ -35,9 +43,8 @@ import           Data.IORef
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr, castPtr)
 import           Foreign.Storable
-import           Foreign.Marshal.Array (advancePtr)
-import           Foreign.C.Types (CDouble)
 import           Foreign.C.String (CString)
+import           Foreign.Marshal.Utils (with)
 import           System.IO.Unsafe (unsafePerformIO)
 import qualified GHC.Exts as Exts
 
@@ -56,41 +63,8 @@ C.include "parameter_util.hpp"
 C.include "hs_datasource.hpp"
 
 C.using "namespace mapnik"
-
-data Query = Query
-  { bbox :: !Box
-  }
-  deriving (Eq, Show)
-
-data Geometry
-  = GeometryWKB !ByteString
-  | GeometryWKT !Text
-  deriving (Eq, Show)
-
-data Feature = Feature
-  { geometry :: !Geometry
-  }
-  deriving (Eq, Show)
-
-data Point = Point { x, y :: !Double }
-  deriving (Eq, Show)
-
-instance Storable Point where
-  sizeOf   _ = 2 * sizeOf (undefined :: CDouble)
-  alignment _ = alignment (undefined :: CDouble)
-  peek p = Point <$> (realToFrac <$> peek @CDouble (castPtr p))
-                 <*> (realToFrac <$> peek @CDouble (castPtr p `advancePtr` 1))
-  poke p (Point (realToFrac -> a) (realToFrac -> b)) = do
-    poke @CDouble (castPtr p) a
-    poke @CDouble (castPtr p `advancePtr` 1) b
-
-data HsDatasource = HsDatasource
-  { name               :: !Text
-  , extent             :: !Box
-  , getFeatures        :: Query -> IO [Feature]
-  , getFeaturesAtPoint :: Point -> Double -> IO [Feature]
-  }
-
+C.verbatim "typedef hs_featureset::feature_list feature_list;"
+C.verbatim "typedef box2d<double> bbox;"
 
 foreign import ccall "&hs_mapnik_destroy_Parameters" destroyParameters :: FinalizerPtr Parameters
 foreign import ccall "&hs_mapnik_destroy_Datasource" destroyDatasource :: FinalizerPtr Datasource
@@ -108,24 +82,7 @@ create params = unsafeNew $ \ ptr ->
   *$(datasource_ptr** ptr) = new datasource_ptr(p);
   |]
 
-createHsDatasource :: HsDatasource -> IO Datasource
-createHsDatasource _ = unsafeNew $ \ ptr -> do
-  features <- $(C.mkFunPtr [t|Ptr FeatureList -> Ptr QueryPtr -> IO ()|]) $ \fs q -> do
-    putStrLn "Hi there!"
-    return ()
-  featuresAtPoint <- $(C.mkFunPtr [t|Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ()|]) $ \fs x y tol -> do
-    return ()
-  [CU.block|void {
-  datasource_ptr p = std::make_shared<hs_datasource>(
-    "hs_layer",
-    datasource::Vector, 
-    datasource_geometry_t::Collection,
-    box2d<double>(0,0,100,100),
-    $(features_callback features),
-    $(features_at_point_callback featuresAtPoint)
-    );
-  *$(datasource_ptr** ptr) = new datasource_ptr(p);
-  }|]
+
 
 unsafeNewParams :: (Ptr (Ptr Parameters) -> IO ()) -> IO Parameters
 unsafeNewParams = mkUnsafeNew Parameters destroyParameters
@@ -214,3 +171,80 @@ toList ps = unsafePerformIO $ do
      }
   }|]
   readIORef resultRef
+
+
+data Query = Query
+  { box              :: !Box
+  , unbufferedBox    :: !Box
+  , resolution       :: !Pair
+  , scaleDenominator :: !Double
+  , filterFactor     :: !Double
+  }
+  deriving (Eq, Show)
+
+data Pair = Pair { x, y :: !Double }
+  deriving (Eq, Show)
+
+data HsDatasource = HsDatasource
+  { name               :: !Text
+  , extent             :: !Box
+  , getFeatures        :: !(Query -> IO [Feature])
+  , getFeaturesAtPoint :: !(Pair -> Double -> IO [Feature])
+  }
+
+
+
+createHsDatasource :: HsDatasource -> IO Datasource
+createHsDatasource HsDatasource{..} = with extent $ \e -> unsafeNew $ \ ptr -> do
+  fs <- $(C.mkFunPtr [t|Ptr FeatureList -> Ptr QueryPtr -> IO ()|]) getFeatures'
+  fsp <- $(C.mkFunPtr [t|Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ()|]) getFeaturesAtPoint'
+  [CU.block|void {
+  datasource_ptr p = std::make_shared<hs_datasource>(
+    "hs_layer",                        //TODO
+    datasource::Vector,                //TODO
+    datasource_geometry_t::Collection, //TODO
+    *$(bbox *e),
+    $(features_callback fs),
+    $(features_at_point_callback fsp)
+    );
+  *$(datasource_ptr** ptr) = new datasource_ptr(p);
+  }|]
+
+  where
+    getFeatures' fs q = catchingExceptions "getFeatures" $
+      mapM_ (pushBack fs) =<< getFeatures =<< unCreateQuery q
+
+    getFeaturesAtPoint' fs (realToFrac -> x) (realToFrac -> y) (realToFrac -> tol) =
+      catchingExceptions "getFeaturesAtPoint" $
+        mapM_ (pushBack fs) =<< getFeaturesAtPoint (Pair x y) tol
+
+    pushBack fs f = do
+      f' <- createFeature f
+      [CU.block|void {
+        $(feature_list *fs)->push_back(*$fptr-ptr:(feature_ptr *f')); }
+      |]
+
+    catchingExceptions ctx = (`catch` (\e ->
+      hPutStrLn stderr ("Unhandled haskell exception in " ++ ctx ++ ": " ++ show @SomeException e)))
+
+
+unCreateQuery :: Ptr QueryPtr -> IO Query
+unCreateQuery q = do
+  (   realToFrac -> resx
+    , realToFrac -> resy
+    , realToFrac -> scaleDenominator
+    , realToFrac -> filterFactor
+    , box
+    , unbufferedBox
+    ) <- C.withPtrs_ $ \(x,y,s,f,b,ub) ->
+    [CU.block|void{
+    const query& q = *$(query *q);
+    auto res       = q.resolution();
+    *$(double *x)  = std::get<0>(res);
+    *$(double *y)  = std::get<1>(res);
+    *$(double *s)  = q.scale_denominator();
+    *$(double *f)  = q.get_filter_factor();
+    *$(bbox *b)    = q.get_bbox();
+    *$(bbox *ub)   = q.get_unbuffered_bbox();
+    }|]
+  return Query{resolution=Pair resx resy, ..}

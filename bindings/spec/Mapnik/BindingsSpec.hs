@@ -25,6 +25,7 @@ import           Mapnik.Bindings.FromMapnik
 import           Control.Lens hiding ((.=))
 import           Control.Monad (void)
 import           Data.Text (Text)
+import           Data.IORef
 import           Data.Maybe (isJust, isNothing)
 import           Data.List (lookup)
 import           Data.Either (isLeft, isRight)
@@ -93,9 +94,9 @@ spec = beforeAll_ registerDefaults $ do
 
     it "can get max extent when Just" $ do
       m <- Map.create 512 512
-      Map.setMaxExtent m box
+      Map.setMaxExtent m aBox
       e <- Map.getMaxExtent m
-      e `shouldBe` Just box
+      e `shouldBe` Just aBox
 
     it "can resize" $ do
       m <- Map.create 10 10
@@ -129,7 +130,7 @@ spec = beforeAll_ registerDefaults $ do
                          , maxx = 1746737.6177269476
                          , maxy = -25098.59307479199
                          }
-      forward trans box `shouldBe` expected
+      forward trans aBox `shouldBe` expected
 
   describe "Color" $ do
     it "can set good" $ do
@@ -189,10 +190,10 @@ spec = beforeAll_ registerDefaults $ do
 
     it "can get/set name" $ do
       r <- Rule.create
-      let name = "foo"
-      Rule.setName r name
+      let theName = "foo"
+      Rule.setName r theName
       name' <- Rule.getName r
-      name' `shouldBe` name
+      name' `shouldBe` theName
 
     it "can get symbolizers" $ do
       m <- Map.create 512 512
@@ -302,30 +303,40 @@ spec = beforeAll_ registerDefaults $ do
       m <- Map.create 512 512
       loadFixture m
       Map.removeAllLayers m
+      Map.setSrs m "+init=epsg:3857"
       l <- Layer.create "fooo"
+      Layer.setSrs l "+init=epsg:3857"
+      ref <- newIORef Nothing
+      let theExtent = Box 0 0 100 100
       ds <- createHsDatasource HsDatasource
         { name = "fooo"
-        , extent = Box 0 0 100 100
+        , extent = theExtent
+        , getFeatures = \q -> do
+            writeIORef ref (Just q)
+            return []
+        , getFeaturesAtPoint = \_ _ -> return []
         }
       Layer.setDatasource l ds
       Layer.addStyle l "provlines"
       Map.addLayer m l
       Map.zoomAll m
-      img <- Map.render m 1
-      let Just bs = Image.serialize "png8" img
-      bs `shouldSatisfy` isPng
+      _ <- Map.render m 1
+      Just q <- readIORef ref
+      box q `shouldBe` theExtent
+      unbufferedBox q `shouldBe` theExtent
+      resolution q `shouldBe` Pair 5.12 5.12
 
 loadFixture :: Map -> IO ()
 loadFixture m = do
   loadFixtureFrom "spec/map.xml" m
   Map.setSrs m merc
-  Map.zoomToBox m box
+  Map.zoomToBox m aBox
 
 loadFixtureFrom :: String -> Map -> IO ()
 loadFixtureFrom p m = Map.loadXml m =<< BS.readFile p
 
-box :: Box
-box = Box (-8024477.28459) 5445190.38849 (-7381388.20071) 5662941.44855
+aBox :: Box
+aBox = Box (-8024477.28459) 5445190.38849 (-7381388.20071) 5662941.44855
 
 merc :: Text
 merc = "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over"
