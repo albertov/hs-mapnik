@@ -378,6 +378,8 @@ readPropWith f = do
     *$(int *has) = *v != def.CPP;\
     }|]
 #define GET_PROP_F(HS,CPP) GET_PROP(format_properties,HS,CPP)
+#define GET_PROP_L(HS,CPP) GET_PROP(text_layout_properties,HS,CPP)
+#define GET_PROP_T(HS,CPP) GET_PROP(text_properties_expressions,HS,CPP)
 
 unFormatProperties :: Ptr TextFormatProperties -> IO Mapnik.TextFormatProperties
 unFormatProperties p = do
@@ -405,7 +407,6 @@ unFormatProperties p = do
   GET_PROP_F(ffSettings, ff_settings)
   return Mapnik.TextFormatProperties{..}
 
-#define GET_PROP_L(HS,CPP) GET_PROP(text_layout_properties,HS,CPP)
 unLayoutProperties :: Ptr TextLayoutProperties -> IO Mapnik.TextLayoutProperties
 unLayoutProperties p = do
   GET_PROP_L(dx,dx)
@@ -430,7 +431,6 @@ unLayoutProperties p = do
     }|]
   return Mapnik.TextLayoutProperties{..}
 
-#define GET_PROP_T(HS,CPP) GET_PROP(text_properties_expressions,HS,CPP)
 unProperties :: Ptr TextProperties -> IO Mapnik.TextProperties
 unProperties p = do
   GET_PROP_T(labelPlacement,label_placement)

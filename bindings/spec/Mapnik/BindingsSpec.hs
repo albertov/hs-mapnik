@@ -71,7 +71,7 @@ spec = beforeAll_ registerDefaults $ do
       m <- Map.create 512 512
       loadFixture m
       sts <- map fst <$> Map.getStyles m
-      sts `shouldBe` ["drainage","highway-border","highway-fill","popplaces","provinces","provlines","road-border","road-fill","smallroads"]
+      sts `shouldMatchList` ["drainage","highway-border","highway-fill","popplaces","provinces","provlines","road-border","road-fill","smallroads","raster-style"]
 
     it "can get layers" $ do
       m <- Map.create 512 512
@@ -271,16 +271,28 @@ spec = beforeAll_ registerDefaults $ do
       m' <- Map.create 512 512
       loadFixture m'
       m <- fromMapnik m'
-      let lns :: Traversal' Mapnik.Map DashArray
-          lns = L.styles . at "provlines" . _Just
-              . L.rules . ix 0
-              . L.symbolizers . ix 0
-              . L.strokeDashArray
-              . _Just . L._Val
-      m^?lns `shouldBe` Just [Dash 8 4, Dash 2 2, Dash 2 2]
+      do
+        let lns :: Traversal' Mapnik.Map DashArray
+            lns = L.styles . at "provlines" . _Just
+                . L.rules . ix 0
+                . L.symbolizers . ix 0
+                . L.strokeDashArray
+                . _Just . L._Val
+        m^?lns `shouldBe` Just [Dash 8 4, Dash 2 2, Dash 2 2]
+      do
+        let lns :: Traversal' Mapnik.Map Double
+            lns = L.styles . at "raster-style" . _Just
+                . L.rules . ix 0
+                . L.symbolizers . ix 0
+                . L.colorizer
+                . _Just
+                . L.stops
+                . traverse
+                . L.value
+        m^..lns `shouldBe` [0,10..90]
 
   describe "TextPlacements" $ do
-    it "can create Dummy" $ do
+    it "can create" $ do
       let ps = Mapnik.def
       ps' <- TextPlacements.unCreate =<< TextPlacements.create ps
       ps `shouldBe` ps'

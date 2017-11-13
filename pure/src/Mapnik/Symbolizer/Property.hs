@@ -34,14 +34,14 @@ type PropValue a = Maybe (Prop a)
 data Stop = Stop
   { value :: !Double
   , color :: !Color
-  , mode  :: !ColorizerMode
+  , mode  :: !(Maybe ColorizerMode)
   , label :: !(Maybe Text)
   } deriving (Eq, Show, Generic)
 deriveMapnikJSON ''Stop
 
 data Colorizer = Colorizer
-  { mode :: !ColorizerMode
-  , color :: !Color
+  { mode   :: !(Maybe ColorizerMode)
+  , color  :: !(Maybe Color)
   , stops  :: ![Stop]
   } deriving (Eq, Show, Generic)
 deriveMapnikJSON ''Colorizer
