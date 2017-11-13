@@ -13,12 +13,15 @@ module Mapnik.Bindings.Projection (
 
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util (newText)
+import           Mapnik.Bindings.Orphans()
+
 import           Control.Exception (try)
 import           Control.Monad ((<=<))
 import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
+import           Foreign.Marshal.Utils (with)
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
@@ -34,6 +37,7 @@ C.include "<mapnik/projection.hpp>"
 C.include "<mapnik/proj_transform.hpp>"
 
 C.using "namespace mapnik"
+C.verbatim "typedef box2d<double> bbox;"
 
 -- * Projection
 
@@ -72,29 +76,18 @@ class CanTransform p where
   forward :: ProjTransform -> p -> p
   backward :: ProjTransform -> p -> p
 
-newBox ::((Ptr C.CDouble, Ptr C.CDouble, Ptr C.CDouble, Ptr C.CDouble) -> IO ()) -> IO Box
-newBox fun = do
-  (x0,y0,x1,y1) <- C.withPtrs_ fun
-  return (Box (realToFrac x0) (realToFrac y0) (realToFrac x1) (realToFrac y1))
-
 instance CanTransform Box where
-  forward p (Box (realToFrac->x0) (realToFrac->y0) (realToFrac->x1) (realToFrac->y1)) =
-    unsafePerformIO $ newBox $ \(px0,py0,px1,py1) ->
+  forward p box =
+    unsafePerformIO $ with box $ \boxPtr -> C.withPtr_ $ \ret ->
       [C.block|void {
-      box2d<double> res($(double x0), $(double y0), $(double x1), $(double y1));
+      auto res = *$(bbox *boxPtr);
       $fptr-ptr:(proj_transform *p)->forward(res);
-      *$(double *px0) = res.minx();
-      *$(double *py0) = res.miny();
-      *$(double *px1) = res.maxx();
-      *$(double *py1) = res.maxy();
+      *$(bbox *ret) = res;
     }|]
-  backward p (Box (realToFrac->x0) (realToFrac->y0) (realToFrac->x1) (realToFrac->y1)) =
-    unsafePerformIO $ newBox $ \(px0,py0,px1,py1) ->
+  backward p box =
+    unsafePerformIO $ with box $ \boxPtr -> C.withPtr_ $ \ret ->
       [C.block|void {
-      box2d<double> res($(double x0), $(double y0), $(double x1), $(double y1));
+      auto res = *$(bbox *boxPtr);
       $fptr-ptr:(proj_transform *p)->backward(res);
-      *$(double *px0) = res.minx();
-      *$(double *py0) = res.miny();
-      *$(double *px1) = res.maxx();
-      *$(double *py1) = res.maxy();
+      *$(bbox *ret) = res;
     }|]

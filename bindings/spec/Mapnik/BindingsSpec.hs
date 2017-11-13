@@ -305,6 +305,7 @@ spec = beforeAll_ registerDefaults $ do
       l <- Layer.create "fooo"
       ds <- createHsDatasource HsDatasource
         { name = "fooo"
+        , extent = Box 0 0 100 100
         }
       Layer.setDatasource l ds
       Layer.addStyle l "provlines"

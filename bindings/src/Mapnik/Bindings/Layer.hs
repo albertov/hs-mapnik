@@ -37,6 +37,7 @@ module Mapnik.Bindings.Layer (
 import           Mapnik (StyleName)
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
+import           Mapnik.Bindings.Orphans()
 import qualified Mapnik.Bindings.Datasource as Datasource
 import           Data.IORef
 import           Data.Text (Text)
@@ -56,6 +57,7 @@ C.include "<mapnik/layer.hpp>"
 C.include "<mapnik/datasource.hpp>"
 
 C.using "namespace mapnik"
+C.verbatim "typedef box2d<double> bbox;"
 
 --
 -- * Layer
@@ -189,26 +191,16 @@ setDatasource l ds =
   [C.block|void { $fptr-ptr:(layer *l)->set_datasource(*$fptr-ptr:(datasource_ptr *ds)); }|]
 
 getMaxExtent :: Layer -> IO (Maybe Box)
-getMaxExtent l =  do
-  (   has
-    , realToFrac -> minx
-    , realToFrac -> miny
-    , realToFrac -> maxx
-    , realToFrac -> maxy
-    ) <- C.withPtrs_ $ \(has,x0,y0,x1,y1) ->
+getMaxExtent l =  newMaybe $ \(has,p) ->
     [C.block|void {
       auto res = $fptr-ptr:(layer *l)->maximum_extent();
       if (res) {
-        *$(double *x0) = res->minx();
-        *$(double *y0) = res->miny();
-        *$(double *x1) = res->maxx();
-        *$(double *y1) = res->maxy();
+        *$(bbox *p) = *res;
         *$(int *has) = 1;
       } else {
         *$(int *has) = 0;
       }
       }|]
-  return $ if has==1 then Just Box{..} else Nothing
 
 setMaxExtent :: Layer -> Box -> IO ()
 setMaxExtent l (Box (realToFrac -> x0) (realToFrac -> y0) (realToFrac -> x1) (realToFrac -> y1)) = 

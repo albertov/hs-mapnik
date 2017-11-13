@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -7,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE FlexibleInstances #-}
 module Mapnik.Bindings.Datasource (
   Datasource
@@ -27,6 +27,7 @@ import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 import           Control.Exception (throwIO)
 import           Control.Monad (forM_)
+import           Data.ByteString (ByteString)
 import           Data.ByteString.Unsafe (unsafePackMallocCString)
 import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
@@ -34,12 +35,15 @@ import           Data.IORef
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr, castPtr)
 import           Foreign.Storable
+import           Foreign.Marshal.Array (advancePtr)
+import           Foreign.C.Types (CDouble)
 import           Foreign.C.String (CString)
 import           System.IO.Unsafe (unsafePerformIO)
 import qualified GHC.Exts as Exts
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
+import Foreign.C.Types (CDouble)
 
 
 C.context mapnikCtx
@@ -53,8 +57,38 @@ C.include "hs_datasource.hpp"
 
 C.using "namespace mapnik"
 
+data Query = Query
+  { bbox :: !Box
+  }
+  deriving (Eq, Show)
+
+data Geometry
+  = GeometryWKB !ByteString
+  | GeometryWKT !Text
+  deriving (Eq, Show)
+
+data Feature = Feature
+  { geometry :: !Geometry
+  }
+  deriving (Eq, Show)
+
+data Point = Point { x, y :: !Double }
+  deriving (Eq, Show)
+
+instance Storable Point where
+  sizeOf   _ = 2 * sizeOf (undefined :: CDouble)
+  alignment _ = alignment (undefined :: CDouble)
+  peek p = Point <$> (realToFrac <$> peek @CDouble (castPtr p))
+                 <*> (realToFrac <$> peek @CDouble (castPtr p `advancePtr` 1))
+  poke p (Point (realToFrac -> a) (realToFrac -> b)) = do
+    poke @CDouble (castPtr p) a
+    poke @CDouble (castPtr p `advancePtr` 1) b
+
 data HsDatasource = HsDatasource
-  { name :: !Text
+  { name               :: !Text
+  , extent             :: !Box
+  , getFeatures        :: Query -> IO [Feature]
+  , getFeaturesAtPoint :: Point -> Double -> IO [Feature]
   }
 
 
@@ -76,7 +110,7 @@ create params = unsafeNew $ \ ptr ->
 
 createHsDatasource :: HsDatasource -> IO Datasource
 createHsDatasource _ = unsafeNew $ \ ptr -> do
-  features <- $(C.mkFunPtr [t|Ptr FeatureList -> Ptr Query -> IO ()|]) $ \fs q -> do
+  features <- $(C.mkFunPtr [t|Ptr FeatureList -> Ptr QueryPtr -> IO ()|]) $ \fs q -> do
     putStrLn "Hi there!"
     return ()
   featuresAtPoint <- $(C.mkFunPtr [t|Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ()|]) $ \fs x y tol -> do

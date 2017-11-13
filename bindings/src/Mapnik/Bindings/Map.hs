@@ -76,6 +76,7 @@ C.include "<mapnik/layer.hpp>"
 C.include "<mapnik/load_map.hpp>"
 
 C.using "namespace mapnik"
+C.verbatim "typedef box2d<double> bbox;"
 
 --
 -- * Map
@@ -227,10 +228,8 @@ zoomAll :: Map -> IO ()
 zoomAll m = [C.catchBlock|$fptr-ptr:(Map *m)->zoom_all();|]
 
 zoomToBox :: Map -> Box -> IO ()
-zoomToBox m (Box (realToFrac -> x0) (realToFrac -> y0) (realToFrac -> x1) (realToFrac -> y1)) = 
-  [C.block|void {
-  $fptr-ptr:(Map *m)->zoom_to_box(mapnik::box2d<double>($(double x0), $(double y0), $(double x1), $(double y1)));
-  }|]
+zoomToBox m box = with box $ \boxPtr -> 
+  [C.block|void {$fptr-ptr:(Map *m)->zoom_to_box(*$(bbox *boxPtr));}|]
 
 render :: Map -> Double -> IO Image
 render m (realToFrac -> scale) = Image.unsafeNew $ \ptr ->
@@ -257,7 +256,7 @@ getLayers m = do
   layersRef <- newIORef []
   let callback :: Ptr Layer -> IO ()
       callback ptr = do
-        layer <- Layer.unsafeNew (flip poke ptr)
+        layer <- Layer.unsafeNew (`poke` ptr)
         modifyIORef' layersRef (layer:)
   [C.block|void {
   typedef std::vector<layer> layer_list;
@@ -273,7 +272,7 @@ getStyles m = do
   stylesRef <- newIORef []
   let callback :: CString -> C.CInt -> Ptr Style -> IO ()
       callback ptr (fromIntegral -> len) ptrStyle = do
-        style <- Style.unsafeNew (flip poke ptrStyle)
+        style <- Style.unsafeNew (`poke` ptrStyle)
         styleName <- decodeUtf8 <$> unsafePackMallocCStringLen (ptr, len)
         modifyIORef' stylesRef ((styleName,style):)
   [C.block|void {
@@ -298,29 +297,17 @@ removeAllLayers m =
   [C.block| void { $fptr-ptr:(Map *m)->layers().clear(); }|]
 
 getMaxExtent :: Map -> IO (Maybe Box)
-getMaxExtent m =  do
-  (   has
-    , realToFrac -> minx
-    , realToFrac -> miny
-    , realToFrac -> maxx
-    , realToFrac -> maxy
-    ) <- C.withPtrs_ $ \(has,x0,y0,x1,y1) ->
-    [C.block|void {
-      auto res = $fptr-ptr:(Map *m)->maximum_extent();
-      if (res) {
-        *$(double *x0) = res->minx();
-        *$(double *y0) = res->miny();
-        *$(double *x1) = res->maxx();
-        *$(double *y1) = res->maxy();
-        *$(int *has) = 1;
-      } else {
-        *$(int *has) = 0;
-      }
-      }|]
-  return $ if has==1 then Just Box{..} else Nothing
+getMaxExtent m =  newMaybe $ \(has, p) ->
+  [C.block|void {
+    auto res = $fptr-ptr:(Map *m)->maximum_extent();
+    if (res) {
+      *$(bbox *p)  = *res;
+      *$(int *has) = 1;
+    } else {
+      *$(int *has) = 0;
+    }
+    }|]
 
 setMaxExtent :: Map -> Box -> IO ()
-setMaxExtent m (Box (realToFrac -> x0) (realToFrac -> y0) (realToFrac -> x1) (realToFrac -> y1)) = 
-  [C.block|void {
-  $fptr-ptr:(Map *m)->set_maximum_extent(mapnik::box2d<double>($(double x0), $(double y0), $(double x1), $(double y1)));
-  }|]
+setMaxExtent m box = with box $ \boxPtr ->
+  [C.block|void { $fptr-ptr:(Map *m)->set_maximum_extent(*$(bbox *boxPtr)); }|]
