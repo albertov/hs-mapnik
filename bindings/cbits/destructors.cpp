@@ -11,6 +11,7 @@
 #include <mapnik/symbolizer_base.hpp>
 #include <mapnik/raster_colorizer.hpp>
 #include <mapnik/text/text_properties.hpp>
+#include <mapnik/feature.hpp>
 
 extern "C" {
 
@@ -84,6 +85,10 @@ MAPNIK_DECL void hs_mapnik_destroy_Format(void *p) {
 
 MAPNIK_DECL void hs_mapnik_destroy_SymbolizerValue(void *p) {
   delete static_cast<mapnik::symbolizer_base::value_type*>(p);
+}
+
+MAPNIK_DECL void hs_mapnik_destroy_Feature(void *p) {
+  delete static_cast<mapnik::feature_ptr*>(p);
 }
 }
 

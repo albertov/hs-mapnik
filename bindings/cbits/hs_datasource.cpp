@@ -1,6 +1,7 @@
 #include <mapnik/query.hpp>
 #include <mapnik/box2d.hpp>
 #include <mapnik/boolean.hpp>
+#include <mapnik/feature_factory.hpp>
 
 #include "hs_datasource.hpp"
 #include "hs_featureset.hpp"
@@ -47,7 +48,8 @@ datasource::datasource_t hs_datasource::type() const
 featureset_ptr hs_datasource::features(const query& q) const
 {
   hs_featureset::feature_list_ptr features = std::make_shared<hs_featureset::feature_list>();
-  get_features_(features.get(), &q);
+  auto ctx = std::make_shared<mapnik::context_type>();
+  get_features_(&ctx, features.get(), &q);
   return std::make_shared<hs_featureset>(features, type_);
 }
 
@@ -55,9 +57,11 @@ featureset_ptr hs_datasource::features(const query& q) const
 featureset_ptr hs_datasource::features_at_point(coord2d const& pt, double tol) const
 {
   hs_featureset::feature_list_ptr features = std::make_shared<hs_featureset::feature_list>();
-  get_features_at_point_(features.get(), pt.x, pt.y, tol);
+  auto ctx = std::make_shared<mapnik::context_type>();
+  get_features_at_point_(&ctx, features.get(), pt.x, pt.y, tol);
   return std::make_shared<hs_featureset>(features, type_);
 }
+
 
 box2d<double> hs_datasource::envelope() const
 {

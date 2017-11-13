@@ -40,6 +40,7 @@ module Mapnik.Bindings (
 , FeatureList
 , QueryPtr
 , FeaturePtr (..)
+, FeatureCtx
 , MapnikInt
 , mapnikCtx
 ) where
@@ -87,6 +88,7 @@ fptr(ListNode)
 fptr(QueryPtr)
 fptr(FeaturePtr)
 fptr(FeatureList)
+fptr(FeatureCtx)
 
 #ifdef BIGINT
 type MapnikInt = C.CLong
@@ -135,8 +137,9 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "feature_list", [t| FeatureList |])
       , (C.TypeName "query", [t| QueryPtr |])
       , (C.TypeName "feature_ptr", [t| FeaturePtr |])
+      , (C.TypeName "context_ptr", [t| FeatureCtx |])
       , (C.TypeName "bbox", [t| Box |])
-      , (C.TypeName "features_callback", [t|FunPtr (Ptr FeatureList -> Ptr QueryPtr -> IO ())|])
-      , (C.TypeName "features_at_point_callback", [t|FunPtr (Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ())|])
+      , (C.TypeName "features_callback", [t|FunPtr (Ptr FeatureCtx -> Ptr FeatureList -> Ptr QueryPtr -> IO ())|])
+      , (C.TypeName "features_at_point_callback", [t|FunPtr (Ptr FeatureCtx -> Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ())|])
       ]
     }

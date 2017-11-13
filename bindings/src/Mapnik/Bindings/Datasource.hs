@@ -196,8 +196,8 @@ data HsDatasource = HsDatasource
 
 createHsDatasource :: HsDatasource -> IO Datasource
 createHsDatasource HsDatasource{..} = with extent $ \e -> unsafeNew $ \ ptr -> do
-  fs <- $(C.mkFunPtr [t|Ptr FeatureList -> Ptr QueryPtr -> IO ()|]) getFeatures'
-  fsp <- $(C.mkFunPtr [t|Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ()|]) getFeaturesAtPoint'
+  fs <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> Ptr QueryPtr -> IO ()|]) getFeatures'
+  fsp <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ()|]) getFeaturesAtPoint'
   [CU.block|void {
   datasource_ptr p = std::make_shared<hs_datasource>(
     "hs_layer",                        //TODO
@@ -211,15 +211,15 @@ createHsDatasource HsDatasource{..} = with extent $ \e -> unsafeNew $ \ ptr -> d
   }|]
 
   where
-    getFeatures' fs q = catchingExceptions "getFeatures" $
-      mapM_ (pushBack fs) =<< getFeatures =<< unCreateQuery q
+    getFeatures' ctx fs q = catchingExceptions "getFeatures" $
+      mapM_ (pushBack ctx fs) =<< getFeatures =<< unCreateQuery q
 
-    getFeaturesAtPoint' fs (realToFrac -> x) (realToFrac -> y) (realToFrac -> tol) =
+    getFeaturesAtPoint' ctx fs (realToFrac -> x) (realToFrac -> y) (realToFrac -> tol) =
       catchingExceptions "getFeaturesAtPoint" $
-        mapM_ (pushBack fs) =<< getFeaturesAtPoint (Pair x y) tol
+        mapM_ (pushBack ctx fs) =<< getFeaturesAtPoint (Pair x y) tol
 
-    pushBack fs f = do
-      f' <- createFeature f
+    pushBack ctx fs = \f -> do
+      f' <- createFeature ctx f
       [CU.block|void {
         $(feature_list *fs)->push_back(*$fptr-ptr:(feature_ptr *f')); }
       |]

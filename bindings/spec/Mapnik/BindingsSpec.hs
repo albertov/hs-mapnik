@@ -313,7 +313,10 @@ spec = beforeAll_ registerDefaults $ do
         , extent = theExtent
         , getFeatures = \q -> do
             writeIORef ref (Just q)
-            return []
+            return [ Feature { fid=105
+                             , geometry="LINESTRING (30 10, 10 30, 40 40)"
+                             }
+                   ]
         , getFeaturesAtPoint = \_ _ -> return []
         }
       Layer.setDatasource l ds
