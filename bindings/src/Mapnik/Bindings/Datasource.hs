@@ -10,11 +10,13 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Mapnik.Bindings.Datasource (
   Datasource
+, HsDatasource (..)
 , Parameters
 , unsafeNew
 , unsafeNewMaybe
 , getParameters
 , create
+, createHsDatasource
 , fromList
 , toList
 , module X
@@ -47,11 +49,13 @@ C.include "<mapnik/params.hpp>"
 C.include "<mapnik/datasource.hpp>"
 C.include "<mapnik/datasource_cache.hpp>"
 C.include "parameter_util.hpp"
+C.include "hs_datasource.hpp"
 
 C.using "namespace mapnik"
 
---
--- * Layer
+data HsDatasource = HsDatasource
+  { name :: !Text
+  }
 
 
 foreign import ccall "&hs_mapnik_destroy_Parameters" destroyParameters :: FinalizerPtr Parameters
@@ -69,6 +73,25 @@ create params = unsafeNew $ \ ptr ->
   datasource_ptr p = datasource_cache::instance().create(*$fptr-ptr:(parameters *params));
   *$(datasource_ptr** ptr) = new datasource_ptr(p);
   |]
+
+createHsDatasource :: HsDatasource -> IO Datasource
+createHsDatasource _ = unsafeNew $ \ ptr -> do
+  features <- $(C.mkFunPtr [t|Ptr FeatureList -> Ptr Query -> IO ()|]) $ \fs q -> do
+    putStrLn "Hi there!"
+    return ()
+  featuresAtPoint <- $(C.mkFunPtr [t|Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ()|]) $ \fs x y tol -> do
+    return ()
+  [C.block|void {
+  datasource_ptr p = std::make_shared<hs_datasource>(
+    "hs_layer",
+    datasource::Vector, 
+    datasource_geometry_t::Collection,
+    box2d<double>(0,0,100,100),
+    $(features_callback features),
+    $(features_at_point_callback featuresAtPoint)
+    );
+  *$(datasource_ptr** ptr) = new datasource_ptr(p);
+  }|]
 
 unsafeNewParams :: (Ptr (Ptr Parameters) -> IO ()) -> IO Parameters
 unsafeNewParams = mkUnsafeNew Parameters destroyParameters

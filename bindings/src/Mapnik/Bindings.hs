@@ -37,6 +37,8 @@ module Mapnik.Bindings (
 , ProjTransform (..)
 , C.CppException (..)
 , Dash(..)
+, FeatureList (..)
+, Query
 , MapnikInt
 , mapnikCtx
 ) where
@@ -49,6 +51,7 @@ import           Data.Monoid (mempty, (<>))
 import           Language.C.Inline.Context
 import qualified Language.C.Types as C
 import           Foreign.ForeignPtr (ForeignPtr)
+import           Foreign.Ptr (Ptr, FunPtr)
 
 #define fptr(X) newtype X = X (ForeignPtr X) deriving (Eq, Ord, Show)
 
@@ -80,6 +83,8 @@ fptr(Format)
 fptr(FormatNode)
 fptr(LayoutNode)
 fptr(ListNode)
+fptr(Query)
+fptr(FeatureList)
 
 #ifdef BIGINT
 type MapnikInt = C.CLong
@@ -125,5 +130,9 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "list_node", [t| ListNode |])
       , (C.TypeName "sym_value_type", [t| SymbolizerValue |])
       , (C.TypeName "bool", [t| Bool |])
+      , (C.TypeName "feature_list", [t| FeatureList |])
+      , (C.TypeName "query", [t| Query |])
+      , (C.TypeName "features_callback", [t|FunPtr (Ptr FeatureList -> Ptr Query -> IO ())|])
+      , (C.TypeName "features_at_point_callback", [t|FunPtr (Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ())|])
       ]
     }

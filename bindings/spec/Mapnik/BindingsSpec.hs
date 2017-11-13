@@ -297,6 +297,23 @@ spec = beforeAll_ registerDefaults $ do
       ps' <- TextPlacements.unCreate =<< TextPlacements.create ps
       ps `shouldBe` ps'
 
+  describe "HsDatasource" $ do
+    it "can create" $ do
+      m <- Map.create 512 512
+      loadFixture m
+      Map.removeAllLayers m
+      l <- Layer.create "fooo"
+      ds <- createHsDatasource HsDatasource
+        { name = "fooo"
+        }
+      Layer.setDatasource l ds
+      Layer.addStyle l "provlines"
+      Map.addLayer m l
+      Map.zoomAll m
+      img <- Map.render m 1
+      let Just bs = Image.serialize "png8" img
+      bs `shouldSatisfy` isPng
+
 loadFixture :: Map -> IO ()
 loadFixture m = do
   loadFixtureFrom "spec/map.xml" m

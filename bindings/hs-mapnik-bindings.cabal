@@ -51,7 +51,9 @@ library
   ghc-options:         -Wall -optc-g -funbox-strict-fields
 
   extra-libraries:     mapnik stdc++
-  c-sources:           cbits/destructors.cpp
+  c-sources:
+    cbits/destructors.cpp
+    cbits/hs_datasource.cpp
   include-dirs:        cbits
 
 test-suite spec
