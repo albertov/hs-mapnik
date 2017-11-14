@@ -35,6 +35,7 @@ library
                      , Mapnik.Bindings.Symbolizer
                      , Mapnik.Bindings.SymbolizerValue
                      , Mapnik.Bindings.Variant
+                     , Mapnik.Bindings.Raster
                      , Mapnik.Bindings.Expression
                      , Mapnik.Bindings.Transform
                      , Mapnik.Bindings.Util
@@ -68,6 +69,7 @@ test-suite spec
                   , bytestring
                   , text
                   , lens
+                  , vector
 
   hs-source-dirs:   spec
   main-is:          Main.hs

@@ -59,17 +59,17 @@
   <Style name="raster-style">
     <Rule>
       <RasterSymbolizer>
-        <RasterColorizer default-mode="discrete">
+        <RasterColorizer default-mode="linear">
           <stop value="0" color="rgba(249, 249, 249, 0.50)"/>
-          <stop value="10" color="#F7EBC7"/>
-          <stop value="20" color="#EFCA54"/>
-          <stop value="30" color="#BDE565"/>
-          <stop value="40" color="#8BD595"/>
-          <stop value="50" color="#93FDFF"/>
-          <stop value="60" color="#94CBFF"/>
-          <stop value="70" color="#0069FE"/>
-          <stop value="80" color="#003A94"/>
-          <stop value="90" color="#CF23E6"/>
+          <stop value="100" color="#F7EBC7"/>
+          <stop value="200" color="#EFCA54"/>
+          <stop value="400" color="#BDE565"/>
+          <stop value="800" color="#8BD595"/>
+          <stop value="1600" color="#93FDFF"/>
+          <stop value="3200" color="#94CBFF"/>
+          <stop value="6400" color="#0069FE"/>
+          <stop value="12800" color="#003A94"/>
+          <stop value="25600" color="#CF23E6"/>
         </RasterColorizer>
       </RasterSymbolizer>
     </Rule>

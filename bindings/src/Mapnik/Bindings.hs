@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Mapnik.Bindings (
   Map (..)
 , Image (..)
@@ -40,7 +41,8 @@ module Mapnik.Bindings (
 , FeatureList
 , QueryPtr
 , FeaturePtr (..)
-, FieldPtr
+, RGBA8 (..)
+, RasterPtr
 , FeatureCtx
 , MapnikInt
 , mapnikCtx
@@ -53,6 +55,9 @@ import qualified Language.C.Inline.Cpp.Exceptions as C
 import           Data.Monoid (mempty, (<>))
 import           Language.C.Inline.Context
 import qualified Language.C.Types as C
+import           Data.Word
+import           Data.Int
+import           Foreign.Storable (Storable)
 import           Foreign.ForeignPtr (ForeignPtr)
 import           Foreign.Ptr (Ptr, FunPtr)
 
@@ -90,13 +95,16 @@ fptr(QueryPtr)
 fptr(FeaturePtr)
 fptr(FeatureList)
 fptr(FeatureCtx)
-fptr(FieldPtr)
+fptr(RasterPtr)
 
 #ifdef BIGINT
 type MapnikInt = C.CLong
 #else
 type MapnikInt = C.CInt
 #endif
+
+newtype RGBA8 = RGBA8 Word32
+  deriving (Eq, Storable)
 
 mapnikCtx :: Context
 mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCtx <> ctx
@@ -135,7 +143,7 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "layout_node", [t| LayoutNode |])
       , (C.TypeName "list_node", [t| ListNode |])
       , (C.TypeName "sym_value_type", [t| SymbolizerValue |])
-      , (C.TypeName "value_type", [t| FieldPtr |])
+      , (C.TypeName "raster_ptr", [t| RasterPtr |])
       , (C.TypeName "bool", [t| Bool |])
       , (C.TypeName "feature_list", [t| FeatureList |])
       , (C.TypeName "query", [t| QueryPtr |])
@@ -144,5 +152,16 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "bbox", [t| Box |])
       , (C.TypeName "features_callback", [t|FunPtr (Ptr FeatureCtx -> Ptr FeatureList -> Ptr QueryPtr -> IO ())|])
       , (C.TypeName "features_at_point_callback", [t|FunPtr (Ptr FeatureCtx -> Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ())|])
+      , (C.TypeName "pixel_rgba8", [t| RGBA8 |])
+      , (C.TypeName "pixel_gray8", [t| Word8 |])
+      , (C.TypeName "pixel_gray8s", [t| Int8 |])
+      , (C.TypeName "pixel_gray16", [t| Word16 |])
+      , (C.TypeName "pixel_gray16s", [t| Int16 |])
+      , (C.TypeName "pixel_gray32", [t| Word32 |])
+      , (C.TypeName "pixel_gray32s", [t| Int32 |])
+      , (C.TypeName "pixel_gray32f", [t| Float |])
+      , (C.TypeName "pixel_gray64", [t| Word64 |])
+      , (C.TypeName "pixel_gray64s", [t| Int64 |])
+      , (C.TypeName "pixel_gray64f", [t| Double |])
       ]
     }

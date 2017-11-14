@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -8,10 +9,13 @@ module Mapnik.Bindings.Feature (
 , Geometry (..)
 , Field (..)
 , createFeature
+, createRasterFeature
 ) where
 
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
+import           Mapnik.Bindings.Raster
+import           Mapnik.Bindings.Variant
 
 import           Control.Exception (bracket)
 import           Control.Monad (forM_)
@@ -132,10 +136,19 @@ createFeature ctx f = unsafeNew $ \ret -> do
       feat->set_data(*fs);
     }|]
   where 
-    Feature { fid = (fromIntegral -> fid')
-            , ..
-            }  = f
+    Feature {fid=(fromIntegral -> fid'),..}  = f
 
     withVec = bracket alloc dealloc where
       alloc = [CU.exp|void * { new feature_impl::cont_type() }|]
       dealloc p = [CU.exp| void { delete static_cast<feature_impl::cont_type*>($(void *p)) } |]
+
+createRasterFeature
+  :: Variant RasterPtr (Raster a)
+  => Ptr FeatureCtx -> Raster a -> IO FeaturePtr
+createRasterFeature ctx r = unsafeNew $ \ret -> withV r $ \raster ->
+  [CU.block|void {
+  auto feat = *$(feature_ptr **ret) = new feature_ptr(
+    feature_factory::create(*$(context_ptr *ctx), 0)
+    );
+  feat->get()->set_raster(*$(raster_ptr *raster));
+  }|]

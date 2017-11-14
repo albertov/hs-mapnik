@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 module Mapnik.BindingsSpec (main, spec) where
 
 import qualified Data.ByteString as BS
@@ -12,6 +13,7 @@ import           Mapnik.Bindings
 import           Mapnik.Bindings.Registry (registerDefaults)
 import           Mapnik.Bindings.Map as Map
 import           Mapnik.Bindings.Image as Image
+import           Mapnik.Bindings.Raster as Raster
 import           Mapnik.Bindings.Layer as Layer
 import           Mapnik.Bindings.Projection as Projection
 import           Mapnik.Bindings.Rule as Rule
@@ -26,10 +28,12 @@ import           Mapnik.Bindings.FromMapnik
 import           Control.Lens hiding ((.=))
 import           Control.Monad (void)
 import           Data.Text (Text)
+import           Data.Int
 import           Data.IORef
-import           Data.Maybe (isJust, isNothing)
+import           Data.Maybe (isJust, isNothing, fromJust)
 import           Data.List (lookup)
 import           Data.Either (isLeft, isRight)
+import qualified Data.Vector.Storable as V
 
 main :: IO ()
 main = hspec spec
@@ -291,7 +295,7 @@ spec = beforeAll_ registerDefaults $ do
                 . L.stops
                 . traverse
                 . L.value
-        m^..lns `shouldBe` [0,10..90]
+        m^..lns `shouldBe` [0,100,200,400,800,1600,3200,6400,12800,25600]
 
   describe "TextPlacements" $ do
     it "can create" $ do
@@ -299,7 +303,7 @@ spec = beforeAll_ registerDefaults $ do
       ps' <- TextPlacements.unCreate =<< TextPlacements.create ps
       ps `shouldBe` ps'
 
-  describe "HsDatasource" $ do
+  describe "HsVector" $ do
     it "can create" $ do
       m <- Map.create 512 512
       loadFixture m
@@ -329,8 +333,41 @@ spec = beforeAll_ registerDefaults $ do
       _ <- Map.render m 1
       Just q <- readIORef ref
       box q `shouldBe` theExtent
-      unbufferedBox q `shouldBe` theExtent
+      unBufferedBox q `shouldBe` theExtent
       resolution q `shouldBe` Pair 5.12 5.12
+
+  describe "HsRaster" $ do
+    it "can create" $ do
+      let w = 256; h=256
+      m <- Map.create w h
+      loadFixture m
+      Map.removeAllLayers m
+      Map.setSrs m "+init=epsg:3857"
+      l <- Layer.create "fooo"
+      Layer.setSrs l "+init=epsg:3857"
+      let theExtent = Box 0 0 100 100
+      ds <- createHsDatasource HsRaster
+        { name = "fooo"
+        , extent = theExtent
+        , getRaster = \q -> do
+            return Raster
+              { extent = box q
+              , queryExtent = box q
+              , filterFactor = 1
+              , width = w
+              , height = h
+              , nodata = Nothing
+              , pixels = V.generate (w*h) fromIntegral :: V.Vector Int32
+              }
+        , getFeaturesAtPoint = \_ _ -> return []
+        }
+      Layer.setDatasource l ds
+      Layer.addStyle l "raster-style"
+      Map.addLayer m l
+      Map.zoomAll m
+      _img <- Map.render m 1
+      --BS.writeFile "map.webp" (fromJust (Image.serialize "webp" _img))
+      return ()
 
 loadFixture :: Map -> IO ()
 loadFixture m = do
