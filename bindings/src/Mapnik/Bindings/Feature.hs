@@ -23,8 +23,20 @@ C.context mapnikCtx
 C.include "<string>"
 C.include "<mapnik/feature.hpp>"
 C.include "<mapnik/feature_factory.hpp>"
+C.include "<mapnik/geometry.hpp>"
+C.include "<mapnik/wkb.hpp>"
+C.include "<mapnik/wkt/wkt_factory.hpp>"
+C.include "<mapnik/wkt/wkt_grammar.hpp>"
+C.include "<mapnik/wkt/wkt_grammar_impl.hpp>"
+C.include "<mapnik/wkt/wkt_generator_grammar.hpp>"
+
+-- Mapnik does not export this template instantiation that the inlined
+-- from_wkt needs so we instantitate it here
+C.verbatim "using iterator_type = std::string::const_iterator;"
+C.verbatim "template struct mapnik::wkt::wkt_grammar<iterator_type>;"
 
 C.using "namespace mapnik"
+C.using "mapnik::geometry_utils"
 
 data Geometry
   = GeometryWKB !ByteString
@@ -48,9 +60,24 @@ unsafeNew = mkUnsafeNew FeaturePtr destroyFeature
 createFeature :: Ptr FeatureCtx -> Feature -> IO FeaturePtr
 createFeature ctx Feature{ fid = (fromIntegral -> fid')
                          , ..
-                         } = unsafeNew $ \ret ->
+                         } = unsafeNew $ \ret -> do
   [CU.block|void {
-  *$(feature_ptr **ret) = new feature_ptr(
+  auto feat = *$(feature_ptr **ret) = new feature_ptr(
     feature_factory::create(*$(context_ptr *ctx), $(value_integer fid'))
     );
   }|]
+  case geometry of
+    GeometryWKB wkb ->
+      [CU.block|void {
+      auto feat = **$(feature_ptr **ret);
+      feat->set_geometry(geometry_utils::from_wkb($bs-ptr:wkb, $bs-len:wkb, mapnik::wkbAuto));
+      }|]
+    GeometryWKT wkt ->
+      [CU.block|void{
+      auto feat = **$(feature_ptr **ret);
+      mapnik::geometry::geometry<double> geom;
+      if (mapnik::from_wkt(std::string($bs-ptr:wkt, $bs-len:wkt), geom)) {
+        feat->set_geometry(std::move(geom));
+      }
+      }|]
+  --TODO feature attributes
