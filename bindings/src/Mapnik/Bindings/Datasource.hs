@@ -35,6 +35,7 @@ import           Mapnik.Bindings.Feature
 
 import           System.IO
 import           Control.Exception (throwIO, catch, SomeException)
+import           Data.Vector (Vector)
 import           Control.Monad (forM_)
 import           Data.ByteString.Unsafe (unsafePackMallocCString)
 import           Data.Text (Text)
@@ -188,7 +189,7 @@ data Pair = Pair { x, y :: !Double }
 data HsDatasource = HsVector
   { name               :: !Text
   , extent             :: !Box
-  , fieldNames         :: ![Text]
+  , fieldNames         :: !(Vector Text)
   , getFeatures        :: !(Query -> IO [Feature])
   , getFeaturesAtPoint :: !(Pair -> Double -> IO [Feature])
   }
@@ -210,6 +211,11 @@ createHsDatasource HsVector{..} = with extent $ \e -> unsafeNew $ \ ptr -> do
     );
   *$(datasource_ptr** ptr) = new datasource_ptr(p);
   }|]
+  forM_ fieldNames $ \(encodeUtf8 -> v) ->
+    [CU.block|void {
+      auto ds = dynamic_cast<hs_datasource*>((*$(datasource_ptr **ptr))->get());
+      ds->push_key(std::string($bs-ptr:v, $bs-len:v));
+    }|]
 
   where
     getFeatures' ctx fs q = catchingExceptions "getFeatures" $
@@ -220,7 +226,7 @@ createHsDatasource HsVector{..} = with extent $ \e -> unsafeNew $ \ ptr -> do
         mapM_ (pushBack ctx fs) =<< getFeaturesAtPoint (Pair x y) tol
 
     pushBack ctx fs = \f -> do
-      f' <- createFeature fieldNames ctx f
+      f' <- createFeature ctx f
       [CU.block|void {
         $(feature_list *fs)->push_back(*$fptr-ptr:(feature_ptr *f')); }
       |]

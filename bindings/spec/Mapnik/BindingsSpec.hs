@@ -20,6 +20,7 @@ import           Mapnik.Bindings.Transform as Transform
 import           Mapnik.Bindings.Expression as Expression
 import           Mapnik.Bindings.Datasource as Datasource
 import           Mapnik.Bindings.Symbolizer as Symbolizer
+import           Mapnik.Bindings.Feature as Feature
 import           Mapnik.Bindings.TextPlacements as TextPlacements
 import           Mapnik.Bindings.FromMapnik
 import           Control.Lens hiding ((.=))
@@ -311,12 +312,12 @@ spec = beforeAll_ registerDefaults $ do
       ds <- createHsDatasource HsVector
         { name = "fooo"
         , extent = theExtent
-        , fieldNames = ["foo"]
+        , fieldNames = ["aString", "anInt", "aBool", "aDouble", "aNull"]
         , getFeatures = \q -> do
             writeIORef ref (Just q)
             return [ Feature { fid=105
                              , geometry="LINESTRING (30 10, 10 30, 40 40)"
-                             , fields=["bar"]
+                             , fields=["bar", IntField 3, BoolField False, DoubleField 3.2, NullField]
                              }
                    ]
         , getFeaturesAtPoint = \_ _ -> return []

@@ -30,7 +30,8 @@ hs_datasource::hs_datasource( std::string const& layer_name
     extent_(extent),
     geom_type_(geom_type),
     get_features_(fcb),
-    get_features_at_point_(fapcb)
+    get_features_at_point_(fapcb),
+    ctx_(std::make_shared<mapnik::context_type>())
     {}
 
 hs_datasource::~hs_datasource()
@@ -48,8 +49,7 @@ datasource::datasource_t hs_datasource::type() const
 featureset_ptr hs_datasource::features(const query& q) const
 {
   hs_featureset::feature_list_ptr features = std::make_shared<hs_featureset::feature_list>();
-  auto ctx = std::make_shared<mapnik::context_type>();
-  get_features_(&ctx, features.get(), &q);
+  get_features_(const_cast<context_ptr*>(&ctx_), features.get(), &q);
   return std::make_shared<hs_featureset>(features, type_);
 }
 
@@ -57,8 +57,7 @@ featureset_ptr hs_datasource::features(const query& q) const
 featureset_ptr hs_datasource::features_at_point(coord2d const& pt, double tol) const
 {
   hs_featureset::feature_list_ptr features = std::make_shared<hs_featureset::feature_list>();
-  auto ctx = std::make_shared<mapnik::context_type>();
-  get_features_at_point_(&ctx, features.get(), pt.x, pt.y, tol);
+  get_features_at_point_(const_cast<context_ptr*>(&ctx_), features.get(), pt.x, pt.y, tol);
   return std::make_shared<hs_featureset>(features, type_);
 }
 
@@ -78,5 +77,9 @@ layer_descriptor hs_datasource::get_descriptor() const
   return desc_;
 }
 
+void hs_datasource::push_key(std::string const& name)
+{
+  ctx_->push(name);
+}
 
 }

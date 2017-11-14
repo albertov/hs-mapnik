@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -5,17 +6,20 @@
 module Mapnik.Bindings.Feature (
   Feature (..)
 , Geometry (..)
+, Field (..)
 , createFeature
 ) where
 
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 
+import           Control.Exception (bracket)
 import           Control.Monad (forM_)
 import           Data.ByteString (ByteString)
 import           Data.String (IsString(..))
 import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
+import           Data.Vector (Vector)
 import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
 import qualified Language.C.Inline.Cpp as C
@@ -64,7 +68,7 @@ instance IsString Geometry where
 data Feature = Feature
   { fid      :: !Int
   , geometry :: !Geometry
-  , fields   :: ![Field]
+  , fields   :: !(Vector Field)
   }
   deriving (Eq, Show)
 
@@ -73,8 +77,8 @@ foreign import ccall "&hs_mapnik_destroy_Feature" destroyFeature :: FinalizerPtr
 unsafeNew :: (Ptr (Ptr FeaturePtr) -> IO ()) -> IO FeaturePtr
 unsafeNew = mkUnsafeNew FeaturePtr destroyFeature
 
-createFeature :: [Text] -> Ptr FeatureCtx -> Feature -> IO FeaturePtr
-createFeature names ctx f = unsafeNew $ \ret -> do
+createFeature :: Ptr FeatureCtx -> Feature -> IO FeaturePtr
+createFeature ctx f = unsafeNew $ \ret -> do
   [CU.block|void {
   auto feat = *$(feature_ptr **ret) = new feature_ptr(
     feature_factory::create(*$(context_ptr *ctx), $(value_integer fid'))
@@ -94,17 +98,44 @@ createFeature names ctx f = unsafeNew $ \ret -> do
         feat->set_geometry(std::move(geom));
       }
       }|]
-  forM_ (zip names fields) $ \(encodeUtf8 -> k, val) ->
-    case val of
+  withVec $ \fs -> do
+    forM_ fields $ \case
       TextField (encodeUtf8 -> v) ->
         [CU.block|void{
-          auto feat = **$(feature_ptr **ret);
-          auto key = std::string($bs-ptr:k, $bs-len:k);
-
           static const mapnik::transcoder tr("utf-8");
-          feat->put_new(key, tr.transcode($bs-ptr:v, $bs-len:v));
+          auto fs = static_cast<feature_impl::cont_type*>($(void *fs));
+          fs->push_back(tr.transcode($bs-ptr:v, $bs-len:v));
         }|]
+      IntField (fromIntegral -> v) ->
+        [CU.block|void{
+          auto fs = static_cast<feature_impl::cont_type*>($(void *fs));
+          fs->push_back($(value_integer v));
+        }|]
+      DoubleField (realToFrac -> v) ->
+        [CU.block|void{
+          auto fs = static_cast<feature_impl::cont_type*>($(void *fs));
+          fs->push_back($(double v));
+        }|]
+      BoolField (fromIntegral . fromEnum -> v) ->
+        [CU.block|void{
+          auto fs = static_cast<feature_impl::cont_type*>($(void *fs));
+          fs->push_back($(int v)?true:false);
+        }|]
+      NullField ->
+        [CU.block|void{
+          auto fs = static_cast<feature_impl::cont_type*>($(void *fs));
+          fs->push_back(value_null());
+        }|]
+    [CU.block|void{
+      auto feat = **$(feature_ptr **ret);
+      auto fs = static_cast<feature_impl::cont_type*>($(void *fs));
+      feat->set_data(*fs);
+    }|]
   where 
     Feature { fid = (fromIntegral -> fid')
             , ..
             }  = f
+
+    withVec = bracket alloc dealloc where
+      alloc = [CU.exp|void * { new feature_impl::cont_type() }|]
+      dealloc p = [CU.exp| void { delete static_cast<feature_impl::cont_type*>($(void *p)) } |]

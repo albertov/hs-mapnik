@@ -35,6 +35,7 @@ public:
   virtual box2d<double> envelope() const;
   virtual boost::optional<datasource_geometry_t> get_geometry_type() const;
   virtual layer_descriptor get_descriptor() const;
+  void  push_key(std::string const&);
 private:
   const mapnik::layer_descriptor desc_;
   const datasource::datasource_t type_;
@@ -42,6 +43,7 @@ private:
   const boost::optional<datasource_geometry_t> geom_type_;
   features_callback get_features_;
   features_at_point_callback get_features_at_point_;
+  context_ptr ctx_;
 };
 
 }
