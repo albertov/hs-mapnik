@@ -11,6 +11,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DuplicateRecordFields #-}
@@ -27,7 +28,7 @@ import           Mapnik ( Transform(..), Prop (..) )
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()
-import           Mapnik.Bindings.SymbolizerValue (SymValue(..))
+import           Mapnik.Bindings.Variant (Variant(..))
 import           Mapnik.Bindings.TextPlacements ()
 
 import           Data.IORef
@@ -87,11 +88,8 @@ getProperties :: Symbolizer -> IO [Property]
 getProperties sym' = bracket alloc dealloc $ \sym -> do
   ret <- newIORef []
   let cb :: Ptr SymbolizerValue -> C.CUChar -> IO ()
-      cb p = withKey $ \k -> do
-               v <- peekSv p
-               case v of
-                 Just prop -> modifyIORef ret ((k :=> prop):)
-                 Nothing   -> throwIO (userError "Unexpected type")
+      cb p = withKey $ \k -> do prop <- peekV p
+                                modifyIORef ret ((k :=> prop):)
   [C.block|void {
     symbolizer_base::cont_type const& props =
       $(symbolizer_base *sym)->properties;
@@ -160,7 +158,7 @@ castSym Mapnik.Dot{} p =
 
 
 data Property where
-  (:=>) :: SymValue v => Key v -> Prop v -> Property
+  (:=>) :: Variant SymbolizerValue v => Key v -> Prop v -> Property
 
 type Properties = [Property]
 
@@ -507,14 +505,14 @@ symbolizerProps = lens getProps setProps where
       ]
 
 setProperty :: Property -> Ptr SymbolizerBase -> IO ()
-setProperty ((keyIndex -> k) :=> (flip pokeSv -> cb)) sym =
+setProperty ((keyIndex -> k) :=> (flip pokeV -> cb)) sym =
   [C.block|void {
     sym_value_type val;
     $fun:(void (*cb)(sym_value_type*))(&val);
     $(symbolizer_base *sym)->properties[$(keys k)] = val;
   }|]
 
-withKey :: (forall a. SymValue a => Key a -> IO b) -> C.CUChar -> IO b
+withKey :: (forall a. Variant SymbolizerValue a => Key a -> IO b) -> C.CUChar -> IO b
 withKey f = \k -> if
   | k == [CU.pure|keys{keys::gamma}|] -> f Gamma
   | k == [CU.pure|keys{keys::gamma_method}|] -> f GammaMethod

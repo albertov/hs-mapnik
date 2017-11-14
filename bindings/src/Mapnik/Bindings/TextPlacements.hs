@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -15,7 +16,7 @@ module Mapnik.Bindings.TextPlacements (
 import qualified Mapnik
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
-import           Mapnik.Bindings.SymbolizerValue (SymValue(..))
+import           Mapnik.Bindings.Variant (Variant(..), justOrTypeError)
 import qualified Mapnik.Bindings.TextSymProperties as Props
 import           Control.Exception (throwIO)
 import           Control.Monad (when)
@@ -73,9 +74,9 @@ unCreate (TextPlacements fp) = withForeignPtr fp $ \p -> do
   }|]
 
 
-instance SymValue Mapnik.TextPlacements where
-  peekSv p = mapM unCreate =<<
-    unsafeNewMaybe (\ret ->
+instance Variant SymbolizerValue Mapnik.TextPlacements where
+  peekV p = unCreate =<<
+    justOrTypeError (unsafeNewMaybe $ \ret ->
       [CU.block|void {
       try {
         *$(text_placements_ptr **ret) =
@@ -84,6 +85,6 @@ instance SymValue Mapnik.TextPlacements where
         *$(text_placements_ptr **ret) = nullptr;
       }
       }|])
-  pokeSv p v' = do
+  pokeV p v' = do
     v <- create v'
     [CU.block|void { *$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(text_placements_ptr *v)); }|]

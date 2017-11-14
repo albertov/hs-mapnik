@@ -34,6 +34,7 @@ library
                      , Mapnik.Bindings.Rule
                      , Mapnik.Bindings.Symbolizer
                      , Mapnik.Bindings.SymbolizerValue
+                     , Mapnik.Bindings.Variant
                      , Mapnik.Bindings.Expression
                      , Mapnik.Bindings.Transform
                      , Mapnik.Bindings.Util

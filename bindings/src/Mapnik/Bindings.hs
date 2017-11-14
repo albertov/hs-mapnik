@@ -40,6 +40,7 @@ module Mapnik.Bindings (
 , FeatureList
 , QueryPtr
 , FeaturePtr (..)
+, FieldPtr
 , FeatureCtx
 , MapnikInt
 , mapnikCtx
@@ -89,6 +90,7 @@ fptr(QueryPtr)
 fptr(FeaturePtr)
 fptr(FeatureList)
 fptr(FeatureCtx)
+fptr(FieldPtr)
 
 #ifdef BIGINT
 type MapnikInt = C.CLong
@@ -133,6 +135,7 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "layout_node", [t| LayoutNode |])
       , (C.TypeName "list_node", [t| ListNode |])
       , (C.TypeName "sym_value_type", [t| SymbolizerValue |])
+      , (C.TypeName "value_type", [t| FieldPtr |])
       , (C.TypeName "bool", [t| Bool |])
       , (C.TypeName "feature_list", [t| FeatureList |])
       , (C.TypeName "query", [t| QueryPtr |])

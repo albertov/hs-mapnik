@@ -23,6 +23,7 @@ configureWithMapnikConfig lbi flags = do
   myCppOptions   <- words <$> mapnikConfig ["--defines"]
   myCcOptions    <- words <$> mapnikConfig ["--defines", "--cxxflags"]
   myLdOptions    <- words <$> mapnikConfig ["--ldflags"]
+  icuLdOptions    <- words <$> icuConfig ["--ldflags"]
   mapnikInputPluginDir <- (escapeWinPathSep . head . words) <$>
     mapnikConfig ["--input-plugins"]
   mapnikFontDir <- (escapeWinPathSep . head . words) <$> (mapnikConfig ["--fonts"])
@@ -30,7 +31,7 @@ configureWithMapnikConfig lbi flags = do
                        , extraLibs    = extraLibs    bi ++ myExtraLibs
                        , includeDirs  = includeDirs  bi ++ myIncludeDirs
                        , ccOptions    = ccOptions    bi ++ myCcOptions
-                       , ldOptions    = ldOptions    bi ++ myLdOptions
+                       , ldOptions    = ldOptions    bi ++ myLdOptions ++ icuLdOptions
                        , cppOptions   = cppOptions   bi ++ mapnikCppOptions
                        , options      = options      bi ++ myGhcOptions
                        }

@@ -1,5 +1,5 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -16,7 +16,8 @@ module Mapnik.Bindings.TextSymProperties (
 import qualified Mapnik
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
-import           Mapnik.Bindings.SymbolizerValue (SymValue(..), withSv)
+import           Mapnik.Bindings.Variant (Variant(..), withV)
+import           Mapnik.Bindings.SymbolizerValue ()
 import qualified Mapnik.Bindings.Expression as Expression
 
 import           Control.Exception (bracket, throwIO)
@@ -61,7 +62,7 @@ unsafeNewFormat :: (Ptr (Ptr Format) -> IO ()) -> IO Format
 unsafeNewFormat = mkUnsafeNew Format destroyFormat
 
 #define SET_NODE_PROP(TY,HS,CPP) \
-    forM_ HS $ \v -> withSv v $ \v' -> [CU.block|void { \
+    forM_ HS $ \v -> withV v $ \v' -> [CU.block|void { \
       auto node = dynamic_cast<TY*>((*$(node_ptr **p))->get()); \
       node->CPP = *$(sym_value_type *v'); \
       }|]
@@ -128,9 +129,9 @@ createFormat f = unsafeNewFormat $ \p -> case f of
     SET_NODE_PROP(layout_node, verticalAlignment, valign)
 
 
-#define SET_PROP_T(HS,CPP) forM_ HS (\v -> (`pokeSv` v) =<< [CU.exp|sym_value_type *{ &$(text_properties_expressions *p)->CPP}|])
-#define SET_PROP_F(HS,CPP) forM_ HS (\v -> (`pokeSv` v) =<< [CU.exp|sym_value_type *{ &$(format_properties *p)->CPP}|])
-#define SET_PROP_L(HS,CPP) forM_ HS (\v -> (`pokeSv` v) =<< [CU.exp|sym_value_type *{ &$(text_layout_properties *p)->CPP}|])
+#define SET_PROP_T(HS,CPP) forM_ HS (\v -> (`pokeV` v) =<< [CU.exp|sym_value_type *{ &$(text_properties_expressions *p)->CPP}|])
+#define SET_PROP_F(HS,CPP) forM_ HS (\v -> (`pokeV` v) =<< [CU.exp|sym_value_type *{ &$(format_properties *p)->CPP}|])
+#define SET_PROP_L(HS,CPP) forM_ HS (\v -> (`pokeV` v) =<< [CU.exp|sym_value_type *{ &$(text_layout_properties *p)->CPP}|])
 
 withTextProperties :: Mapnik.TextProperties -> (Ptr TextProperties -> IO a) -> IO a
 withTextProperties Mapnik.TextProperties{..} = bracket alloc dealloc . enter
@@ -365,11 +366,11 @@ unFormat (Format fp) = withForeignPtr fp $ \p -> do
 
 
 readPropWith
-  :: SymValue a
+  :: Variant SymbolizerValue a
   => ((Ptr C.CInt, Ptr (Ptr SymbolizerValue)) -> IO ()) -> IO (Maybe a)
 readPropWith f = do
   (has,ret) <- C.withPtrs_ f
-  if has==1 then peekSv ret else return Nothing
+  if has==1 then Just <$> peekV ret else return Nothing
 
 #define GET_PROP(PS, HS, CPP) \
   HS <- readPropWith $ \(has,ret) -> \

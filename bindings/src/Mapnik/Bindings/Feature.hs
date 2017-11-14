@@ -11,8 +11,11 @@ module Mapnik.Bindings.Feature (
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 
+import           Control.Monad (forM_)
 import           Data.ByteString (ByteString)
 import           Data.String (IsString(..))
+import           Data.Text (Text)
+import           Data.Text.Encoding (encodeUtf8)
 import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
 import qualified Language.C.Inline.Cpp as C
@@ -29,6 +32,7 @@ C.include "<mapnik/wkt/wkt_factory.hpp>"
 C.include "<mapnik/wkt/wkt_grammar.hpp>"
 C.include "<mapnik/wkt/wkt_grammar_impl.hpp>"
 C.include "<mapnik/wkt/wkt_generator_grammar.hpp>"
+C.include "<mapnik/unicode.hpp>"
 
 -- Mapnik does not export this template instantiation that the inlined
 -- from_wkt needs so we instantitate it here
@@ -37,6 +41,17 @@ C.verbatim "template struct mapnik::wkt::wkt_grammar<iterator_type>;"
 
 C.using "namespace mapnik"
 C.using "mapnik::geometry_utils"
+
+data Field
+  = TextField   !Text
+  | BoolField   !Bool
+  | IntField    !Int
+  | DoubleField !Double
+  | NullField
+  deriving (Eq, Show)
+
+instance IsString Field where
+  fromString = TextField . fromString
 
 data Geometry
   = GeometryWKB !ByteString
@@ -49,6 +64,7 @@ instance IsString Geometry where
 data Feature = Feature
   { fid      :: !Int
   , geometry :: !Geometry
+  , fields   :: ![Field]
   }
   deriving (Eq, Show)
 
@@ -57,10 +73,8 @@ foreign import ccall "&hs_mapnik_destroy_Feature" destroyFeature :: FinalizerPtr
 unsafeNew :: (Ptr (Ptr FeaturePtr) -> IO ()) -> IO FeaturePtr
 unsafeNew = mkUnsafeNew FeaturePtr destroyFeature
 
-createFeature :: Ptr FeatureCtx -> Feature -> IO FeaturePtr
-createFeature ctx Feature{ fid = (fromIntegral -> fid')
-                         , ..
-                         } = unsafeNew $ \ret -> do
+createFeature :: [Text] -> Ptr FeatureCtx -> Feature -> IO FeaturePtr
+createFeature names ctx f = unsafeNew $ \ret -> do
   [CU.block|void {
   auto feat = *$(feature_ptr **ret) = new feature_ptr(
     feature_factory::create(*$(context_ptr *ctx), $(value_integer fid'))
@@ -80,4 +94,17 @@ createFeature ctx Feature{ fid = (fromIntegral -> fid')
         feat->set_geometry(std::move(geom));
       }
       }|]
-  --TODO feature attributes
+  forM_ (zip names fields) $ \(encodeUtf8 -> k, val) ->
+    case val of
+      TextField (encodeUtf8 -> v) ->
+        [CU.block|void{
+          auto feat = **$(feature_ptr **ret);
+          auto key = std::string($bs-ptr:k, $bs-len:k);
+
+          static const mapnik::transcoder tr("utf-8");
+          feat->put_new(key, tr.transcode($bs-ptr:v, $bs-len:v));
+        }|]
+  where 
+    Feature { fid = (fromIntegral -> fid')
+            , ..
+            }  = f

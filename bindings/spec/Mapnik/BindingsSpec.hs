@@ -308,13 +308,15 @@ spec = beforeAll_ registerDefaults $ do
       Layer.setSrs l "+init=epsg:3857"
       ref <- newIORef Nothing
       let theExtent = Box 0 0 100 100
-      ds <- createHsDatasource HsDatasource
+      ds <- createHsDatasource HsVector
         { name = "fooo"
         , extent = theExtent
+        , fieldNames = ["foo"]
         , getFeatures = \q -> do
             writeIORef ref (Just q)
             return [ Feature { fid=105
                              , geometry="LINESTRING (30 10, 10 30, 40 40)"
+                             , fields=["bar"]
                              }
                    ]
         , getFeaturesAtPoint = \_ _ -> return []

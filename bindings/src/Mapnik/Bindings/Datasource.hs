@@ -185,9 +185,10 @@ data Query = Query
 data Pair = Pair { x, y :: !Double }
   deriving (Eq, Show)
 
-data HsDatasource = HsDatasource
+data HsDatasource = HsVector
   { name               :: !Text
   , extent             :: !Box
+  , fieldNames         :: ![Text]
   , getFeatures        :: !(Query -> IO [Feature])
   , getFeaturesAtPoint :: !(Pair -> Double -> IO [Feature])
   }
@@ -195,7 +196,7 @@ data HsDatasource = HsDatasource
 
 
 createHsDatasource :: HsDatasource -> IO Datasource
-createHsDatasource HsDatasource{..} = with extent $ \e -> unsafeNew $ \ ptr -> do
+createHsDatasource HsVector{..} = with extent $ \e -> unsafeNew $ \ ptr -> do
   fs <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> Ptr QueryPtr -> IO ()|]) getFeatures'
   fsp <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ()|]) getFeaturesAtPoint'
   [CU.block|void {
@@ -219,7 +220,7 @@ createHsDatasource HsDatasource{..} = with extent $ \e -> unsafeNew $ \ ptr -> d
         mapM_ (pushBack ctx fs) =<< getFeaturesAtPoint (Pair x y) tol
 
     pushBack ctx fs = \f -> do
-      f' <- createFeature ctx f
+      f' <- createFeature fieldNames ctx f
       [CU.block|void {
         $(feature_list *fs)->push_back(*$fptr-ptr:(feature_ptr *f')); }
       |]

@@ -1,4 +1,7 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -6,23 +9,22 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Mapnik.Bindings.SymbolizerValue (
-  SymValue(..)
-, unsafeNew
+  unsafeNew
 , unsafeNewMaybe
-, withSv
 ) where
 
 import qualified Mapnik
 import           Mapnik.Enums
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
+import           Mapnik.Bindings.Variant
 import qualified Mapnik.Bindings.GroupProperties as GroupProperties
 import qualified Mapnik.Bindings.Colorizer as Colorizer
 import qualified Mapnik.Bindings.Expression as Expression
 import qualified Mapnik.Bindings.Transform as Transform
 import           Mapnik.Bindings.Orphans ()
 
-import           Control.Exception (throwIO, bracket)
+import           Control.Exception
 import           Data.Text (Text, pack, unpack)
 import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Vector.Storable.Mutable as VM
@@ -57,23 +59,16 @@ unsafeNew = mkUnsafeNew SymbolizerValue destroySymbolizerValue
 unsafeNewMaybe :: (Ptr (Ptr SymbolizerValue) -> IO ()) -> IO (Maybe SymbolizerValue)
 unsafeNewMaybe = mkUnsafeNewMaybe SymbolizerValue destroySymbolizerValue
 
-withSv :: SymValue a => a -> (Ptr SymbolizerValue -> IO b) -> IO b
-withSv v f = allocaSv (\p -> pokeSv p v >> f p)
+instance VariantPtr SymbolizerValue where
+  allocaV = bracket alloc dealloc where
+    alloc = [CU.exp|sym_value_type * { new sym_value_type }|]
+    dealloc p = [CU.exp|void { delete $(sym_value_type *p)}|]
 
-allocaSv :: (Ptr SymbolizerValue -> IO a) -> IO a
-allocaSv = bracket alloc dealloc where
-  alloc = [CU.exp|sym_value_type * { new sym_value_type }|]
-  dealloc p = [CU.exp|void { delete $(sym_value_type *p)}|]
-
-
-class SymValue a where
-  pokeSv :: Ptr SymbolizerValue -> a -> IO ()
-  peekSv :: Ptr SymbolizerValue -> IO (Maybe a)
 
 #define SYM_VAL_PTR(HS,CPP) \
-instance SymValue Mapnik.HS where {\
-  peekSv p = mapM HS.unCreate =<<\
-    HS.unsafeNewMaybe (\ret ->\
+instance Variant SymbolizerValue Mapnik.HS where {\
+  peekV p = HS.unCreate =<<\
+    HS.unsafeNew (\ret ->\
       [CU.block|void {\
       try {\
         *$(CPP **ret) =\
@@ -82,7 +77,7 @@ instance SymValue Mapnik.HS where {\
         *$(CPP **ret) = nullptr;\
       }\
       }|]) ;\
-  pokeSv p v' = do {\
+  pokeV p v' = do {\
     v <-HS.create v';\
     [CU.block|void {\
       *$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(CPP *v));\
@@ -93,11 +88,11 @@ SYM_VAL_PTR(Colorizer,raster_colorizer_ptr)
 SYM_VAL_PTR(GroupProperties,group_symbolizer_properties_ptr)
 
 
-#define SYM_VAL(HS,CPP,FROM,TO) \
-instance SymValue HS where {\
-  pokeSv p v' = FROM v' >>= \v -> \
+#define SYM_VAL(HS,CPP,CONV) \
+instance Variant SymbolizerValue HS where {\
+  pokeV p (CONV -> v) = \
     [CU.block|void { *$(sym_value_type *p) = sym_value_type($(CPP v)); }|]; \
-  peekSv p = mapM TO =<< newMaybe (\(has,ret) -> \
+  peekV p = fmap CONV $ justOrTypeError $ newMaybe (\(has,ret) -> \
     [CU.block|void { \
     try { \
       *$(CPP *ret) = util::get<CPP>(*$(sym_value_type *p)); \
@@ -109,10 +104,10 @@ instance SymValue HS where {\
 }
 
 #define SYM_VAL_ENUM(HS,CPP) \
-instance SymValue HS where {\
-  pokeSv p (fromIntegral . fromEnum -> v) = \
+instance Variant SymbolizerValue HS where {\
+  pokeV p (fromIntegral . fromEnum -> v) = \
     [CU.block|void { *$(sym_value_type *p) = enumeration_wrapper(static_cast<CPP>($(int v)));}|]; \
-  peekSv p = fmap (fmap (toEnum . fromIntegral)) <$> newMaybe $ \(has,ret) -> \
+  peekV p = fmap (toEnum . fromIntegral) $ justOrTypeError $ newMaybe $ \(has,ret) -> \
     [CU.block|void { \
     try { \
       *$(int *ret) = static_cast<int>(util::get<enumeration_wrapper>(*$(sym_value_type *p))); \
@@ -124,9 +119,9 @@ instance SymValue HS where {\
 }
 
 
-SYM_VAL(Int,value_integer,(return.fromIntegral),(return.fromIntegral))
-SYM_VAL(Double,double,(return.realToFrac),(return.realToFrac))
-SYM_VAL(Bool,bool,return,return)
+SYM_VAL(Int,value_integer,fromIntegral)
+SYM_VAL(Double,double,realToFrac)
+SYM_VAL(Bool,bool,id)
 SYM_VAL_ENUM(CompositeMode,composite_mode_e)
 SYM_VAL_ENUM(LineCap,line_cap_enum)
 SYM_VAL_ENUM(LineJoin,line_join_enum)
@@ -148,15 +143,17 @@ SYM_VAL_ENUM(GammaMethod,gamma_method_enum)
 SYM_VAL_ENUM(ScalingMethod,scaling_method_e)
 SYM_VAL_ENUM(SimplifyAlgorithm,simplify_algorithm_e)
 
-instance SymValue a => SymValue (Mapnik.Prop a) where
-  peekSv p = maybe (fmap Mapnik.Val <$> peekSv p)
-                   (return . Just . Mapnik.Exp)
-             =<< peekSv p
-  pokeSv p (Mapnik.Exp a) = pokeSv p a
-  pokeSv p (Mapnik.Val a) = pokeSv p a
+instance Variant SymbolizerValue a => Variant SymbolizerValue (Mapnik.Prop a) where
+  peekV p = do
+    val <- try (peekV p)
+    case val of
+      Right v -> return (Mapnik.Exp v)
+      Left VariantTypeError -> Mapnik.Val <$> peekV p
+  pokeV p (Mapnik.Exp a) = pokeV p a
+  pokeV p (Mapnik.Val a) = pokeV p a
 
-instance SymValue Text where
-  peekSv p =
+instance Variant SymbolizerValue Text where
+  peekV p = justOrTypeError $
     newTextMaybe $ \(ptr, len) ->
       [CU.block|void {
       try {
@@ -167,18 +164,18 @@ instance SymValue Text where
         *$(char** ptr) = nullptr;
       }
       }|]
-  pokeSv p (encodeUtf8 -> v) =
+  pokeV p (encodeUtf8 -> v) =
     [C.catchBlock|
       *$(sym_value_type *p) = sym_value_type(std::string($bs-ptr:v, $bs-len:v));
     |]
 
-instance SymValue String where
-  peekSv = fmap (fmap unpack) . peekSv
-  pokeSv p = pokeSv p . pack
+instance Variant SymbolizerValue String where
+  peekV = fmap unpack . peekV
+  pokeV p = pokeV p . pack
 
-instance SymValue Mapnik.Expression where
-  peekSv p = 
-    fmap (fmap Mapnik.Expression) $ newTextMaybe $ \(ret, len) ->
+instance Variant SymbolizerValue Mapnik.Expression where
+  peekV p = 
+    fmap Mapnik.Expression $ justOrTypeError $ newTextMaybe $ \(ret, len) ->
       [CU.block|void {
       try {
         auto expr = util::get<expression_ptr>(*$(sym_value_type *p));
@@ -193,15 +190,15 @@ instance SymValue Mapnik.Expression where
         *$(char** ret) = nullptr;
       }
       }|]
-  pokeSv p (Mapnik.Expression expr) =
+  pokeV p (Mapnik.Expression expr) =
     case Expression.parse expr of
       Right v ->
         [CU.block|void{ *$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(expression_ptr *v)); }|]
       Left e -> throwIO (userError e)
 
-instance SymValue Mapnik.FontFeatureSettings where
-  peekSv p =
-    fmap (fmap Mapnik.FontFeatureSettings) $ newTextMaybe $ \(ptr, len) ->
+instance Variant SymbolizerValue Mapnik.FontFeatureSettings where
+  peekV p =
+    fmap Mapnik.FontFeatureSettings $ justOrTypeError $ newTextMaybe $ \(ptr, len) ->
       [CU.block|void {
       try {
         auto v = util::get<font_feature_settings>(*$(sym_value_type *p));
@@ -212,13 +209,13 @@ instance SymValue Mapnik.FontFeatureSettings where
         *$(char** ptr) = nullptr;
       }
       }|]
-  pokeSv p (Mapnik.FontFeatureSettings (encodeUtf8 -> v)) =
+  pokeV p (Mapnik.FontFeatureSettings (encodeUtf8 -> v)) =
     [C.catchBlock|
       *$(sym_value_type *p) = sym_value_type(font_feature_settings(std::string($bs-ptr:v, $bs-len:v)));
     |]
 
-instance SymValue Mapnik.DashArray where
-  pokeSv p dashes =
+instance Variant SymbolizerValue Mapnik.DashArray where
+  pokeV p dashes =
     [CU.block|void {
       std::vector<dash_t> dashes($vec-len:dashes);
       for (int i=0; i<$vec-len:dashes; i++) {
@@ -227,7 +224,7 @@ instance SymValue Mapnik.DashArray where
       *$(sym_value_type *p) = sym_value_type(dashes);
     }|]
 
-  peekSv p = do
+  peekV p = do
     (fromIntegral -> len, castPtr -> ptr) <- C.withPtrs_ $ \(len,ptr) ->
       [CU.block|void{
       try {
@@ -245,11 +242,11 @@ instance SymValue Mapnik.DashArray where
       }|]
     if ptr /= nullPtr then do
       fp <- newForeignPtr finalizerFree ptr
-      Just <$> V.freeze (VM.unsafeFromForeignPtr0 fp len)
-    else return Nothing
+      V.freeze (VM.unsafeFromForeignPtr0 fp len)
+    else throwIO VariantTypeError
 
-instance SymValue Mapnik.Color where
-  peekSv p = newMaybe $ \(has,ret) ->
+instance Variant SymbolizerValue Mapnik.Color where
+  peekV p = justOrTypeError $ newMaybe $ \(has,ret) ->
     [CU.block|void {
     try {
       *$(color *ret) = util::get<color>(*$(sym_value_type *p));
@@ -258,18 +255,18 @@ instance SymValue Mapnik.Color where
       *$(int *has) = 0;
     }
     }|]
-  pokeSv p c = with c $ \cPtr ->
+  pokeV p c = with c $ \cPtr ->
     [CU.block|void {*$(sym_value_type *p) = *$(color *cPtr);}|]
 
-instance SymValue Mapnik.Transform where
-  pokeSv p (Mapnik.Transform expr) =
+instance Variant SymbolizerValue Mapnik.Transform where
+  pokeV p (Mapnik.Transform expr) =
     case Transform.parse expr of
       Right v ->
         [CU.block|void {*$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(transform_type *v));}|]
       Left e -> throwIO (userError e)
 
-  peekSv p =
-    fmap (fmap Mapnik.Transform) $ newTextMaybe $ \(ptr, len) ->
+  peekV p =
+    fmap Mapnik.Transform $ justOrTypeError $ newTextMaybe $ \(ptr, len) ->
       [CU.block|void {
       try {
         auto t = util::get<transform_type>(*$(sym_value_type *p));
