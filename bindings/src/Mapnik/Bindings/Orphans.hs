@@ -11,15 +11,16 @@ module Mapnik.Bindings.Orphans (
 ) where
 
 import qualified Mapnik
+import           Mapnik (Value(..))
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Variant
 
 import           Control.Exception (bracket, throwIO)
 import           Data.Text.Foreign (useAsPtr)
-import           Data.Text.Encoding (decodeUtf8)
+import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import           Data.ByteString.Unsafe (unsafePackMallocCString)
 import           Foreign.Storable (Storable(..))
-import           Foreign.Ptr (castPtr)
+import           Foreign.Ptr (Ptr, castPtr)
 import           Foreign.Marshal.Alloc (alloca)
 
 import qualified Language.C.Inline.Cpp as C
@@ -33,6 +34,7 @@ C.include "<mapnik/box2d.hpp>"
 C.include "<mapnik/color_factory.hpp>"
 C.include "<mapnik/feature.hpp>"
 C.include "<mapnik/unicode.hpp>"
+C.include "<mapnik/params.hpp>"
 C.include "value_util.hpp"
 
 C.using "namespace mapnik"
@@ -107,7 +109,10 @@ instance Variant Value Value where
     [CU.block|void{
       util::apply_visitor(value_extractor_visitor($(void *res), $(int *ty)), *$(value *p));
     }|]
-    type_ <- peek ty
+    extractVal res =<< peek ty
+
+extractVal :: Ptr () -> C.CInt -> IO Value
+extractVal res type_ =
     case type_ of
       0 -> return NullValue
       1 -> DoubleValue . realToFrac   <$> peek @C.CDouble (castPtr res)
@@ -117,3 +122,25 @@ instance Variant Value Value where
        <$> (unsafePackMallocCString =<< peek (castPtr res))
       _ -> throwIO VariantTypeError
 
+instance VariantPtr Param where
+  allocaV = bracket alloc dealloc where
+    alloc = [CU.exp|value_holder * { new value_holder }|]
+    dealloc p = [CU.exp|void { delete $(value_holder *p)}|]
+
+instance Variant Param Value where
+  pokeV p (TextValue (encodeUtf8 -> v)) =
+    [CU.block|void{ *$(value_holder *p) = std::string ($bs-ptr:v, $bs-len:v); }|]
+  pokeV p (IntValue (fromIntegral -> v)) =
+    [CU.block|void{ *$(value_holder *p) = $(value_integer v); }|]
+  pokeV p (DoubleValue (realToFrac -> v)) =
+    [CU.block|void{ *$(value_holder *p) = $(double v); }|]
+  pokeV p (BoolValue (fromIntegral . fromEnum -> v)) =
+    [CU.block|void{ *$(value_holder *p) = $(int v) ? true : false ; }|]
+  pokeV p NullValue =
+    [CU.block|void{ *$(value_holder *p) = value_null(); }|]
+
+  peekV p = alloca $ \res -> alloca $ \ty -> do
+    [CU.block|void{
+      util::apply_visitor(value_extractor_visitor($(void *res), $(int *ty)), *$(value_holder *p));
+    }|]
+    extractVal res =<< peek ty

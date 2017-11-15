@@ -25,7 +25,7 @@ makeMapnikFields ''Map.Map
 makeMapnikFields ''Rule
 makeMapnikFields ''Style
 
-makePrisms ''ParamValue
+makePrisms ''Value
 
 class HasStyleLst s a | s -> a where
   styleLst :: Lens' s a
@@ -37,5 +37,5 @@ instance HasStyleLst Map.Map [(StyleName,Style)] where
 class HasParameters s a | s -> a where
   parameters :: Lens' s a
 
-instance HasParameters Datasource (M.HashMap Text ParamValue) where
+instance HasParameters Datasource (M.HashMap Text Value) where
   parameters = lens (\(Datasource s) -> s) (const Datasource) 

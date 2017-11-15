@@ -42,6 +42,12 @@ struct value_extractor_visitor
       *static_cast<char**>(retPtr_) = strdup(ret.c_str());
     }
 
+    void operator() (std::string const& val) const
+    {
+      *tyPtr_ = static_cast<int>(value_type::string_type);
+      *static_cast<char**>(retPtr_) = strdup(val.c_str());
+    }
+
     void operator() (value_bool const& val) const
     {
       *tyPtr_ = static_cast<int>(value_type::bool_type);

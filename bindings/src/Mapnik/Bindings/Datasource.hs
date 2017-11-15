@@ -29,7 +29,7 @@ module Mapnik.Bindings.Datasource (
 , module X
 ) where
 
-import           Mapnik.Parameter as X (ParamValue(..), Parameter, (.=))
+import           Mapnik.Parameter as X (Value(..), Parameter, (.=))
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()
@@ -38,7 +38,7 @@ import           Mapnik.Bindings.Variant
 import           Mapnik.Bindings.Raster
 
 import           System.IO
-import           Control.Exception (throwIO, catch, SomeException)
+import           Control.Exception (catch, SomeException)
 import           Data.Vector (Vector)
 import           Control.Monad (forM_)
 import           Data.ByteString (packCString)
@@ -46,8 +46,7 @@ import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.IORef
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
-import           Foreign.Ptr (Ptr, castPtr)
-import           Foreign.Storable
+import           Foreign.Ptr (Ptr)
 import           Foreign.C.String (CString)
 import           Foreign.Marshal.Utils (with)
 import           System.IO.Unsafe (unsafePerformIO)
@@ -66,7 +65,6 @@ C.include "<mapnik/attribute.hpp>"
 C.include "<mapnik/params.hpp>"
 C.include "<mapnik/datasource.hpp>"
 C.include "<mapnik/datasource_cache.hpp>"
-C.include "parameter_util.hpp"
 C.include "hs_datasource.hpp"
 
 C.using "namespace mapnik"
@@ -91,12 +89,12 @@ create params = unsafeNew $ \ ptr ->
 
 
 
-unsafeNewParams :: (Ptr (Ptr Parameters) -> IO ()) -> IO Parameters
-unsafeNewParams = mkUnsafeNew Parameters destroyParameters
+unsafeNewValues :: (Ptr (Ptr Parameters) -> IO ()) -> IO Parameters
+unsafeNewValues = mkUnsafeNew Parameters destroyParameters
 
 
 getParameters :: Datasource -> IO Parameters
-getParameters ds = unsafeNewParams $ \ ptr ->
+getParameters ds = unsafeNewValues $ \ ptr ->
   [CU.block|void{
   *$(parameters** ptr) = new parameters((*$fptr-ptr:(datasource_ptr *ds))->params());
   }|]
@@ -106,78 +104,39 @@ instance Exts.IsList Parameters where
   fromList = fromList
   toList = toList
 
-fromList :: [(Text,ParamValue)] -> Parameters
+fromList :: [(Text,Value)] -> Parameters
 fromList ps = unsafePerformIO $ do
-  p <- emptyParams
-  forM_ ps $ \(encodeUtf8 -> k, value) ->
-    case value of
-      StringParam (encodeUtf8 -> v) ->
-        [CU.block|void {
-          std::string k($bs-ptr:k, $bs-len:k);
-          std::string v($bs-ptr:v, $bs-len:v);
-          (*$fptr-ptr:(parameters *p))[k] = value_holder(v);
-        }|]
-      DoubleParam (realToFrac -> v) ->
-        [CU.block|void {
-          std::string k($bs-ptr:k, $bs-len:k);
-          (*$fptr-ptr:(parameters *p))[k] = value_holder($(double v));
-        }|]
-      IntParam (fromIntegral -> v) ->
-        [CU.block|void {
-          std::string k($bs-ptr:k, $bs-len:k);
-          (*$fptr-ptr:(parameters *p))[k] = value_holder($(value_integer v));
-        }|]
-      BoolParam (fromIntegral . fromEnum -> v) ->
-        [CU.block|void {
-          std::string k($bs-ptr:k, $bs-len:k);
-          (*$fptr-ptr:(parameters *p))[k] = value_holder($(int v)?true:false);
-        }|]
-      NullParam ->
-        [CU.block|void {
-          std::string k($bs-ptr:k, $bs-len:k);
-          (*$fptr-ptr:(parameters *p))[k] = value_null();
-        }|]
+  p <- emptyValues
+  forM_ ps $ \(encodeUtf8 -> k, value) -> withV value $ \v ->
+    [CU.block|void {
+      std::string k($bs-ptr:k, $bs-len:k);
+      (*$fptr-ptr:(parameters *p))[k] = *$(value_holder *v);
+    }|]
   return p
 
-emptyParams :: IO Parameters
-emptyParams = fmap Parameters . newForeignPtr destroyParameters =<< [CU.exp|parameters *{ new parameters }|]
+emptyValues :: IO Parameters
+emptyValues = fmap Parameters . newForeignPtr destroyParameters =<< [CU.exp|parameters *{ new parameters }|]
 
-
-toList :: Parameters -> [(Text,ParamValue)]
-toList ps = unsafePerformIO $ do
-  resultRef <- newIORef []
-  let callback :: C.CInt -> Ptr () -> CString -> IO ()
-      callback 0 _ kptr = do
-        k <- decodeUtf8 <$> packCString kptr
-        modifyIORef' resultRef ((k, NullParam):)
-      callback 1 (castPtr -> (ptr :: Ptr C.CDouble)) kptr = do
-        k <- decodeUtf8 <$> packCString kptr
-        v <- realToFrac <$> peek ptr
-        modifyIORef' resultRef ((k, DoubleParam v):)
-      callback 2 (castPtr -> (ptr :: Ptr MapnikInt)) kptr = do
-        k <- decodeUtf8 <$> packCString kptr
-        v <- fromIntegral <$> peek ptr
-        modifyIORef' resultRef ((k, IntParam v):)
-      callback 3 (castPtr -> (ptr :: Ptr C.CInt)) kptr = do
-        k <- decodeUtf8 <$> packCString kptr
-        v <- toEnum . fromIntegral <$> peek ptr
-        modifyIORef' resultRef ((k, BoolParam v):)
-      callback 4 (castPtr -> (ptr :: CString)) kptr = do
-        k <- decodeUtf8 <$> packCString kptr
-        v <- decodeUtf8 <$> packCString ptr
-        modifyIORef' resultRef ((k, StringParam v):)
-      callback _ _ kptr = do
-        k <- decodeUtf8 <$> packCString kptr
-        throwIO (userError ("Invalid type for parameter at key: " ++ show k))
+toList :: Parameters -> [(Text,Value)]
+toList p = unsafePerformIO $ do
+  ref <- newIORef []
+  let cb :: CString -> Ptr Param -> IO ()
+      cb k v = do
+        key <- decodeUtf8 <$> packCString k
+        val <- peekV v
+        modifyIORef' ref ((key,val):)
   [C.block|void {
-     for (parameters::const_iterator it = $fptr-ptr:(parameters *ps)->begin();
-          it != $fptr-ptr:(parameters *ps)->end();
+     for (parameters::const_iterator it = $fptr-ptr:(parameters *p)->begin();
+          it != $fptr-ptr:(parameters *p)->end();
           ++it)
      {
-       util::apply_visitor(value_extractor_visitor($fun:(void (*callback)(param_type , void*, char*)), const_cast<char*>(it->first.c_str())),it->second);
+       $fun:(void (*cb)(char*, value_holder*))(
+          const_cast<char*>(it->first.c_str()),
+          const_cast<value_holder*>(&it->second)
+          );
      }
   }|]
-  readIORef resultRef
+  readIORef ref
 
 
 data Query = Query

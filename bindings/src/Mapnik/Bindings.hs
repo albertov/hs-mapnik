@@ -43,14 +43,15 @@ module Mapnik.Bindings (
 , FeaturePtr (..)
 , RGBA8 (..)
 , RasterPtr
-, Value(..)
+, Value
+, Param
 , Attributes
 , FeatureCtx
 , MapnikInt
 , mapnikCtx
 ) where
 
-import           Mapnik (Box(..), Color(..), Dash(..))
+import           Mapnik (Box(..), Color(..), Dash(..), Value)
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
@@ -60,7 +61,6 @@ import qualified Language.C.Types as C
 import           Data.Word
 import           Data.Int
 import           Data.Text
-import           Data.String
 import qualified Data.HashMap.Strict as M
 import           Foreign.Storable (Storable)
 import           Foreign.ForeignPtr (ForeignPtr)
@@ -101,6 +101,7 @@ fptr(FeaturePtr)
 fptr(FeatureList)
 fptr(FeatureCtx)
 fptr(RasterPtr)
+fptr(Param)
 
 #ifdef BIGINT
 type MapnikInt = C.CLong
@@ -111,18 +112,8 @@ type MapnikInt = C.CInt
 newtype RGBA8 = RGBA8 Word32
   deriving (Eq, Storable)
 
-data Value
-  = TextValue   !Text
-  | BoolValue   !Bool
-  | IntValue    !Int
-  | DoubleValue !Double
-  | NullValue
-  deriving (Eq, Show)
 
-type Attributes = M.HashMap Text Value
-
-instance IsString Value where
-  fromString = TextValue . fromString
+type Attributes = M.HashMap Text Mapnik.Value
 
 mapnikCtx :: Context
 mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCtx <> ctx
@@ -169,6 +160,7 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "feature_ptr", [t| FeaturePtr |])
       , (C.TypeName "context_ptr", [t| FeatureCtx |])
       , (C.TypeName "value", [t| Value |])
+      , (C.TypeName "value_holder", [t| Param |])
       , (C.TypeName "bbox", [t| Box |])
       , (C.TypeName "attributes", [t| Attributes |])
       , (C.TypeName "features_callback", [t|FunPtr (Ptr FeatureCtx -> Ptr FeatureList -> Ptr QueryPtr -> IO ())|])

@@ -12,32 +12,32 @@ import           Data.String(IsString(..))
 import qualified Data.HashMap.Strict as M
 
 
-data ParamValue = StringParam !Text
-                | DoubleParam !Double
-                | IntParam    !Int
-                | BoolParam   !Bool
-                | NullParam
+data Value = TextValue !Text
+                | DoubleValue !Double
+                | IntValue    !Int
+                | BoolValue   !Bool
+                | NullValue
   deriving (Show, Eq, Generic)
-deriveMapnikJSON ''ParamValue
+deriveMapnikJSON ''Value
 
-class ToParam p where
-  toParam :: p -> ParamValue
-instance ToParam ParamValue where toParam = id
-instance ToParam String where toParam = StringParam . fromString
-instance ToParam Text where toParam = StringParam
-instance ToParam Double where toParam = DoubleParam
-instance ToParam Int where toParam = IntParam
-instance ToParam Bool where toParam = BoolParam
-instance ToParam a => ToParam (Maybe a) where
-  toParam (Just a) = toParam a
-  toParam Nothing  = NullParam
+class ToValue p where
+  toValue :: p -> Value
+instance ToValue Value where toValue = id
+instance ToValue String where toValue = TextValue . fromString
+instance ToValue Text where toValue = TextValue
+instance ToValue Double where toValue = DoubleValue
+instance ToValue Int where toValue = IntValue
+instance ToValue Bool where toValue = BoolValue
+instance ToValue a => ToValue (Maybe a) where
+  toValue (Just a) = toValue a
+  toValue Nothing  = NullValue
 
-type Parameter = (Text, ParamValue)
+type Parameter = (Text, Value)
 
-(.=) :: ToParam v => String -> v -> Parameter
-k .= v = (fromString k, toParam v)
+(.=) :: ToValue v => String -> v -> Parameter
+k .= v = (fromString k, toValue v)
 
-instance IsString ParamValue where
-  fromString = StringParam . fromString
+instance IsString Value where
+  fromString = TextValue . fromString
 
-type Parameters = M.HashMap Text ParamValue
+type Parameters = M.HashMap Text Value
