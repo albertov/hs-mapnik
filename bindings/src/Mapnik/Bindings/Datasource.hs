@@ -24,8 +24,12 @@ module Mapnik.Bindings.Datasource (
 , getParameters
 , create
 , createHsDatasource
-, fromList
-, toList
+, paramsFromList
+, paramsToList
+, features
+, featuresAtPoint
+, queryBox
+, queryBoxProps
 , module X
 ) where
 
@@ -33,16 +37,19 @@ import           Mapnik.Parameter as X (Value(..), Parameter, (.=))
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()
-import           Mapnik.Bindings.Feature
+import           Mapnik.Bindings.Feature as Feature
 import           Mapnik.Bindings.Variant
 import           Mapnik.Bindings.Raster
 
 import           System.IO
-import           Control.Exception (catch, SomeException)
+import           Control.Exception (catch, bracket, SomeException)
 import           Data.Vector (Vector)
-import           Control.Monad (forM_)
+import qualified Data.Vector as V
+import           Control.Monad (forM_, (>=>))
 import           Data.ByteString (packCString)
 import           Data.Text (Text)
+import           Data.List (sortBy)
+import           Data.Function (on)
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.IORef
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
@@ -64,6 +71,7 @@ C.include "<string>"
 C.include "<mapnik/attribute.hpp>"
 C.include "<mapnik/params.hpp>"
 C.include "<mapnik/datasource.hpp>"
+C.include "<mapnik/featureset.hpp>"
 C.include "<mapnik/datasource_cache.hpp>"
 C.include "hs_datasource.hpp"
 
@@ -101,11 +109,11 @@ getParameters ds = unsafeNewValues $ \ ptr ->
 
 instance Exts.IsList Parameters where
   type Item Parameters = Parameter
-  fromList = fromList
-  toList = toList
+  fromList = paramsFromList
+  toList = paramsToList
 
-fromList :: [(Text,Value)] -> Parameters
-fromList ps = unsafePerformIO $ do
+paramsFromList :: [(Text,Value)] -> Parameters
+paramsFromList ps = unsafePerformIO $ do
   p <- emptyValues
   forM_ ps $ \(encodeUtf8 -> k, value) -> withV value $ \v ->
     [CU.block|void {
@@ -117,8 +125,8 @@ fromList ps = unsafePerformIO $ do
 emptyValues :: IO Parameters
 emptyValues = fmap Parameters . newForeignPtr destroyParameters =<< [CU.exp|parameters *{ new parameters }|]
 
-toList :: Parameters -> [(Text,Value)]
-toList p = unsafePerformIO $ do
+paramsToList :: Parameters -> [(Text,Value)]
+paramsToList p = unsafePerformIO $ do
   ref <- newIORef []
   let cb :: CString -> Ptr Param -> IO ()
       cb k v = do
@@ -138,6 +146,46 @@ toList p = unsafePerformIO $ do
   }|]
   readIORef ref
 
+type FeatureSet = (Vector Text, [Feature])
+
+features :: Datasource -> Query -> IO FeatureSet
+features ds query = withQuery query $ \q -> do
+  feats <- newIORef []
+  fields <- newIORef [] :: IO (IORef [(Text, C.CSize)])
+  let cbFeat :: Ptr FeaturePtr -> IO ()
+      cbFeat p = do
+        f <- Feature.unCreate p
+        modifyIORef' feats (f:)
+      cbField :: CString -> C.CSize -> IO ()
+      cbField p ix= do
+        f <- decodeUtf8 <$> packCString p
+        modifyIORef' fields ((f,ix):)
+  [C.block|void { do {
+    auto ds = $fptr-ptr:(datasource_ptr *ds)->get();
+    if (!ds) break;
+    auto fs = ds->features(*$(query *q));
+    if ( !is_valid(fs) ) break;
+    feature_ptr last;
+    while (auto feat = fs->next() ) {
+      $fun:(void (*cbFeat)(feature_ptr*))(&feat);
+      last = feat;
+    }
+    if (last) {
+      auto ctx = last->context();
+      for (auto it=ctx->begin(); it!=ctx->end(); ++it) {
+        $fun:(void (*cbField)(char *, size_t))(
+          const_cast<char*>(it->first.c_str()),
+          it->second
+        );
+      }
+    }
+  } while(0);}|]
+
+  (,) <$> (V.fromList . map fst . sortBy (compare `on` snd) <$> readIORef fields)
+      <*> (reverse  <$> readIORef feats)
+
+featuresAtPoint :: Datasource -> Pair -> Double -> IO FeatureSet
+featuresAtPoint = undefined
 
 data Query = Query
   { box              :: !Box
@@ -145,9 +193,32 @@ data Query = Query
   , resolution       :: !Pair
   , scaleDenominator :: !Double
   , filterFactor     :: !Double
+  , propertyNames    :: ![Text] --XXX a set really
   , variables        :: !Attributes
   }
   deriving (Eq, Show)
+
+queryBox :: Box -> Query
+queryBox b = Query
+  { box = b
+  , unBufferedBox = b
+  , resolution=Pair 1 1
+  , scaleDenominator = 1
+  , filterFactor = 1
+  , propertyNames=[]
+  , variables = M.empty
+  }
+
+queryBoxProps :: Box -> [Text] -> Query
+queryBoxProps b ps = Query
+  { box = b
+  , unBufferedBox = b
+  , resolution=Pair 1 1
+  , scaleDenominator = 1
+  , filterFactor = 1
+  , propertyNames=ps
+  , variables = M.empty
+  }
 
 data Pair = Pair { x, y :: !Double }
   deriving (Eq, Show)
@@ -242,6 +313,38 @@ catchingExceptions :: String -> IO () -> IO ()
 catchingExceptions ctx = (`catch` (\e ->
   hPutStrLn stderr ("Unhandled haskell exception in " ++ ctx ++ ": " ++ show @SomeException e)))
 
+withQuery :: Query -> (Ptr QueryPtr -> IO a) -> IO a
+withQuery query f =
+  with box $ \pBox ->
+  with unBufferedBox $ \uBox ->
+  withAttributes variables $ \attrs ->
+    let alloc = C.withPtr_ $ \p -> [CU.block|void {
+      auto q = new query( *$(bbox *pBox)
+                        , std::tuple<double,double>( $(double resx)
+                                                   , $(double resy))
+                        , $(double scale)
+                        , *$(bbox *uBox)
+                        );
+      q->set_filter_factor($(double ff));
+      q->set_variables(*$(attributes *attrs));
+      *$(query **p) = q;
+      }|]
+    in bracket alloc dealloc enter
+
+  where
+    dealloc p = [CU.exp|void { delete $(query *p) }|]
+    enter p = do
+      forM_ propertyNames $ \(encodeUtf8 -> name) ->
+        [CU.block|void {
+          $(query *p)->add_property_name(std::string($bs-ptr:name, $bs-len:name));
+        }|]
+      f p
+    Query { resolution = Pair (realToFrac -> resx) (realToFrac -> resy)
+          , scaleDenominator = (realToFrac -> scale) 
+          , filterFactor = (realToFrac -> ff) 
+          , ..
+          } = query
+  
 
 unCreateQuery :: Ptr QueryPtr -> IO Query
 unCreateQuery q = do
@@ -264,8 +367,30 @@ unCreateQuery q = do
     *$(bbox *ub)       = q.get_unbuffered_bbox();
     *$(attributes **vs) = const_cast<attributes*>(&q.variables());
     }|]
+  ref <- newIORef  []
+  let cb :: CString -> IO ()
+      cb = packCString >=> \s -> modifyIORef' ref (decodeUtf8 s:)
+  [C.block|void {
+    auto names = $(query *q)->property_names(); //TODO use const_iter
+    for (auto it=names.begin(); it!=names.end(); ++it) {
+      $fun:(void (*cb)(char *))(const_cast<char *>(it->c_str()));
+    }
+  }|]
+  propertyNames <- readIORef ref
   variables <- extractAttributes varPtr
   return Query{resolution=Pair resx resy, ..}
+
+withAttributes :: Attributes -> (Ptr Attributes -> IO a) -> IO a
+withAttributes attrs f = bracket alloc dealloc enter where
+  alloc = [CU.exp|attributes * { new attributes } |]
+  enter p = do
+    forM_ (M.toList attrs) $ \(encodeUtf8 -> k, val) -> withV val $ \v ->
+      [CU.block|void {
+        (*$(attributes *p))[std::string($bs-ptr:k, $bs-ptr:k)] = *$(value *v);
+      }|]
+    f p
+  dealloc p = [CU.exp|void { delete $(attributes *p) }|]
+
 
 extractAttributes :: Ptr Attributes -> IO Attributes
 extractAttributes p = do

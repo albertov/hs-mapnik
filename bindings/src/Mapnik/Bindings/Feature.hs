@@ -1,4 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -9,6 +11,7 @@ module Mapnik.Bindings.Feature (
 , Geometry (..)
 , createFeature
 , createRasterFeature
+, unCreate
 ) where
 
 import           Mapnik.Bindings
@@ -19,8 +22,10 @@ import           Mapnik.Bindings.Variant
 import           Control.Exception (bracket)
 import           Control.Monad (forM_)
 import           Data.ByteString (ByteString)
+import           Data.IORef
 import           Data.String (IsString(..))
 import           Data.Vector (Vector)
+import qualified Data.Vector as V
 import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
 import qualified Language.C.Inline.Cpp as C
@@ -116,3 +121,19 @@ createRasterFeature ctx r = unsafeNew $ \ret -> withV r $ \raster ->
     );
   feat->get()->set_raster(*$(raster_ptr *raster));
   }|]
+
+unCreate :: Ptr FeaturePtr -> IO Feature
+unCreate p = do
+  fid <- fromIntegral <$> [CU.exp|int { (*$(feature_ptr* p))->id() }|]
+  geometry <- return (GeometryWKT "POINT(2 2)")
+  fieldsRef <- newIORef []
+  let cb :: Ptr Value -> IO ()
+      cb v = peekV v >>= \f -> modifyIORef' fieldsRef (f:)
+  [C.block|void {
+      auto fs = (*$(feature_ptr *p))->get_data();
+      for (auto it=fs.begin(); it!=fs.end(); ++it) {
+        $fun:(void (*cb)(value *))(&*it);
+      }
+  }|]
+  fields <- V.reverse . V.fromList <$> readIORef fieldsRef
+  return Feature{..}

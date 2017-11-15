@@ -101,7 +101,7 @@ instance FromMapnik Style where
 
 instance FromMapnik Datasource where
   type HsType Datasource = Mapnik.Datasource
-  fromMapnik = fmap (Mapnik.Datasource . M.fromList . Datasource.toList)
+  fromMapnik = fmap (Mapnik.Datasource . M.fromList . Datasource.paramsToList)
              . Datasource.getParameters
 
 instance FromMapnik Symbolizer where

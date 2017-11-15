@@ -33,7 +33,8 @@ import           Data.IORef
 import           Data.Maybe (isJust, isNothing)
 import           Data.List (lookup)
 import           Data.Either (isLeft, isRight)
-import qualified Data.Vector.Storable as V
+import qualified Data.Vector.Storable as St
+import qualified Data.Vector.Generic as G
 
 main :: IO ()
 main = hspec spec
@@ -212,7 +213,7 @@ spec = beforeAll_ registerDefaults $ do
       mSym `shouldBe` expected
 
   describe "Parameters" $ do
-    it "toList/fromList = id" $ do
+    it "paramsToList/paramsFromList = id" $ do
       let params =
             [ "type"     .= ("shape" :: String)
             , "encoding" .= ("latin1" :: String)
@@ -224,11 +225,28 @@ spec = beforeAll_ registerDefaults $ do
             , "aNullInt" .= (Just 5 :: Maybe Int)
             , "file"     .= ("spec/data/popplaces" :: String)
             ]
-      Datasource.toList (Datasource.fromList params) `shouldMatchList` params
+      Datasource.paramsToList (Datasource.paramsFromList params) `shouldMatchList` params
 
   describe "Datasource" $ do
     it "throws on invalid datasource" $
       Datasource.create ["type".= ("shapes" :: String)] `shouldThrow` cppStdException
+
+    it "can get features" $ do
+      ds <- Datasource.create
+            [ "type"     .= ("shape" :: String)
+            , "encoding" .= ("latin1" :: String)
+            , "file"     .= ("spec/data/popplaces" :: String)
+            ]
+      let theBox = Box { minx = 1372637.1001942465
+                       , miny = -247003.8133187965
+                       , maxx = 1746737.6177269476
+                       , maxy = -25098.59307479199
+                       }
+      let props = ["GEONAME", "SCALE_CAT"]
+      (fs,feats) <- Datasource.features ds (queryBoxProps theBox props)
+      length feats `shouldBe` 192
+      G.toList fs `shouldMatchList` props
+      G.toList (fields (head feats)) `shouldMatchList` [TextValue "Sorel-Tracy", IntValue 0]
 
   describe "Image" $ do
     it "can convert to rgba8 data and read it back" $ do
@@ -354,7 +372,7 @@ spec = beforeAll_ registerDefaults $ do
               , width = w
               , height = h
               , nodata = Nothing
-              , pixels = V.generate (w*h) fromIntegral :: V.Vector Int32
+              , pixels = G.generate (w*h) fromIntegral :: St.Vector Int32
               }
         , getFeaturesAtPoint = \_ _ -> return []
         }
