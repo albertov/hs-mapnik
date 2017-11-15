@@ -304,7 +304,7 @@ spec = beforeAll_ registerDefaults $ do
       ps `shouldBe` ps'
 
   describe "HsVector" $ do
-    it "can create" $ do
+    it "can create and render" $ do
       m <- Map.create 512 512
       loadFixture m
       Map.removeAllLayers m
@@ -321,7 +321,7 @@ spec = beforeAll_ registerDefaults $ do
             writeIORef ref (Just q)
             return [ Feature { fid=105
                              , geometry="LINESTRING (30 10, 10 30, 40 40)"
-                             , fields=["bar", IntField 3, BoolField False, DoubleField 3.2, NullField]
+                             , fields=["batróñ~", IntValue 3, BoolValue False, DoubleValue 3.2, NullValue]
                              }
                    ]
         , getFeaturesAtPoint = \_ _ -> return []
@@ -337,7 +337,7 @@ spec = beforeAll_ registerDefaults $ do
       resolution q `shouldBe` Pair 5.12 5.12
 
   describe "HsRaster" $ do
-    it "can create" $ do
+    it "can create and render" $ do
       let w = 256; h=256
       m <- Map.create w h
       loadFixture m
@@ -349,7 +349,8 @@ spec = beforeAll_ registerDefaults $ do
       ds <- createHsDatasource HsRaster
         { name = "fooo"
         , extent = theExtent
-        , getRaster = \q -> do
+        , fieldNames = []
+        , getRaster = \q ->
             return Raster
               { extent = box q
               , queryExtent = box q

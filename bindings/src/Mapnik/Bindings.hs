@@ -43,6 +43,7 @@ module Mapnik.Bindings (
 , FeaturePtr (..)
 , RGBA8 (..)
 , RasterPtr
+, Value(..)
 , FeatureCtx
 , MapnikInt
 , mapnikCtx
@@ -57,6 +58,8 @@ import           Language.C.Inline.Context
 import qualified Language.C.Types as C
 import           Data.Word
 import           Data.Int
+import           Data.Text
+import           Data.String
 import           Foreign.Storable (Storable)
 import           Foreign.ForeignPtr (ForeignPtr)
 import           Foreign.Ptr (Ptr, FunPtr)
@@ -106,6 +109,17 @@ type MapnikInt = C.CInt
 newtype RGBA8 = RGBA8 Word32
   deriving (Eq, Storable)
 
+data Value
+  = TextValue   !Text
+  | BoolValue   !Bool
+  | IntValue    !Int
+  | DoubleValue !Double
+  | NullValue
+  deriving (Eq, Show)
+
+instance IsString Value where
+  fromString = TextValue . fromString
+
 mapnikCtx :: Context
 mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCtx <> ctx
   where ctx = mempty {
@@ -149,6 +163,7 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "query", [t| QueryPtr |])
       , (C.TypeName "feature_ptr", [t| FeaturePtr |])
       , (C.TypeName "context_ptr", [t| FeatureCtx |])
+      , (C.TypeName "value", [t| Value |])
       , (C.TypeName "bbox", [t| Box |])
       , (C.TypeName "features_callback", [t|FunPtr (Ptr FeatureCtx -> Ptr FeatureList -> Ptr QueryPtr -> IO ())|])
       , (C.TypeName "features_at_point_callback", [t|FunPtr (Ptr FeatureCtx -> Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ())|])

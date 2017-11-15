@@ -77,13 +77,13 @@ create Mapnik.Colorizer{..} = unsafeNew $ \p -> do
 
 withStop :: Mapnik.Stop -> (Ptr Stop -> IO a) -> IO a
 withStop Mapnik.Stop
-  { value = (realToFrac -> value)
+  { value = (realToFrac -> val)
   , ..
   } fun = with color $ \c -> bracket (alloc c) dealloc enter
   where
     alloc c =
       [CU.block|colorizer_stop * {
-      auto ret = new colorizer_stop($(float value));
+      auto ret = new colorizer_stop($(float val));
       ret->set_color(*$(color *c));
       ret;
       }|]
@@ -106,11 +106,11 @@ unCreateStop p = do
    , mMode
    , labelPtr
    , fromIntegral -> labelLen
-   ) <- C.withPtrs_ $ \(value,col,mode,ptr,len) ->
+   ) <- C.withPtrs_ $ \(val,col,mode,ptr,len) ->
     [CU.block|void {
       const colorizer_stop &stop = *$(colorizer_stop *p);
       static const colorizer_stop def;
-      *$(float *value) = stop.get_value();
+      *$(float *val) = stop.get_value();
       if ( stop.get_mode() != def.get_mode() ) {
         *$(int *mode) = static_cast<int>(stop.get_mode());
       } else {

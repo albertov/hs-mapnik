@@ -6,8 +6,6 @@
 #include "hs_datasource.hpp"
 #include "hs_featureset.hpp"
 
-#include <algorithm>
-
 using mapnik::datasource;
 using mapnik::parameters;
 
@@ -39,7 +37,6 @@ hs_datasource::~hs_datasource()
   hs_free_fun_ptr(reinterpret_cast<HsFunPtr>(get_features_));
   hs_free_fun_ptr(reinterpret_cast<HsFunPtr>(get_features_at_point_));
 }
-
 
 datasource::datasource_t hs_datasource::type() const
 {

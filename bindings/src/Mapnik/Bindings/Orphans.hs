@@ -1,15 +1,19 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module Mapnik.Bindings.Orphans (
 ) where
 
 import qualified Mapnik
 import           Mapnik.Bindings
+import           Mapnik.Bindings.Variant
+
+import           Control.Exception
+import           Data.Text.Encoding (encodeUtf8)
 import           Foreign.Storable
 
 import qualified Language.C.Inline.Cpp as C
@@ -21,6 +25,8 @@ C.include "<string>"
 C.include "<mapnik/color.hpp>"
 C.include "<mapnik/box2d.hpp>"
 C.include "<mapnik/color_factory.hpp>"
+C.include "<mapnik/feature.hpp>"
+C.include "<mapnik/unicode.hpp>"
 
 C.using "namespace mapnik"
 
@@ -70,3 +76,24 @@ instance Storable Mapnik.Box where
     [CU.block|void{
       *$(bbox* p) = bbox($(double minx), $(double miny), $(double maxx), $(double maxy));
       }|]
+
+instance VariantPtr Value where
+  allocaV = bracket alloc dealloc where
+    alloc = [CU.exp|value * { new value }|]
+    dealloc p = [CU.exp|void { delete $(value *p)}|]
+
+
+instance Variant Value Value where
+  pokeV p (TextValue (encodeUtf8 -> v)) =
+    [CU.block|void{
+      static const mapnik::transcoder tr("utf-8");
+      *$(value *p) = tr.transcode($bs-ptr:v, $bs-len:v);
+    }|]
+  pokeV p (IntValue (fromIntegral -> v)) =
+    [CU.block|void{ *$(value *p) = $(value_integer v); }|]
+  pokeV p (DoubleValue (realToFrac -> v)) =
+    [CU.block|void{ *$(value *p) = $(double v); }|]
+  pokeV p (BoolValue (fromIntegral . fromEnum -> v)) =
+    [CU.block|void{ *$(value *p) = $(int v) ? true : false ; }|]
+  pokeV p NullValue =
+    [CU.block|void{ *$(value *p) = value_null(); }|]

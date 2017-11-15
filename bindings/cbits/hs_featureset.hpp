@@ -29,6 +29,7 @@ public:
   {
     while (pos_ != end_)
     {
+        //std::cout << (*pos_)->to_string() << std::endl;
         return *pos_++;
     }
     return feature_ptr();

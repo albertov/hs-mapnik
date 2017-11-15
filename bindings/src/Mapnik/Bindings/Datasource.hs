@@ -201,6 +201,7 @@ data HsDatasource where
   HsRaster :: Variant RasterPtr (Raster a) =>
     { name               :: !Text
     , extent             :: !Box
+    , fieldNames         :: !(Vector Text)
     , getRaster          :: !(Query -> IO (Raster a))
     , getFeaturesAtPoint :: !(Pair -> Double -> IO [Feature])
     } -> HsDatasource
@@ -250,6 +251,11 @@ createHsDatasource HsRaster{..} = with extent $ \e -> unsafeNew $ \ ptr -> do
     );
   *$(datasource_ptr** ptr) = new datasource_ptr(p);
   }|]
+  forM_ fieldNames $ \(encodeUtf8 -> v) ->
+    [CU.block|void {
+      auto ds = dynamic_cast<hs_datasource*>((*$(datasource_ptr **ptr))->get());
+      ds->push_key(std::string($bs-ptr:v, $bs-len:v));
+    }|]
 
   where
     getFeatures' ctx fs q = catchingExceptions "getRaster" $ do

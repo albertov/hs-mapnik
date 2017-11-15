@@ -7,7 +7,6 @@
 module Mapnik.Bindings.Feature (
   Feature (..)
 , Geometry (..)
-, Field (..)
 , createFeature
 , createRasterFeature
 ) where
@@ -21,7 +20,6 @@ import           Control.Exception (bracket)
 import           Control.Monad (forM_)
 import           Data.ByteString (ByteString)
 import           Data.String (IsString(..))
-import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
 import           Data.Vector (Vector)
 import           Foreign.ForeignPtr (FinalizerPtr)
@@ -50,17 +48,6 @@ C.verbatim "template struct mapnik::wkt::wkt_grammar<iterator_type>;"
 C.using "namespace mapnik"
 C.using "mapnik::geometry_utils"
 
-data Field
-  = TextField   !Text
-  | BoolField   !Bool
-  | IntField    !Int
-  | DoubleField !Double
-  | NullField
-  deriving (Eq, Show)
-
-instance IsString Field where
-  fromString = TextField . fromString
-
 data Geometry
   = GeometryWKB !ByteString
   | GeometryWKT !ByteString
@@ -72,7 +59,7 @@ instance IsString Geometry where
 data Feature = Feature
   { fid      :: !Int
   , geometry :: !Geometry
-  , fields   :: !(Vector Field)
+  , fields   :: !(Vector Value)
   }
   deriving (Eq, Show)
 
@@ -103,33 +90,11 @@ createFeature ctx f = unsafeNew $ \ret -> do
       }
       }|]
   withVec $ \fs -> do
-    forM_ fields $ \case
-      TextField (encodeUtf8 -> v) ->
-        [CU.block|void{
-          static const mapnik::transcoder tr("utf-8");
-          auto fs = static_cast<feature_impl::cont_type*>($(void *fs));
-          fs->push_back(tr.transcode($bs-ptr:v, $bs-len:v));
-        }|]
-      IntField (fromIntegral -> v) ->
-        [CU.block|void{
-          auto fs = static_cast<feature_impl::cont_type*>($(void *fs));
-          fs->push_back($(value_integer v));
-        }|]
-      DoubleField (realToFrac -> v) ->
-        [CU.block|void{
-          auto fs = static_cast<feature_impl::cont_type*>($(void *fs));
-          fs->push_back($(double v));
-        }|]
-      BoolField (fromIntegral . fromEnum -> v) ->
-        [CU.block|void{
-          auto fs = static_cast<feature_impl::cont_type*>($(void *fs));
-          fs->push_back($(int v)?true:false);
-        }|]
-      NullField ->
-        [CU.block|void{
-          auto fs = static_cast<feature_impl::cont_type*>($(void *fs));
-          fs->push_back(value_null());
-        }|]
+    forM_ fields $ flip withV $ \f ->
+      [CU.block|void{
+        auto fs = static_cast<feature_impl::cont_type*>($(void *fs));
+        fs->push_back(*$(value *f));
+      }|]
     [CU.block|void{
       auto feat = **$(feature_ptr **ret);
       auto fs = static_cast<feature_impl::cont_type*>($(void *fs));
