@@ -41,7 +41,7 @@ import           System.IO
 import           Control.Exception (throwIO, catch, SomeException)
 import           Data.Vector (Vector)
 import           Control.Monad (forM_)
-import           Data.ByteString.Unsafe (unsafePackMallocCString)
+import           Data.ByteString (packCString)
 import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.IORef
@@ -51,6 +51,7 @@ import           Foreign.Storable
 import           Foreign.C.String (CString)
 import           Foreign.Marshal.Utils (with)
 import           System.IO.Unsafe (unsafePerformIO)
+import qualified Data.HashMap.Strict as M
 import qualified GHC.Exts as Exts
 
 import qualified Language.C.Inline.Cpp as C
@@ -61,6 +62,7 @@ import qualified Language.C.Inline.Unsafe as CU
 C.context mapnikCtx
 
 C.include "<string>"
+C.include "<mapnik/attribute.hpp>"
 C.include "<mapnik/params.hpp>"
 C.include "<mapnik/datasource.hpp>"
 C.include "<mapnik/datasource_cache.hpp>"
@@ -68,8 +70,8 @@ C.include "parameter_util.hpp"
 C.include "hs_datasource.hpp"
 
 C.using "namespace mapnik"
-C.verbatim "typedef hs_featureset::feature_list feature_list;"
-C.verbatim "typedef box2d<double> bbox;"
+C.using "feature_list = hs_featureset::feature_list"
+C.using "bbox = box2d<double>"
 
 foreign import ccall "&hs_mapnik_destroy_Parameters" destroyParameters :: FinalizerPtr Parameters
 foreign import ccall "&hs_mapnik_destroy_Datasource" destroyDatasource :: FinalizerPtr Datasource
@@ -146,33 +148,33 @@ toList ps = unsafePerformIO $ do
   resultRef <- newIORef []
   let callback :: C.CInt -> Ptr () -> CString -> IO ()
       callback 0 _ kptr = do
-        k <- decodeUtf8 <$> unsafePackMallocCString kptr
+        k <- decodeUtf8 <$> packCString kptr
         modifyIORef' resultRef ((k, NullParam):)
       callback 1 (castPtr -> (ptr :: Ptr C.CDouble)) kptr = do
-        k <- decodeUtf8 <$> unsafePackMallocCString kptr
+        k <- decodeUtf8 <$> packCString kptr
         v <- realToFrac <$> peek ptr
         modifyIORef' resultRef ((k, DoubleParam v):)
       callback 2 (castPtr -> (ptr :: Ptr MapnikInt)) kptr = do
-        k <- decodeUtf8 <$> unsafePackMallocCString kptr
+        k <- decodeUtf8 <$> packCString kptr
         v <- fromIntegral <$> peek ptr
         modifyIORef' resultRef ((k, IntParam v):)
       callback 3 (castPtr -> (ptr :: Ptr C.CInt)) kptr = do
-        k <- decodeUtf8 <$> unsafePackMallocCString kptr
+        k <- decodeUtf8 <$> packCString kptr
         v <- toEnum . fromIntegral <$> peek ptr
         modifyIORef' resultRef ((k, BoolParam v):)
       callback 4 (castPtr -> (ptr :: CString)) kptr = do
-        k <- decodeUtf8 <$> unsafePackMallocCString kptr
-        v <- decodeUtf8 <$> unsafePackMallocCString ptr
+        k <- decodeUtf8 <$> packCString kptr
+        v <- decodeUtf8 <$> packCString ptr
         modifyIORef' resultRef ((k, StringParam v):)
       callback _ _ kptr = do
-        k <- decodeUtf8 <$> unsafePackMallocCString kptr
+        k <- decodeUtf8 <$> packCString kptr
         throwIO (userError ("Invalid type for parameter at key: " ++ show k))
   [C.block|void {
      for (parameters::const_iterator it = $fptr-ptr:(parameters *ps)->begin();
           it != $fptr-ptr:(parameters *ps)->end();
           ++it)
      {
-       util::apply_visitor(value_extractor_visitor($fun:(void (*callback)(param_type , void*, char*)), strdup(it->first.c_str())),it->second);
+       util::apply_visitor(value_extractor_visitor($fun:(void (*callback)(param_type , void*, char*)), const_cast<char*>(it->first.c_str())),it->second);
      }
   }|]
   readIORef resultRef
@@ -184,6 +186,7 @@ data Query = Query
   , resolution       :: !Pair
   , scaleDenominator :: !Double
   , filterFactor     :: !Double
+  , variables        :: !Attributes
   }
   deriving (Eq, Show)
 
@@ -289,15 +292,39 @@ unCreateQuery q = do
     , realToFrac -> filterFactor
     , box
     , unBufferedBox
-    ) <- C.withPtrs_ $ \(x,y,s,f,b,ub) ->
+    , varPtr
+    ) <- C.withPtrs_ $ \(x,y,s,f,b,ub,vs) ->
     [CU.block|void{
-    const query& q = *$(query *q);
-    auto res       = q.resolution();
-    *$(double *x)  = std::get<0>(res);
-    *$(double *y)  = std::get<1>(res);
-    *$(double *s)  = q.scale_denominator();
-    *$(double *f)  = q.get_filter_factor();
-    *$(bbox *b)    = q.get_bbox();
-    *$(bbox *ub)   = q.get_unbuffered_bbox();
+    const query& q     = *$(query *q);
+    auto res           = q.resolution();
+    *$(double *x)      = std::get<0>(res);
+    *$(double *y)      = std::get<1>(res);
+    *$(double *s)      = q.scale_denominator();
+    *$(double *f)      = q.get_filter_factor();
+    *$(bbox *b)        = q.get_bbox();
+    *$(bbox *ub)       = q.get_unbuffered_bbox();
+    *$(attributes **vs) = const_cast<attributes*>(&q.variables());
     }|]
+  variables <- extractAttributes varPtr
   return Query{resolution=Pair resx resy, ..}
+
+extractAttributes :: Ptr Attributes -> IO Attributes
+extractAttributes p = do
+  ref <- newIORef M.empty
+  let cb :: CString -> Ptr Value -> IO ()
+      cb k v = do
+        key <- decodeUtf8 <$> packCString k
+        val <- peekV v
+        modifyIORef' ref (M.insert key val)
+  [C.block|void {
+     for (attributes::const_iterator it = $(attributes *p)->begin();
+          it != $(attributes *p)->end();
+          ++it)
+     {
+       $fun:(void (*cb)(char*, value*))(
+          const_cast<char*>(it->first.c_str()),
+          const_cast<value*>(&it->second)
+          );
+     }
+  }|]
+  readIORef ref

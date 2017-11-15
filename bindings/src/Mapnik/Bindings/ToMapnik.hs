@@ -45,7 +45,7 @@ toMapnikId(Expression)
 instance ToMapnik Mapnik.Map where
   type MapnikType Mapnik.Map = Map
   toMapnik Mapnik.Map{..} = do
-    m' <- Map.create 400 400
+    m' <- Map.create
     forM_ backgroundColor        (setBackground m' <=< toMapnik)
     forM_ backgroundImage        (setBackgroundImage m')
     forM_ backgroundImageCompOp  (setBackgroundImageCompOp m')

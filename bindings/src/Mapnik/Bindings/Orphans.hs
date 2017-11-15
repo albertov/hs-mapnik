@@ -1,8 +1,10 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Mapnik.Bindings.Orphans (
@@ -12,9 +14,13 @@ import qualified Mapnik
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Variant
 
-import           Control.Exception
-import           Data.Text.Encoding (encodeUtf8)
-import           Foreign.Storable
+import           Control.Exception (bracket, throwIO)
+import           Data.Text.Foreign (useAsPtr)
+import           Data.Text.Encoding (decodeUtf8)
+import           Data.ByteString.Unsafe (unsafePackMallocCString)
+import           Foreign.Storable (Storable(..))
+import           Foreign.Ptr (castPtr)
+import           Foreign.Marshal.Alloc (alloca)
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Unsafe as CU
@@ -27,6 +33,7 @@ C.include "<mapnik/box2d.hpp>"
 C.include "<mapnik/color_factory.hpp>"
 C.include "<mapnik/feature.hpp>"
 C.include "<mapnik/unicode.hpp>"
+C.include "value_util.hpp"
 
 C.using "namespace mapnik"
 
@@ -82,12 +89,10 @@ instance VariantPtr Value where
     alloc = [CU.exp|value * { new value }|]
     dealloc p = [CU.exp|void { delete $(value *p)}|]
 
-
 instance Variant Value Value where
-  pokeV p (TextValue (encodeUtf8 -> v)) =
+  pokeV p (TextValue t) = useAsPtr t $ \(castPtr -> v) (fromIntegral -> len) ->
     [CU.block|void{
-      static const mapnik::transcoder tr("utf-8");
-      *$(value *p) = tr.transcode($bs-ptr:v, $bs-len:v);
+      *$(value *p) = UnicodeString (($(unsigned short *v)), $(int len));
     }|]
   pokeV p (IntValue (fromIntegral -> v)) =
     [CU.block|void{ *$(value *p) = $(value_integer v); }|]
@@ -97,3 +102,18 @@ instance Variant Value Value where
     [CU.block|void{ *$(value *p) = $(int v) ? true : false ; }|]
   pokeV p NullValue =
     [CU.block|void{ *$(value *p) = value_null(); }|]
+
+  peekV p = alloca $ \res -> alloca $ \ty -> do
+    [CU.block|void{
+      util::apply_visitor(value_extractor_visitor($(void *res), $(int *ty)), *$(value *p));
+    }|]
+    type_ <- peek ty
+    case type_ of
+      0 -> return NullValue
+      1 -> DoubleValue . realToFrac   <$> peek @C.CDouble (castPtr res)
+      2 -> IntValue    . fromIntegral <$> peek @C.CInt    (castPtr res)
+      3 -> BoolValue   . toEnum . fromIntegral <$> peek @C.CInt    (castPtr res)
+      4 -> TextValue . decodeUtf8
+       <$> (unsafePackMallocCString =<< peek (castPtr res))
+      _ -> throwIO VariantTypeError
+

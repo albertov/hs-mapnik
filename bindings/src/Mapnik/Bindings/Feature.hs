@@ -20,7 +20,6 @@ import           Control.Exception (bracket)
 import           Control.Monad (forM_)
 import           Data.ByteString (ByteString)
 import           Data.String (IsString(..))
-import           Data.Text.Encoding (encodeUtf8)
 import           Data.Vector (Vector)
 import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
@@ -90,10 +89,10 @@ createFeature ctx f = unsafeNew $ \ret -> do
       }
       }|]
   withVec $ \fs -> do
-    forM_ fields $ flip withV $ \f ->
+    forM_ fields $ flip withV $ \fld ->
       [CU.block|void{
         auto fs = static_cast<feature_impl::cont_type*>($(void *fs));
-        fs->push_back(*$(value *f));
+        fs->push_back(*$(value *fld));
       }|]
     [CU.block|void{
       auto feat = **$(feature_ptr **ret);

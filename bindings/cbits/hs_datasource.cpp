@@ -6,6 +6,7 @@
 #include "hs_datasource.hpp"
 #include "hs_featureset.hpp"
 
+
 using mapnik::datasource;
 using mapnik::parameters;
 

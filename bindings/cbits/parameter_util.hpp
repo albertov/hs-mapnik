@@ -14,6 +14,9 @@ typedef void (*callback_t)(enum param_type, void *, char *);
 
 struct value_extractor_visitor
 {
+    callback_t callback_;
+    char *key_;
+
     value_extractor_visitor(callback_t callback, char *key)
         :callback_(callback), key_(key) {}
 
@@ -29,7 +32,7 @@ struct value_extractor_visitor
 
     void operator() (std::string const& val) const
     {
-      callback_(param_type::string_type, const_cast<void*>(static_cast<const void*>(strdup(val.c_str()))), key_);
+      callback_(param_type::string_type, const_cast<void*>(const_cast<void*>(static_cast<const void*>(val.c_str()))), key_);
     }
 
     void operator() (value_bool const& val) const
@@ -44,6 +47,4 @@ struct value_extractor_visitor
     }
 
 
-    callback_t callback_;
-    char *key_;
 };

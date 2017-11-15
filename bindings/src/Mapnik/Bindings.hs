@@ -44,6 +44,7 @@ module Mapnik.Bindings (
 , RGBA8 (..)
 , RasterPtr
 , Value(..)
+, Attributes
 , FeatureCtx
 , MapnikInt
 , mapnikCtx
@@ -60,6 +61,7 @@ import           Data.Word
 import           Data.Int
 import           Data.Text
 import           Data.String
+import qualified Data.HashMap.Strict as M
 import           Foreign.Storable (Storable)
 import           Foreign.ForeignPtr (ForeignPtr)
 import           Foreign.Ptr (Ptr, FunPtr)
@@ -117,6 +119,8 @@ data Value
   | NullValue
   deriving (Eq, Show)
 
+type Attributes = M.HashMap Text Value
+
 instance IsString Value where
   fromString = TextValue . fromString
 
@@ -140,6 +144,7 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "transform_type", [t| Transform |])
       , (C.TypeName "keys", [t| C.CUChar |])
       , (C.TypeName "param_type", [t| C.CInt |])
+      , (C.TypeName "value_type", [t| C.CInt |])
       , (C.TypeName "value_integer", [t| MapnikInt |])
       , (C.TypeName "color", [t| Mapnik.Color |])
       , (C.TypeName "text_placements_ptr", [t| TextPlacements |])
@@ -165,6 +170,7 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "context_ptr", [t| FeatureCtx |])
       , (C.TypeName "value", [t| Value |])
       , (C.TypeName "bbox", [t| Box |])
+      , (C.TypeName "attributes", [t| Attributes |])
       , (C.TypeName "features_callback", [t|FunPtr (Ptr FeatureCtx -> Ptr FeatureList -> Ptr QueryPtr -> IO ())|])
       , (C.TypeName "features_at_point_callback", [t|FunPtr (Ptr FeatureCtx -> Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ())|])
       , (C.TypeName "pixel_rgba8", [t| RGBA8 |])

@@ -22,15 +22,15 @@ import           Mapnik.Bindings.Transform as Transform
 import           Mapnik.Bindings.Expression as Expression
 import           Mapnik.Bindings.Datasource as Datasource
 import           Mapnik.Bindings.Symbolizer as Symbolizer
-import           Mapnik.Bindings.Feature as Feature
 import           Mapnik.Bindings.TextPlacements as TextPlacements
 import           Mapnik.Bindings.FromMapnik
+import           Mapnik.Bindings.Render as Render
 import           Control.Lens hiding ((.=))
 import           Control.Monad (void)
 import           Data.Text (Text)
 import           Data.Int
 import           Data.IORef
-import           Data.Maybe (isJust, isNothing, fromJust)
+import           Data.Maybe (isJust, isNothing)
 import           Data.List (lookup)
 import           Data.Either (isLeft, isRight)
 import qualified Data.Vector.Storable as V
@@ -41,25 +41,28 @@ main = hspec spec
 isPng :: BS.ByteString -> Bool
 isPng s = BS.take 6 s == "\137PNG\r\n"
 
+rSettings :: RenderSettings
+rSettings = renderSettings 256 256 aBox
+
 spec :: Spec
 spec = beforeAll_ registerDefaults $ do
 
   describe "Map" $ do
     it "renders as PNG" $ do
-      m <- Map.create 512 512
+      m <- Map.create
       loadFixture m
-      img <- Map.render m 1
+      img <- render m rSettings
       -- BS.writeFile "map.webp" (Image.serialize "webp" img)
       let Just bs = Image.serialize "png8" img
       bs `shouldSatisfy` isPng
 
 
     it "throws on broken XML" $ do
-      m <- Map.create 512 512
+      m <- Map.create
       loadFixtureFrom "spec/bad.xml" m `shouldThrow` cppStdException
 
     it "can add layer and render" $ do
-      m <- Map.create 11 11
+      m <- Map.create
       loadFixture m
 
       l <- Layer.create "Populated places"
@@ -71,49 +74,41 @@ spec = beforeAll_ registerDefaults $ do
         , "file"     .= ("spec/data/popplaces" :: String)
         ]
       Map.addLayer m l
-      void $ Map.render m 1
+      void $ render m rSettings
 
     it "can get styles" $ do
-      m <- Map.create 512 512
+      m <- Map.create
       loadFixture m
       sts <- map fst <$> Map.getStyles m
       sts `shouldMatchList` ["drainage","highway-border","highway-fill","popplaces","provinces","provlines","road-border","road-fill","smallroads","raster-style"]
 
     it "can get layers" $ do
-      m <- Map.create 512 512
+      m <- Map.create
       loadFixture m
       layers <- Map.getLayers m
       length layers `shouldBe` 5
 
 
     it "can get srs" $ do
-      m <- Map.create 512 512
+      m <- Map.create
       Map.setSrs m merc
-      srs <- Map.getSrs m
-      srs `shouldBe` merc
+      s <- Map.getSrs m
+      s `shouldBe` merc
 
     it "can get max extent when Nothing" $ do
-      m <- Map.create 512 512
+      m <- Map.create
       e <- Map.getMaxExtent m
       e `shouldBe` Nothing
 
     it "can get max extent when Just" $ do
-      m <- Map.create 512 512
+      m <- Map.create
       Map.setMaxExtent m aBox
       e <- Map.getMaxExtent m
       e `shouldBe` Just aBox
 
-    it "can resize" $ do
-      m <- Map.create 10 10
-      img <- Map.render m 1
-      BS.length (snd (toRgba8 img)) `shouldBe` (10*10*4)
-      Map.resize m 300 200
-      img2 <- Map.render m 1
-      BS.length (snd (toRgba8 img2)) `shouldBe` (300*200*4)
-
     it "throws on invalid size" $ do
-      m <- Map.create (-1) (-1)
-      Map.render m 1 `shouldThrow` cppStdException
+      m <- Map.create
+      render m (renderSettings (-1) (-1) aBox) `shouldThrow` cppStdException
 
   describe "Projection" $ do
     it "can create valid" $
@@ -139,7 +134,7 @@ spec = beforeAll_ registerDefaults $ do
 
   describe "Color" $ do
     it "can set good" $ do
-      m <- Map.create 10 10
+      m <- Map.create
       let bg = RGBA 3 4 5 255
       Map.setBackground m bg
       Just bg2 <- Map.getBackground m
@@ -173,7 +168,7 @@ spec = beforeAll_ registerDefaults $ do
 
   describe "Style" $ do
     it "can get rules" $ do
-      m <- Map.create 512 512
+      m <- Map.create
       loadFixture m
       Just style <- lookup "provinces" <$> Map.getStyles m
       rs <- Style.getRules style
@@ -201,7 +196,7 @@ spec = beforeAll_ registerDefaults $ do
       name' `shouldBe` theName
 
     it "can get symbolizers" $ do
-      m <- Map.create 512 512
+      m <- Map.create
       loadFixture m
       Just style <- lookup "provinces" <$> Map.getStyles m
       [r1,r2] <- Style.getRules style
@@ -237,11 +232,13 @@ spec = beforeAll_ registerDefaults $ do
 
   describe "Image" $ do
     it "can convert to rgba8 data and read it back" $ do
-      m <- Map.create 10 10
-      img <- Map.render m 1
+      m <- Map.create
+      img <- render m rSettings
       let rgba8 = Image.toRgba8 img
           Just img2  = Image.fromRgba8 rgba8
-      BS.length (snd rgba8)  `shouldBe` (10*10*4)
+          w = Render.width rSettings
+          h = Render.height rSettings
+      BS.length (snd rgba8)  `shouldBe` (w * h * 4)
       --BS.writeFile "map.webp" (Image.serialize "webp" img2)
       Image.serialize "png8" img `shouldBe` Image.serialize "png8" img2
 
@@ -274,7 +271,7 @@ spec = beforeAll_ registerDefaults $ do
 
   describe "fromMapnik" $ do
     it "works for Map" $ do
-      m' <- Map.create 512 512
+      m' <- Map.create
       loadFixture m'
       m <- fromMapnik m'
       do
@@ -305,7 +302,7 @@ spec = beforeAll_ registerDefaults $ do
 
   describe "HsVector" $ do
     it "can create and render" $ do
-      m <- Map.create 512 512
+      m <- Map.create
       loadFixture m
       Map.removeAllLayers m
       Map.setSrs m "+init=epsg:3857"
@@ -329,8 +326,7 @@ spec = beforeAll_ registerDefaults $ do
       Layer.setDatasource l ds
       Layer.addStyle l "provlines"
       Map.addLayer m l
-      Map.zoomAll m
-      _ <- Map.render m 1
+      _ <- render m (renderSettings 512 512 theExtent)
       Just q <- readIORef ref
       box q `shouldBe` theExtent
       unBufferedBox q `shouldBe` theExtent
@@ -339,7 +335,7 @@ spec = beforeAll_ registerDefaults $ do
   describe "HsRaster" $ do
     it "can create and render" $ do
       let w = 256; h=256
-      m <- Map.create w h
+      m <- Map.create
       loadFixture m
       Map.removeAllLayers m
       Map.setSrs m "+init=epsg:3857"
@@ -365,16 +361,43 @@ spec = beforeAll_ registerDefaults $ do
       Layer.setDatasource l ds
       Layer.addStyle l "raster-style"
       Map.addLayer m l
-      Map.zoomAll m
-      _img <- Map.render m 1
+      _img <- render m rSettings
       --BS.writeFile "map.webp" (fromJust (Image.serialize "webp" _img))
       return ()
+
+  it "can pass render variables" $ do
+    m <- Map.create
+    loadFixture m
+    Map.removeAllLayers m
+    l <- Layer.create "fooo"
+    ref <- newIORef Nothing
+    let theExtent = Box 0 0 100 100
+    ds <- createHsDatasource HsVector
+      { name = "fooo"
+      , extent = theExtent
+      , fieldNames = []
+      , getFeatures = \q -> do
+          writeIORef ref (Just q)
+          return []
+      , getFeaturesAtPoint = \_ _ -> return []
+      }
+    Layer.setDatasource l ds
+    Layer.addStyle l "provlines"
+    Map.addLayer m l
+    let vars = [ ("foo", DoubleValue 2.4)
+               , ("bar", IntValue 42)
+               , ("bar", NullValue)
+               , ("mar", BoolValue False)
+               , ("car", TextValue "some text wíẗḧ unicode")
+               ]
+    _ <- render m (renderSettings 512 512 theExtent) { variables = vars }
+    Just q <- readIORef ref
+    Datasource.variables q `shouldBe` vars
 
 loadFixture :: Map -> IO ()
 loadFixture m = do
   loadFixtureFrom "spec/map.xml" m
   Map.setSrs m merc
-  Map.zoomToBox m aBox
 
 loadFixtureFrom :: String -> Map -> IO ()
 loadFixtureFrom p m = Map.loadXml m =<< BS.readFile p

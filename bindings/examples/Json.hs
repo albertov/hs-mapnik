@@ -9,6 +9,6 @@ import           System.Environment
 main = do
   [arg] <- getArgs
   registerDefaults
-  m <- Map.create 400 400
+  m <- Map.create
   Map.loadXmlFile m arg
   LBS.putStr . encodeToLazyText =<< fromMapnik m

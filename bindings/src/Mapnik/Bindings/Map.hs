@@ -36,7 +36,6 @@ module Mapnik.Bindings.Map (
 , getLayers
 , getStyles
 , resize
-, render
 , addLayer
 , insertStyle
 , removeAllLayers
@@ -46,7 +45,6 @@ import           Mapnik (StyleName, AspectFixMode(..), CompositeMode)
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans()
-import qualified Mapnik.Bindings.Image as Image
 import qualified Mapnik.Bindings.Layer as Layer
 import qualified Mapnik.Bindings.Style as Style
 
@@ -70,7 +68,7 @@ import qualified Language.C.Inline.Cpp.Exceptions as C
 C.context mapnikCtx
 
 C.include "<string>"
-C.include "<mapnik/agg_renderer.hpp>"
+C.include "<mapnik/rule.hpp>"
 C.include "<mapnik/feature_type_style.hpp>"
 C.include "<mapnik/map.hpp>"
 C.include "<mapnik/layer.hpp>"
@@ -88,9 +86,8 @@ foreign import ccall "&hs_mapnik_destroy_Map" destroyMap :: FinalizerPtr Map
 unsafeNew :: (Ptr (Ptr Map) -> IO ()) -> IO Map
 unsafeNew = mkUnsafeNew Map destroyMap
 
-create :: Int -> Int -> IO Map
-create (fromIntegral -> width) (fromIntegral -> height) =
-  unsafeNew $ \p -> [CU.block|void{*$(Map** p) = new Map($(int width), $(int height));}|]
+create :: IO Map
+create = unsafeNew $ \p -> [CU.block|void{*$(Map** p) = new Map();}|]
 
 loadXmlFile :: Map -> FilePath -> IO ()
 loadXmlFile m (fromString -> path) =
@@ -231,21 +228,6 @@ zoomAll m = [C.catchBlock|$fptr-ptr:(Map *m)->zoom_all();|]
 zoomToBox :: Map -> Box -> IO ()
 zoomToBox m box = with box $ \boxPtr -> 
   [CU.block|void {$fptr-ptr:(Map *m)->zoom_to_box(*$(bbox *boxPtr));}|]
-
-render :: Map -> Double -> IO Image
-render m (realToFrac -> scale) = Image.unsafeNew $ \ptr ->
-  [C.catchBlock|
-  mapnik::Map *m = $fptr-ptr:(Map *m);
-  mapnik::image_rgba8 *im = new mapnik::image_rgba8(m->width(), m->height());
-  try {
-    mapnik::agg_renderer<mapnik::image_rgba8> ren(*m, *im, $(double scale));
-    ren.apply();
-    *$(image_rgba8** ptr) = im;
-  } catch (...) {
-    delete im;
-    throw;
-  }
-  |]
 
 addLayer :: Map -> Layer -> IO ()
 addLayer m l = [CU.block|void {
