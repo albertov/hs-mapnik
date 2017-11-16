@@ -18,12 +18,11 @@ import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Raster
 import           Mapnik.Bindings.Variant
+import qualified Mapnik.Bindings.Geometry as Geometry
 
 import           Control.Exception (bracket)
 import           Control.Monad (forM_)
-import           Data.ByteString (ByteString)
 import           Data.IORef
-import           Data.String (IsString(..))
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
 import           Foreign.ForeignPtr (FinalizerPtr)
@@ -34,31 +33,14 @@ import qualified Language.C.Inline.Unsafe as CU
 C.context mapnikCtx
 
 C.include "<string>"
+C.include "<mapnik/geometry.hpp>"
 C.include "<mapnik/feature.hpp>"
 C.include "<mapnik/feature_factory.hpp>"
-C.include "<mapnik/geometry.hpp>"
-C.include "<mapnik/wkb.hpp>"
-C.include "<mapnik/wkt/wkt_factory.hpp>"
-C.include "<mapnik/wkt/wkt_grammar.hpp>"
-C.include "<mapnik/wkt/wkt_grammar_impl.hpp>"
-C.include "<mapnik/wkt/wkt_generator_grammar.hpp>"
 C.include "<mapnik/unicode.hpp>"
 
--- Mapnik does not export this template instantiation that the inlined
--- from_wkt needs so we instantitate it here
-C.verbatim "using iterator_type = std::string::const_iterator;"
-C.verbatim "template struct mapnik::wkt::wkt_grammar<iterator_type>;"
 
 C.using "namespace mapnik"
-C.using "mapnik::geometry_utils"
-
-data Geometry
-  = GeometryWKB !ByteString
-  | GeometryWKT !ByteString
-  deriving (Eq, Show)
-
-instance IsString Geometry where
-  fromString = GeometryWKT . fromString
+C.using "geometry_t = geometry::geometry<double>"
 
 data Feature = Feature
   { fid      :: !Int
@@ -78,21 +60,8 @@ createFeature ctx f = unsafeNew $ \ret -> do
   auto feat = *$(feature_ptr **ret) = new feature_ptr(
     feature_factory::create(*$(context_ptr *ctx), $(value_integer fid'))
     );
+  feat->get()->set_geometry_copy(*$fptr-ptr:(geometry_t *geometry));
   }|]
-  case geometry of
-    GeometryWKB wkb ->
-      [CU.block|void {
-      auto feat = **$(feature_ptr **ret);
-      feat->set_geometry(geometry_utils::from_wkb($bs-ptr:wkb, $bs-len:wkb, mapnik::wkbAuto));
-      }|]
-    GeometryWKT wkt ->
-      [CU.block|void{
-      auto feat = **$(feature_ptr **ret);
-      mapnik::geometry::geometry<double> geom;
-      if (mapnik::from_wkt(std::string($bs-ptr:wkt, $bs-len:wkt), geom)) {
-        feat->set_geometry(std::move(geom));
-      }
-      }|]
   withVec $ \fs -> do
     forM_ fields $ flip withV $ \fld ->
       [CU.block|void{
@@ -125,7 +94,11 @@ createRasterFeature ctx r = unsafeNew $ \ret -> withV r $ \raster ->
 unCreate :: Ptr FeaturePtr -> IO Feature
 unCreate p = do
   fid <- fromIntegral <$> [CU.exp|int { (*$(feature_ptr* p))->id() }|]
-  geometry <- return (GeometryWKT "POINT(2 2)")
+  geometry <- Geometry.unsafeNew $ \g ->
+    [CU.block|void {
+    auto feat = *$(feature_ptr *p);
+    *$(geometry_t **g) = new geometry_t(feat->get_geometry());
+    }|]
   fieldsRef <- newIORef []
   let cb :: Ptr Value -> IO ()
       cb v = peekV v >>= \f -> modifyIORef' fieldsRef (f:)

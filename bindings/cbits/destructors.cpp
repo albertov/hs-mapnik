@@ -6,6 +6,7 @@
 #include <mapnik/projection.hpp>
 #include <mapnik/proj_transform.hpp>
 #include <mapnik/transform_expression.hpp>
+#include <mapnik/geometry.hpp>
 #include <mapnik/feature_type_style.hpp>
 #include <mapnik/rule.hpp>
 #include <mapnik/symbolizer_base.hpp>
@@ -89,6 +90,10 @@ MAPNIK_DECL void hs_mapnik_destroy_SymbolizerValue(void *p) {
 
 MAPNIK_DECL void hs_mapnik_destroy_Feature(void *p) {
   delete static_cast<mapnik::feature_ptr*>(p);
+}
+
+MAPNIK_DECL void hs_mapnik_destroy_Geometry(void *p) {
+  delete static_cast<mapnik::geometry::geometry<double>*>(p);
 }
 }
 

@@ -235,7 +235,7 @@ data HsDatasource where
     { name               :: !Text
     , extent             :: !Box
     , fieldNames         :: !(Vector Text)
-    , getRaster          :: !(Query -> IO (Raster a))
+    , getRasters         :: !(Query -> IO [Raster a])
     , getFeaturesAtPoint :: !(Pair -> Double -> IO [Feature])
     } -> HsDatasource
 
@@ -292,10 +292,12 @@ createHsDatasource HsRaster{..} = with extent $ \e -> unsafeNew $ \ ptr -> do
 
   where
     getFeatures' ctx fs q = catchingExceptions "getRaster" $ do
-      f <- createRasterFeature ctx =<< getRaster =<< unCreateQuery q
-      [CU.block|void {
-        $(feature_list *fs)->push_back(*$fptr-ptr:(feature_ptr *f)); }
-      |]
+      rs <- getRasters =<< unCreateQuery q
+      forM_ rs $ \r -> do
+        f <- createRasterFeature ctx r
+        [CU.block|void {
+          $(feature_list *fs)->push_back(*$fptr-ptr:(feature_ptr *f)); }
+        |]
 
     getFeaturesAtPoint' ctx fs (realToFrac -> x) (realToFrac -> y) (realToFrac -> tol) =
       catchingExceptions "getFeaturesAtPoint" $

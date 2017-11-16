@@ -12,6 +12,7 @@ import           Mapnik.Enums
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Registry (registerDefaults)
 import           Mapnik.Bindings.Map as Map
+import           Mapnik.Bindings.Geometry as Geometry
 import           Mapnik.Bindings.Image as Image
 import           Mapnik.Bindings.Raster as Raster
 import           Mapnik.Bindings.Layer as Layer
@@ -244,9 +245,11 @@ spec = beforeAll_ registerDefaults $ do
                        }
       let props = ["GEONAME", "SCALE_CAT"]
       (fs,feats) <- Datasource.features ds (queryBoxProps theBox props)
+      --print feats
       length feats `shouldBe` 192
       G.toList fs `shouldMatchList` props
       G.toList (fields (head feats)) `shouldMatchList` [TextValue "Sorel-Tracy", IntValue 0]
+      Geometry.toWkt (geometry (head feats)) `shouldBe` "POINT(1681422.74999858 -39049.2656230889)"
 
   describe "Image" $ do
     it "can convert to rgba8 data and read it back" $ do
@@ -364,8 +367,8 @@ spec = beforeAll_ registerDefaults $ do
         { name = "fooo"
         , extent = theExtent
         , fieldNames = []
-        , getRaster = \q ->
-            return Raster
+        , getRasters = \q ->
+            return [Raster
               { extent = box q
               , queryExtent = box q
               , filterFactor = 1
@@ -373,7 +376,7 @@ spec = beforeAll_ registerDefaults $ do
               , height = h
               , nodata = Nothing
               , pixels = G.generate (w*h) fromIntegral :: St.Vector Int32
-              }
+              }]
         , getFeaturesAtPoint = \_ _ -> return []
         }
       Layer.setDatasource l ds

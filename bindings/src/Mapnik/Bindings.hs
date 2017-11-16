@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
 module Mapnik.Bindings (
   Map (..)
 , Image (..)
@@ -40,6 +41,7 @@ module Mapnik.Bindings (
 , Dash(..)
 , FeatureList
 , QueryPtr
+, Geometry (..)
 , FeaturePtr (..)
 , RGBA8 (..)
 , RasterPtr
@@ -102,6 +104,7 @@ fptr(FeatureList)
 fptr(FeatureCtx)
 fptr(RasterPtr)
 fptr(Param)
+newtype Geometry = Geometry (ForeignPtr Geometry) deriving (Eq, Ord)
 
 #ifdef BIGINT
 type MapnikInt = C.CLong
@@ -158,6 +161,7 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "feature_list", [t| FeatureList |])
       , (C.TypeName "query", [t| QueryPtr |])
       , (C.TypeName "feature_ptr", [t| FeaturePtr |])
+      , (C.TypeName "geometry_t", [t| Geometry |])
       , (C.TypeName "context_ptr", [t| FeatureCtx |])
       , (C.TypeName "value", [t| Value |])
       , (C.TypeName "value_holder", [t| Param |])
