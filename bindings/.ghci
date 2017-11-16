@@ -1,4 +1,0 @@
-:set -fwarn-unused-binds -fwarn-unused-imports -isrc -ispec -fprint-potential-instances -Wall -fobject-code
-import qualified Mapnik.Bindings.Map as Map
-import           Mapnik.Bindings.Registry (registerDefaults)
-registerDefaults
