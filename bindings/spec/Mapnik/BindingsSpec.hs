@@ -331,7 +331,7 @@ spec = beforeAll_ registerDefaults $ do
       let theExtent = Box 0 0 100 100
 
       imgBase <- render m (renderSettings 512 512 theExtent)
-      BS.writeFile "map.webp" (fromJust (Image.serialize "webp" imgBase))
+      --BS.writeFile "map.webp" (fromJust (Image.serialize "webp" imgBase))
       snd (toRgba8 imgBase) `shouldSatisfy` G.all (== transparent)
 
       l <- Layer.create "fooo"
@@ -392,6 +392,7 @@ spec = beforeAll_ registerDefaults $ do
         , getFeaturesAtPoint = \_ _ -> return []
         }
       (_,feats) <- Datasource.features ds (queryBox theExtent)
+      geometry (head feats) `shouldSatisfy` isNothing
       let Just r = raster (head feats)
       getPixels r `shouldBe` Just thePixels
       Layer.setDatasource l ds
@@ -436,9 +437,7 @@ spec = beforeAll_ registerDefaults $ do
     Datasource.variables q `shouldBe` vars
 
 loadFixture :: Map -> IO ()
-loadFixture m = do
-  loadFixtureFrom "spec/map.xml" m
-  Map.setSrs m merc
+loadFixture = loadFixtureFrom "spec/map.xml"
 
 loadFixtureFrom :: String -> Map -> IO ()
 loadFixtureFrom p m = Map.loadXml m =<< BS.readFile p
