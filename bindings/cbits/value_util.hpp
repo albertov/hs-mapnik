@@ -12,51 +12,53 @@ enum class value_type : int {
 , integer_type
 , bool_type
 , string_type
+, unicode_string_type
 };
 
 struct value_extractor_visitor
 {
-    void * const retPtr_;
-    int * const tyPtr_;
+    void const** const retPtr_;
+    value_type * const tyPtr_;
+    int        * const lenPtr_;
 
-    value_extractor_visitor(void *retPtr, int *tyPtr)
-        :retPtr_(retPtr), tyPtr_(tyPtr) {}
+    value_extractor_visitor(void const** retPtr, value_type *tyPtr, int *lenPtr)
+        :retPtr_(retPtr), tyPtr_(tyPtr), lenPtr_(lenPtr) {}
+
+    void operator() (value_null const& val) const
+    {
+      *tyPtr_  = value_type::null_type;
+    }
 
     void operator() (value_double const& val) const
     {
-      *tyPtr_ = static_cast<int>(value_type::double_type);
-      *static_cast<value_double*>(retPtr_) = val;
+      *tyPtr_  = value_type::double_type;
+      *retPtr_ = &val;
     }
 
     void operator() (value_integer const& val) const
     {
-      *tyPtr_ = static_cast<int>(value_type::integer_type);
-      *static_cast<value_integer*>(retPtr_) = val;
-    }
-
-    void operator() (value_unicode_string const& val) const
-    {
-      *tyPtr_ = static_cast<int>(value_type::string_type);
-      std::string ret;
-      to_utf8(val, ret);
-      *static_cast<char**>(retPtr_) = strdup(ret.c_str());
-    }
-
-    void operator() (std::string const& val) const
-    {
-      *tyPtr_ = static_cast<int>(value_type::string_type);
-      *static_cast<char**>(retPtr_) = strdup(val.c_str());
+      *tyPtr_  = value_type::integer_type;
+      *retPtr_ = &val;
     }
 
     void operator() (value_bool const& val) const
     {
-      *tyPtr_ = static_cast<int>(value_type::bool_type);
-      *static_cast<int*>(retPtr_) = val;
+      *tyPtr_  = value_type::bool_type;
+      *retPtr_ = &val;
     }
 
-    void operator() (value_null const& val) const
+    void operator() (std::string const& val) const
     {
-      *tyPtr_ = static_cast<int>(value_type::null_type);
+      *tyPtr_  = value_type::string_type;
+      *retPtr_ = val.c_str();
+      *lenPtr_ = val.size();
+    }
+
+    void operator() (value_unicode_string const& val) const
+    {
+      *tyPtr_  = value_type::unicode_string_type;
+      *retPtr_ = val.getBuffer();
+      *lenPtr_ = val.length();
     }
 
 };

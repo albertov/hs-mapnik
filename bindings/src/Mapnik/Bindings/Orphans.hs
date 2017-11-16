@@ -15,13 +15,10 @@ import           Mapnik (Value(..))
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Variant
 
-import           Control.Exception (bracket, throwIO)
-import           Data.Text.Foreign (useAsPtr)
-import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
-import           Data.ByteString.Unsafe (unsafePackMallocCString)
+import           Control.Exception (bracket)
+import           Data.Text.Foreign
 import           Foreign.Storable (Storable(..))
 import           Foreign.Ptr (Ptr, castPtr)
-import           Foreign.Marshal.Alloc (alloca)
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Unsafe as CU
@@ -91,56 +88,63 @@ instance VariantPtr Value where
     alloc = [CU.exp|value * { new value }|]
     dealloc p = [CU.exp|void { delete $(value *p)}|]
 
-instance Variant Value Value where
-  pokeV p (TextValue t) = useAsPtr t $ \(castPtr -> v) (fromIntegral -> len) ->
-    [CU.block|void{
-      *$(value *p) = UnicodeString (($(unsigned short *v)), $(int len));
-    }|]
-  pokeV p (IntValue (fromIntegral -> v)) =
-    [CU.block|void{ *$(value *p) = $(value_integer v); }|]
-  pokeV p (DoubleValue (realToFrac -> v)) =
-    [CU.block|void{ *$(value *p) = $(double v); }|]
-  pokeV p (BoolValue (fromIntegral . fromEnum -> v)) =
-    [CU.block|void{ *$(value *p) = $(int v) ? true : false ; }|]
-  pokeV p NullValue =
-    [CU.block|void{ *$(value *p) = value_null(); }|]
-
-  peekV p = alloca $ \res -> alloca $ \ty -> do
-    [CU.block|void{
-      util::apply_visitor(value_extractor_visitor($(void *res), $(int *ty)), *$(value *p));
-    }|]
-    extractVal res =<< peek ty
-
-extractVal :: Ptr () -> C.CInt -> IO Value
-extractVal res type_ =
-    case type_ of
-      0 -> return NullValue
-      1 -> DoubleValue . realToFrac   <$> peek @C.CDouble (castPtr res)
-      2 -> IntValue    . fromIntegral <$> peek @C.CInt    (castPtr res)
-      3 -> BoolValue   . toEnum . fromIntegral <$> peek @C.CInt    (castPtr res)
-      4 -> TextValue . decodeUtf8
-       <$> (unsafePackMallocCString =<< peek (castPtr res))
-      _ -> throwIO VariantTypeError
-
 instance VariantPtr Param where
   allocaV = bracket alloc dealloc where
     alloc = [CU.exp|value_holder * { new value_holder }|]
     dealloc p = [CU.exp|void { delete $(value_holder *p)}|]
 
-instance Variant Param Value where
-  pokeV p (TextValue (encodeUtf8 -> v)) =
-    [CU.block|void{ *$(value_holder *p) = std::string ($bs-ptr:v, $bs-len:v); }|]
+instance Variant Value Value where
+  pokeV p (TextValue t) = useAsPtr t $ \(castPtr -> v) (fromIntegral -> len) ->
+    [CU.exp|void{ *$(value *p) = UnicodeString (($(unsigned short *v)), $(int len)) }|]
   pokeV p (IntValue (fromIntegral -> v)) =
-    [CU.block|void{ *$(value_holder *p) = $(value_integer v); }|]
+    [CU.exp|void{ *$(value *p) = $(value_integer v) }|]
   pokeV p (DoubleValue (realToFrac -> v)) =
-    [CU.block|void{ *$(value_holder *p) = $(double v); }|]
+    [CU.exp|void{ *$(value *p) = $(double v) }|]
   pokeV p (BoolValue (fromIntegral . fromEnum -> v)) =
-    [CU.block|void{ *$(value_holder *p) = $(int v) ? true : false ; }|]
+    [CU.exp|void{ *$(value *p) = $(int v) ? true : false }|]
   pokeV p NullValue =
-    [CU.block|void{ *$(value_holder *p) = value_null(); }|]
+    [CU.exp|void{ *$(value *p) = value_null()}|]
 
-  peekV p = alloca $ \res -> alloca $ \ty -> do
-    [CU.block|void{
-      util::apply_visitor(value_extractor_visitor($(void *res), $(int *ty)), *$(value_holder *p));
+  peekV p = peekVwith $ \(res,ty,len) ->
+    [CU.exp|void{
+      util::apply_visitor(value_extractor_visitor(const_cast<void const**>($(void **res)), $(value_type *ty), $(int *len)),
+                          *$(value *p))
     }|]
-    extractVal res =<< peek ty
+
+instance Variant Param Value where
+  pokeV p (TextValue t) = withCStringLen t $ \(s, fromIntegral -> l) ->
+    [CU.exp|void{ *$(value_holder *p) = std::string ($(char *s), $(int l)) }|]
+  pokeV p (IntValue (fromIntegral -> v)) =
+    [CU.exp|void{ *$(value_holder *p) = $(value_integer v) }|]
+  pokeV p (DoubleValue (realToFrac -> v)) =
+    [CU.exp|void{ *$(value_holder *p) = $(double v) }|]
+  pokeV p (BoolValue (fromIntegral . fromEnum -> v)) =
+    [CU.exp|void{ *$(value_holder *p) = $(int v) ? true : false }|]
+  pokeV p NullValue =
+    [CU.exp|void{ *$(value_holder *p) = value_null() }|]
+
+  peekV p = peekVwith $ \(res,ty,len) ->
+    [CU.exp|void{
+      util::apply_visitor(value_extractor_visitor(const_cast<void const**>($(void **res)), $(value_type *ty), $(int *len)),
+                          *$(value_holder *p))
+    }|]
+
+data ValueType
+  = NullValueT
+  | DoubleValueT
+  | IntValueT
+  | BoolValueT
+  | StringValueT
+  | UnicodeStringValueT
+  deriving Enum
+
+peekVwith :: ((Ptr (Ptr ()), Ptr C.CInt, Ptr C.CInt) -> IO ()) -> IO Value
+peekVwith f = do
+  (res,type_,sz) <- C.withPtrs_ f
+  case toEnum (fromIntegral type_) of
+    NullValueT -> return NullValue
+    DoubleValueT -> DoubleValue . realToFrac   <$> peek @C.CDouble (castPtr res)
+    IntValueT -> IntValue    . fromIntegral <$> peek @MapnikInt (castPtr res)
+    BoolValueT -> BoolValue   . toEnum . fromIntegral <$> peek @C.CUChar (castPtr res)
+    StringValueT -> TextValue <$> peekCStringLen (castPtr res, fromIntegral sz)
+    UnicodeStringValueT -> TextValue <$> fromPtr (castPtr res) (fromIntegral sz)

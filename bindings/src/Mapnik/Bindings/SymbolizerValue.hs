@@ -121,7 +121,7 @@ instance Variant SymbolizerValue HS where {\
 
 SYM_VAL(Int,value_integer,fromIntegral)
 SYM_VAL(Double,double,realToFrac)
-SYM_VAL(Bool,bool,id)
+SYM_VAL_ENUM(Bool,bool)
 SYM_VAL_ENUM(CompositeMode,composite_mode_e)
 SYM_VAL_ENUM(LineCap,line_cap_enum)
 SYM_VAL_ENUM(LineJoin,line_join_enum)

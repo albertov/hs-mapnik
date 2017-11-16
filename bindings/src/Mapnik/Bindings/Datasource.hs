@@ -172,7 +172,7 @@ features ds query = withQuery query $ \q -> do
       $fun:(void (*cbFeat)(feature_ptr*))(&feat);
       last = feat;
     }
-    if (last) {
+    if (last && last->context()) {
       auto ctx = last->context();
       for (auto it=ctx->begin(); it!=ctx->end(); ++it) {
         $fun:(void (*cbField)(char *, size_t))(

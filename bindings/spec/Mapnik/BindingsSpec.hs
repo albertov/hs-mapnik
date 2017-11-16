@@ -411,6 +411,7 @@ spec = beforeAll_ registerDefaults $ do
       , fieldNames = []
       , getFeatures = \q -> do
           writeIORef ref (Just q)
+          --print q
           return []
       , getFeaturesAtPoint = \_ _ -> return []
       }
