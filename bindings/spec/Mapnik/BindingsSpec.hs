@@ -31,7 +31,7 @@ import           Control.Monad (void)
 import           Data.Text (Text)
 import           Data.Int
 import           Data.IORef
-import           Data.Maybe (isJust, isNothing)
+import           Data.Maybe
 import           Data.List (lookup)
 import           Data.Either (isLeft, isRight)
 import qualified Data.Vector.Storable as St
@@ -363,27 +363,29 @@ spec = beforeAll_ registerDefaults $ do
       l <- Layer.create "fooo"
       Layer.setSrs l "+init=epsg:3857"
       let theExtent = Box 0 0 100 100
+          boxes = [Box 0 0 50 50, Box 50 50 100 100]
       ds <- createHsDatasource HsRaster
         { name = "fooo"
         , extent = theExtent
         , fieldNames = []
         , getRasters = \q ->
-            return [Raster
-              { extent = box q
-              , queryExtent = box q
-              , filterFactor = 1
-              , width = w
-              , height = h
-              , nodata = Nothing
-              , pixels = G.generate (w*h) fromIntegral :: St.Vector Int32
-              }]
+            return $ flip map boxes $ \b ->
+              Raster
+                { extent = b
+                , queryExtent = b
+                , filterFactor = 1
+                , width = 50
+                , height = 50
+                , nodata = Nothing
+                , pixels = G.generate (50*50) fromIntegral :: St.Vector Int32
+                }
         , getFeaturesAtPoint = \_ _ -> return []
         }
       Layer.setDatasource l ds
       Layer.addStyle l "raster-style"
       Map.addLayer m l
-      _img <- render m rSettings
-      --BS.writeFile "map.webp" (fromJust (Image.serialize "webp" _img))
+      _img <- render m (rSettings { extent = theExtent })
+      BS.writeFile "map.webp" (fromJust (Image.serialize "webp" _img))
       return ()
 
   it "can pass render variables" $ do
