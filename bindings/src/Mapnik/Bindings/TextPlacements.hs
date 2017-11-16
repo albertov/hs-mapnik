@@ -14,7 +14,7 @@ module Mapnik.Bindings.TextPlacements (
 ) where
 
 import qualified Mapnik
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Variant (Variant(..), justOrTypeError)
 import qualified Mapnik.Bindings.TextSymProperties as Props

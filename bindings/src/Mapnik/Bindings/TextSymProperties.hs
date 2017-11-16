@@ -14,7 +14,7 @@ module Mapnik.Bindings.TextSymProperties (
 ) where
 
 import qualified Mapnik
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Variant (Variant(..), withV)
 import           Mapnik.Bindings.SymbolizerValue ()

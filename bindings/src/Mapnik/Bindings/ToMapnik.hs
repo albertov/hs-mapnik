@@ -5,7 +5,7 @@
 module Mapnik.Bindings.ToMapnik (ToMapnik(..)) where
 
 import qualified Mapnik
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Layer as Layer
 import           Mapnik.Bindings.Map as Map
 import qualified Mapnik.Bindings.Datasource as Datasource

@@ -15,7 +15,7 @@ module Mapnik.Bindings.Style (
 , getRules
 ) where
 
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import qualified Mapnik.Bindings.Rule as Rule
 
 import           Control.Monad ((<=<))

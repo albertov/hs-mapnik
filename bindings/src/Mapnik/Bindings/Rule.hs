@@ -24,7 +24,7 @@ module Mapnik.Bindings.Rule (
 , hasAlsoFilter
 ) where
 
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import qualified Mapnik.Bindings.Expression as Expression
 import qualified Mapnik.Bindings.Symbolizer as Symbolizer

@@ -12,7 +12,7 @@ module Mapnik.Bindings.Orphans (
 
 import qualified Mapnik
 import           Mapnik (Value(..))
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Variant
 
 import           Control.Exception (bracket, throwIO)

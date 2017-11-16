@@ -12,6 +12,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 module Mapnik.Bindings.Raster (
   Raster(..)
 , RasterType
@@ -20,7 +21,7 @@ module Mapnik.Bindings.Raster (
 ) where
 
 import           Mapnik (Box)
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Orphans()
 import           Mapnik.Bindings.Variant
 

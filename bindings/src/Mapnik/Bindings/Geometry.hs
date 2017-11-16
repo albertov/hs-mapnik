@@ -17,7 +17,7 @@ module Mapnik.Bindings.Geometry (
 , unsafeNewMaybe
 ) where
 
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 
 import           Data.ByteString (ByteString, unpack)

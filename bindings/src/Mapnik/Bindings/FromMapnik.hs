@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -7,7 +6,7 @@
 module Mapnik.Bindings.FromMapnik where
 
 import qualified Mapnik
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import qualified Mapnik.Bindings.Map as Map
 import qualified Mapnik.Bindings.Layer as Layer
 import qualified Mapnik.Bindings.Style as Style
@@ -28,26 +27,10 @@ instance FromMapnik a => FromMapnik (Maybe a) where
   fromMapnik Nothing = return Nothing
   fromMapnik (Just a) = Just <$> fromMapnik a
 
-#define fromMapnikId(X) \
-instance FromMapnik X where {\
-  type HsType X = X;\
-  fromMapnik = return;\
-}
-
-fromMapnikId(Mapnik.Map)
-fromMapnikId(Mapnik.Layer)
-fromMapnikId(Mapnik.Datasource)
-fromMapnikId(Mapnik.Parameters)
-fromMapnikId(Mapnik.Color)
-fromMapnikId(Mapnik.Style)
-fromMapnikId(Mapnik.Rule)
-fromMapnikId(Mapnik.Symbolizer)
-fromMapnikId(Mapnik.Expression)
-
 instance FromMapnik Map where
   type HsType Map = Mapnik.Map
   fromMapnik m = do
-    backgroundColor <- fromMapnik =<< Map.getBackground m
+    backgroundColor <- Map.getBackground m
     backgroundImage <- Map.getBackgroundImage m
     backgroundImageCompOp <- Map.getBackgroundImageCompOp m
     backgroundImageOpacity <- Just <$> Map.getBackgroundImageOpacity m

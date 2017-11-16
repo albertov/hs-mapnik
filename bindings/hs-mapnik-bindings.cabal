@@ -18,6 +18,7 @@ custom-setup
 library
   hs-source-dirs:      src
   exposed-modules:     Mapnik.Bindings
+                     , Mapnik.Bindings.Types
                      , Mapnik.Bindings.Map
                      , Mapnik.Bindings.Orphans
                      , Mapnik.Bindings.Image

@@ -3,30 +3,19 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 module Mapnik.BindingsSpec (main, spec) where
 
-import qualified Data.ByteString as BS
-import           Test.Hspec
-import qualified Mapnik
-import           Mapnik (Color (..), Dash(..), DashArray, Prop(..))
-import qualified Mapnik.Lens as L
-import           Mapnik.Enums
 import           Mapnik.Bindings
-import           Mapnik.Bindings.Registry (registerDefaults)
-import           Mapnik.Bindings.Map as Map
-import           Mapnik.Bindings.Feature as Feature
-import           Mapnik.Bindings.Geometry as Geometry
-import           Mapnik.Bindings.Image as Image
-import           Mapnik.Bindings.Raster as Raster
-import           Mapnik.Bindings.Layer as Layer
-import           Mapnik.Bindings.Projection as Projection
-import           Mapnik.Bindings.Rule as Rule
-import           Mapnik.Bindings.Style as Style
-import           Mapnik.Bindings.Transform as Transform
-import           Mapnik.Bindings.Expression as Expression
-import           Mapnik.Bindings.Datasource as Datasource
-import           Mapnik.Bindings.Symbolizer as Symbolizer
-import           Mapnik.Bindings.TextPlacements as TextPlacements
-import           Mapnik.Bindings.FromMapnik
-import           Mapnik.Bindings.Render as Render
+import qualified Mapnik.Lens as L
+import qualified Mapnik.Bindings.Map as Map
+import qualified Mapnik.Bindings.Layer as Layer
+import qualified Mapnik.Bindings.Projection as Projection
+import qualified Mapnik.Bindings.Rule as Rule
+import qualified Mapnik.Bindings.Style as Style
+import qualified Mapnik.Bindings.Transform as Transform
+import qualified Mapnik.Bindings.Expression as Expression
+import qualified Mapnik.Bindings.Datasource as Datasource
+import qualified Mapnik.Bindings.Symbolizer as Symbolizer
+import qualified Mapnik.Bindings.TextPlacements as TextPlacements
+
 import           Control.Lens hiding ((.=))
 import           Control.Monad (void)
 import           Data.Text (Text)
@@ -37,6 +26,9 @@ import           Data.List (lookup)
 import           Data.Either (isLeft, isRight)
 import qualified Data.Vector.Storable as St
 import qualified Data.Vector.Generic as G
+import qualified Data.ByteString as BS
+import           Test.Hspec
+
 
 main :: IO ()
 main = hspec spec
@@ -55,8 +47,8 @@ spec = beforeAll_ registerDefaults $ do
       m <- Map.create
       loadFixture m
       img <- render m rSettings
-      -- BS.writeFile "map.webp" (Image.serialize "webp" img)
-      let Just bs = Image.serialize "png8" img
+      -- BS.writeFile "map.webp" (serialize "webp" img)
+      let Just bs = serialize "png8" img
       bs `shouldSatisfy` isPng
 
 
@@ -88,8 +80,8 @@ spec = beforeAll_ registerDefaults $ do
     it "can get layers" $ do
       m <- Map.create
       loadFixture m
-      layers <- Map.getLayers m
-      length layers `shouldBe` 5
+      ls <- Map.getLayers m
+      length ls `shouldBe` 5
 
 
     it "can get srs" $ do
@@ -115,18 +107,18 @@ spec = beforeAll_ registerDefaults $ do
 
   describe "Projection" $ do
     it "can create valid" $
-      Projection.parse merc `shouldSatisfy` isRight
+      Projection.fromProj4 merc `shouldSatisfy` isRight
 
     it "can toText valid" $
-      fmap Projection.toText (Projection.parse merc) `shouldBe` Right "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over"
+      fmap Projection.toProj4 (Projection.fromProj4 merc) `shouldBe` Right "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over"
 
 
     it "cannot create invalid" $
-      Projection.parse "foo" `shouldSatisfy` isLeft
+      Projection.fromProj4 "foo" `shouldSatisfy` isLeft
 
     it "can trasform" $ do
-      let Right src = Projection.parse merc
-          Right dst = Projection.parse "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
+      let Right src = Projection.fromProj4 merc
+          Right dst = Projection.fromProj4 "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
           trans = projTransform src dst
           expected = Box { minx = 1372637.1001942465
                          , miny = -247003.8133187965
@@ -209,7 +201,7 @@ spec = beforeAll_ registerDefaults $ do
       Just f <- Rule.getFilter r2
       Expression.toText f `shouldBe` "([NOM_FR]='Québec')"
       mSym <- Symbolizer.unCreate sym
-      let expected = Mapnik.polygon
+      let expected = polygonSym
                        & L.fill   ?~ Val (RGBA 217 235 203 255)
                        & L.compOp ?~ Val SrcOver
       mSym `shouldBe` expected
@@ -250,26 +242,25 @@ spec = beforeAll_ registerDefaults $ do
       length feats `shouldBe` 192
       G.toList fs `shouldMatchList` props
       G.toList (fields (head feats)) `shouldMatchList` [TextValue "Sorel-Tracy", IntValue 0]
-      Geometry.toWkt (fromJust (geometry (head feats))) `shouldBe` "POINT(1681422.74999858 -39049.2656230889)"
+      toWkt (fromJust (geometry (head feats))) `shouldBe` "POINT(1681422.74999858 -39049.2656230889)"
 
   describe "Image" $ do
     it "can convert to rgba8 data and read it back" $ do
       m <- Map.create
       img <- render m rSettings
-      let rgba8 = Image.toRgba8 img
-          Just img2  = Image.fromRgba8 rgba8
-          w = Render.width rSettings
-          h = Render.height rSettings
+      let rgba8 = toRgba8 img
+          Just img2  = fromRgba8 rgba8
+          RenderSettings{width=w, height=h} = rSettings
       G.length (snd rgba8)  `shouldBe` (w * h)
-      --BS.writeFile "map.webp" (Image.serialize "webp" img2)
-      Image.serialize "png8" img `shouldBe` Image.serialize "png8" img2
+      --BS.writeFile "map.webp" (serialize "webp" img2)
+      serialize "png8" img `shouldBe` serialize "png8" img2
 
     it "cannot create empty image" $
-      Image.fromRgba8 ((0,0), G.empty) `shouldSatisfy` isNothing
+      fromRgba8 ((0,0), G.empty) `shouldSatisfy` isNothing
 
     it "doesnt serialize bad format" $ do
-      let Just img = Image.fromRgba8 ((10, 10), (G.replicate (10*10) (PixelRgba8 0)))
-      Image.serialize "bad" img `shouldSatisfy` isNothing
+      let Just img = fromRgba8 ((10, 10), (G.replicate (10*10) (PixelRgba8 0)))
+      serialize "bad" img `shouldSatisfy` isNothing
 
   describe "Expression" $ do
     it "can parse good expression" $ do
@@ -297,7 +288,7 @@ spec = beforeAll_ registerDefaults $ do
       loadFixture m'
       m <- fromMapnik m'
       do
-        let lns :: Traversal' Mapnik.Map DashArray
+        let lns :: Traversal' Map DashArray
             lns = L.styles . at "provlines" . _Just
                 . L.rules . ix 0
                 . L.symbolizers . ix 0
@@ -305,7 +296,7 @@ spec = beforeAll_ registerDefaults $ do
                 . _Just . L._Val
         m^?lns `shouldBe` Just [Dash 8 4, Dash 2 2, Dash 2 2]
       do
-        let lns :: Traversal' Mapnik.Map Double
+        let lns :: Traversal' Map Double
             lns = L.styles . at "raster-style" . _Just
                 . L.rules . ix 0
                 . L.symbolizers . ix 0
@@ -318,7 +309,7 @@ spec = beforeAll_ registerDefaults $ do
 
   describe "TextPlacements" $ do
     it "can create" $ do
-      let ps = Mapnik.def
+      let ps = def
       ps' <- TextPlacements.unCreate =<< TextPlacements.create ps
       ps `shouldBe` ps'
 
@@ -331,13 +322,13 @@ spec = beforeAll_ registerDefaults $ do
       let theExtent = Box 0 0 100 100
 
       imgBase <- render m (renderSettings 512 512 theExtent)
-      --BS.writeFile "map.webp" (fromJust (Image.serialize "webp" imgBase))
+      --BS.writeFile "map.webp" (fromJust (serialize "webp" imgBase))
       snd (toRgba8 imgBase) `shouldSatisfy` G.all (== transparent)
 
       l <- Layer.create "fooo"
       Layer.setSrs l "+init=epsg:3857"
       ref <- newIORef Nothing
-      ds <- createHsDatasource HsVector
+      ds <- Datasource.createHsDatasource HsVector
         { name = "fooo"
         , extent = theExtent
         , fieldNames = ["aString", "anInt", "aBool", "aDouble", "aNull"]
@@ -374,7 +365,7 @@ spec = beforeAll_ registerDefaults $ do
       let theExtent = Box 0 0 100 100
           boxes = [Box 0 0 50 50, Box 50 50 100 100]
           thePixels = G.generate (50*50) fromIntegral :: St.Vector Int32
-      ds <- createHsDatasource HsRaster
+      ds <- Datasource.createHsDatasource HsRaster
         { name = "fooo"
         , extent = theExtent
         , fieldNames = []
@@ -400,7 +391,7 @@ spec = beforeAll_ registerDefaults $ do
       Map.addLayer m l
       let h=256; w=256
       img <- render m (rSettings { extent = theExtent, width=w, height=h })
-      --BS.writeFile "map.webp" (fromJust (Image.serialize "webp" img))
+      --BS.writeFile "map.webp" (fromJust (serialize "webp" img))
       let (_, imData) = toRgba8 img
       imData G.! 0 `shouldBe` transparent
       imData G.! 128 `shouldNotBe` transparent
@@ -414,7 +405,7 @@ spec = beforeAll_ registerDefaults $ do
     l <- Layer.create "fooo"
     ref <- newIORef Nothing
     let theExtent = Box 0 0 100 100
-    ds <- createHsDatasource HsVector
+    ds <- Datasource.createHsDatasource HsVector
       { name = "fooo"
       , extent = theExtent
       , fieldNames = []
@@ -436,10 +427,10 @@ spec = beforeAll_ registerDefaults $ do
     Just q <- readIORef ref
     Datasource.variables q `shouldBe` vars
 
-loadFixture :: Map -> IO ()
+loadFixture :: Map.Map -> IO ()
 loadFixture = loadFixtureFrom "spec/map.xml"
 
-loadFixtureFrom :: String -> Map -> IO ()
+loadFixtureFrom :: String -> Map.Map -> IO ()
 loadFixtureFrom p m = Map.loadXml m =<< BS.readFile p
 
 transparent :: PixelRgba8

@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -34,7 +35,7 @@ module Mapnik.Bindings.Datasource (
 ) where
 
 import           Mapnik.Parameter as X (Value(..), Parameter, (.=))
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()
 import           Mapnik.Bindings.Feature (Feature(..), feature)
@@ -221,8 +222,6 @@ queryBoxProps b ps = Query
   , variables = M.empty
   }
 
-data Pair = Pair { x, y :: !Double }
-  deriving (Eq, Show)
 
 data HsDatasource where
   HsVector ::

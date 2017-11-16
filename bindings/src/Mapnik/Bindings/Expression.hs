@@ -10,7 +10,7 @@ module Mapnik.Bindings.Expression (
 , toText
 ) where
 
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import           Control.Exception (try)
 import           Data.Text (Text)

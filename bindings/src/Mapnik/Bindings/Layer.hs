@@ -35,7 +35,7 @@ module Mapnik.Bindings.Layer (
 ) where
 
 import           Mapnik (StyleName)
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans()
 import qualified Mapnik.Bindings.Datasource as Datasource

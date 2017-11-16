@@ -12,7 +12,7 @@ module Mapnik.Bindings.Registry (
 , mapnikCtx
 ) where
 
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import           Data.String (fromString)
 
 import qualified Language.C.Inline.Cpp as C

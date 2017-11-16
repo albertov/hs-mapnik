@@ -14,7 +14,7 @@ module Mapnik.Bindings.Feature (
 , unCreate
 ) where
 
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Raster
 import           Mapnik.Bindings.Variant

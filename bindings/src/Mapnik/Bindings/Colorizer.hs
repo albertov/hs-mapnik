@@ -12,7 +12,7 @@ module Mapnik.Bindings.Colorizer (
 ) where
 
 import qualified Mapnik
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()
 import           Foreign.ForeignPtr (FinalizerPtr, withForeignPtr)

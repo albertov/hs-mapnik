@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -10,7 +11,7 @@ module Mapnik.Bindings.Render (
 ) where
 
 import           Mapnik (Proj4, AspectFixMode(..))
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Variant
 import           Mapnik.Bindings.Orphans()
 import qualified Mapnik.Bindings.Image as Image

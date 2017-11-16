@@ -5,19 +5,19 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 module Mapnik.Bindings.Projection (
-  parse
-, toText
+  fromProj4
+, toProj4
 , projTransform
 , CanTransform (..)
 ) where
 
-import           Mapnik.Bindings
+import           Mapnik (Proj4)
+import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util (newText)
 import           Mapnik.Bindings.Orphans()
 
 import           Control.Exception (try)
 import           Control.Monad ((<=<))
-import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
@@ -48,8 +48,8 @@ foreign import ccall "&hs_mapnik_destroy_Projection" destroyProjection :: Finali
 unsafeNew :: (Ptr (Ptr Projection) -> IO ()) -> IO Projection
 unsafeNew = fmap Projection . newForeignPtr destroyProjection <=< C.withPtr_
 
-parse :: Text -> Either String Projection
-parse (encodeUtf8 -> s) =
+fromProj4 :: Proj4 -> Either String Projection
+fromProj4 (encodeUtf8 -> s) =
   unsafePerformIO $ fmap showExc $ try $ unsafeNew $ \p ->
     [C.catchBlock|*$(projection **p) = new projection(std::string($bs-ptr:s, $bs-len:s));|]
   where
@@ -65,8 +65,8 @@ projTransform src dst = unsafePerformIO $ do
   ProjTransform <$> newForeignPtr destroyProjTransform ptr
 
   
-toText :: Projection -> Text
-toText pr = unsafePerformIO $ newText $ \(ptr,len) ->
+toProj4 :: Projection -> Proj4
+toProj4 pr = unsafePerformIO $ newText $ \(ptr,len) ->
     [CU.block|void {
     std::string const &s = $fptr-ptr:(projection *pr)->params();
     *$(char** ptr) = strdup(s.c_str());

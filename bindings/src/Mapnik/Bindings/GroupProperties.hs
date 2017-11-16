@@ -14,7 +14,7 @@ module Mapnik.Bindings.GroupProperties (
 ) where
 
 import qualified Mapnik
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)

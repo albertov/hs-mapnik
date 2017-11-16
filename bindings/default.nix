@@ -1,15 +1,14 @@
 { mkDerivation, fetchFromGitHub, base, Cabal, directory
 , filepath, hspec, hspec-core, process, stdenv
 , bytestring, icu, harfbuzz, mapnik, boost, inline-c-cpp
-, inline-c, hs-mapnik, hs-mapnik-setup, text
+, inline-c, hs-mapnik, hs-mapnik-setup, text, which
 }:
 mkDerivation {
   pname = "hs-mapnik-bindings";
   version = "0.1.0.0";
   src = ./.;
   doHaddock = false;
-  preConfigure = "export MAPNIK_CONFIG=${mapnik}/bin/mapnik-config";
-  setupHaskellDepends = [ base Cabal directory filepath process ];
+  setupHaskellDepends = [ base Cabal directory filepath process which ];
   libraryHaskellDepends = [ base bytestring inline-c-cpp inline-c hs-mapnik hs-mapnik-setup ];
   librarySystemDepends = [ mapnik boost.dev icu.dev harfbuzz.dev ];
   testHaskellDepends = [

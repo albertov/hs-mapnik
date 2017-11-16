@@ -64,7 +64,7 @@ import Mapnik.Symbolizer.Property
   , BASE_PROPS_DEFS
 
 data Symbolizer
-  = Point
+  = PointSymbolizer
     { file            :: !(PropValue FilePath)
     , opacity         :: !(PropValue Double)
     , allowOverlap    :: !(PropValue Bool)
@@ -73,26 +73,26 @@ data Symbolizer
     , imageTransform  :: !(PropValue Transform)
     , BASE_PROPS
     }
-  | Line
+  | LineSymbolizer
     { offset         :: !(PropValue Double)
     , lineRasterizer :: !(PropValue LineRasterizer)
     , STROKE_PROPS
     }
-  | LinePattern
+  | LinePatternSymbolizer
     { file             :: !(PropValue FilePath)
     , opacity          :: !(PropValue Double)
     , offset           :: !(PropValue Double)
     , imageTransform   :: !(PropValue Transform)
     , BASE_PROPS
     }
-  | Polygon
+  | PolygonSymbolizer
     { fill         :: !(PropValue Color)
     , fillOpacity  :: !(PropValue Double)
     , gamma        :: !(PropValue Double)
     , gammaMethod  :: !(PropValue GammaMethod)
     , BASE_PROPS
     }
-  | PolygonPattern
+  | PolygonPatternSymbolizer
     { file            :: !(PropValue FilePath)
     , opacity         :: !(PropValue Double)
     , gamma           :: !(PropValue Double)
@@ -101,7 +101,7 @@ data Symbolizer
     , alignment       :: !(PropValue PatternAlignment)
     , BASE_PROPS
     }
-  | Raster
+  | RasterSymbolizer
     { scaling       :: !(Maybe ScalingMethod)
     , rasterOpacity :: !(Maybe Double)
     , filterFactor  :: !(Maybe Double)
@@ -110,7 +110,7 @@ data Symbolizer
     , colorizer     :: !(Maybe Colorizer)
     , BASE_PROPS
     }
-  | Shield
+  | ShieldSymbolizer
     { placements      :: !(Maybe TextPlacements)
     , imageTransform  :: !(PropValue Transform)
     , dx              :: !(PropValue Double)
@@ -121,20 +121,20 @@ data Symbolizer
     , haloRasterizer  :: !(PropValue HaloRasterizer)
     , BASE_PROPS
     }
-  | Text
+  | TextSymbolizer
     { placements     :: !(Maybe TextPlacements)
     , haloCompOp     :: !(PropValue CompositeMode)
     , haloRasterizer :: !(PropValue HaloRasterizer)
     , haloTransform  :: !(PropValue Transform)
     , BASE_PROPS
     }
-  | Building
+  | BuildingSymbolizer
     { fill        :: !(PropValue Color)
     , fillOpacity :: !(PropValue Double)
     , height      :: !(PropValue Double)
     , BASE_PROPS
     }
-  | Markers
+  | MarkersSymbolizer
     { file            :: !(PropValue FilePath)
     , opacity         :: !(PropValue Double)
     , fill            :: !(PropValue Color)
@@ -153,7 +153,7 @@ data Symbolizer
     , direction       :: !(PropValue Direction)
     , STROKE_PROPS
     }
-  | Group
+  | GroupSymbolizer
     { groupProperties :: !(PropValue GroupProperties)
     , numColumns      :: !(PropValue Int)
     , startColumn     :: !(PropValue Int)
@@ -161,11 +161,11 @@ data Symbolizer
     , placements      :: !(Maybe TextPlacements)
     , BASE_PROPS
     }
-  | Debug
+  | DebugSymbolizer
     { mode            :: !(Maybe DebugMode)
     , BASE_PROPS
     }
-  | Dot
+  | DotSymbolizer
     { fill    :: !(PropValue Color)
     , opacity :: !(PropValue Double)
     , width   :: !(PropValue Double)
@@ -176,9 +176,9 @@ data Symbolizer
 deriveMapnikJSON ''Symbolizer
 
 
-point, line, linePattern, polygon, polygonPattern, raster :: Symbolizer
-shield, text, building, markers, group, debug, dot :: Symbolizer
-point = Point
+pointSym, lineSym, linePatternSym, polygonSym, polygonPatternSym, rasterSym :: Symbolizer
+shieldSym, textSym, buildingSym, markersSym, groupSym, debugSym, dotSym :: Symbolizer
+pointSym = PointSymbolizer
   { file            = Nothing
   , opacity         = Nothing
   , allowOverlap    = Nothing
@@ -187,26 +187,26 @@ point = Point
   , imageTransform  = Nothing
   , BASE_PROPS_DEFS
   }
-line = Line
+lineSym = LineSymbolizer
   { offset         = Nothing
   , lineRasterizer = Nothing
   , STROKE_PROPS_DEFS
   }
-linePattern = LinePattern
+linePatternSym = LinePatternSymbolizer
   { file             = Nothing
   , opacity          = Nothing
   , offset           = Nothing
   , imageTransform   = Nothing
   , BASE_PROPS_DEFS
   }
-polygon = Polygon
+polygonSym = PolygonSymbolizer
   { fill         = Nothing
   , fillOpacity  = Nothing
   , gamma        = Nothing
   , gammaMethod  = Nothing
   , BASE_PROPS_DEFS
   }
-polygonPattern = PolygonPattern
+polygonPatternSym = PolygonPatternSymbolizer
   { file            = Nothing
   , opacity         = Nothing
   , gamma           = Nothing
@@ -215,7 +215,7 @@ polygonPattern = PolygonPattern
   , alignment       = Nothing
   , BASE_PROPS_DEFS
   }
-raster = Raster
+rasterSym = RasterSymbolizer
   { scaling       = Nothing
   , rasterOpacity = Nothing
   , filterFactor  = Nothing
@@ -224,7 +224,7 @@ raster = Raster
   , colorizer     = Nothing
   , BASE_PROPS_DEFS
   }
-shield = Shield
+shieldSym = ShieldSymbolizer
   { placements      = Nothing
   , imageTransform  = Nothing
   , dx              = Nothing
@@ -235,20 +235,20 @@ shield = Shield
   , haloRasterizer  = Nothing
   , BASE_PROPS_DEFS
   }
-text = Text
+textSym = TextSymbolizer
   { placements     = Nothing
   , haloCompOp     = Nothing
   , haloRasterizer = Nothing
   , haloTransform  = Nothing
   , BASE_PROPS_DEFS
   }
-building = Building
+buildingSym = BuildingSymbolizer
   { fill        = Nothing
   , fillOpacity = Nothing
   , height      = Nothing
   , BASE_PROPS_DEFS
   }
-markers = Markers
+markersSym = MarkersSymbolizer
   { file            = Nothing
   , opacity         = Nothing
   , fill            = Nothing
@@ -267,7 +267,7 @@ markers = Markers
   , direction       = Nothing
   , STROKE_PROPS_DEFS
   }
-group = Group
+groupSym = GroupSymbolizer
   { groupProperties = Nothing
   , numColumns      = Nothing
   , startColumn     = Nothing
@@ -275,11 +275,11 @@ group = Group
   , placements      = Nothing
   , BASE_PROPS_DEFS
   }
-debug = Debug
+debugSym = DebugSymbolizer
   { mode = Nothing
   , BASE_PROPS_DEFS
   }
-dot = Dot
+dotSym = DotSymbolizer
   { fill    = Nothing
   , opacity = Nothing
   , width   = Nothing

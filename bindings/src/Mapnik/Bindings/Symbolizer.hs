@@ -25,7 +25,7 @@ import           Mapnik.Lens
 import qualified Mapnik
 import           Mapnik.Enums
 import           Mapnik ( Transform(..), Prop (..) )
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()
 import           Mapnik.Bindings.Variant (Variant(..))
@@ -112,48 +112,48 @@ getName s = newText $ \(ptr, len) ->
   }|]
 
 defFromName :: Text -> Maybe Mapnik.Symbolizer
-defFromName "PointSymbolizer"          = Just Mapnik.point
-defFromName "LineSymbolizer"           = Just Mapnik.line
-defFromName "LinePatternSymbolizer"    = Just Mapnik.linePattern
-defFromName "PolygonSymbolizer"        = Just Mapnik.polygon
-defFromName "PolygonPatternSymbolizer" = Just Mapnik.polygonPattern
-defFromName "RasterSymbolizer"         = Just Mapnik.raster
-defFromName "ShieldSymbolizer"         = Just Mapnik.shield
-defFromName "TextSymbolizer"           = Just Mapnik.text
-defFromName "BuildingSymbolizer"       = Just Mapnik.building
-defFromName "MarkersSymbolizer"        = Just Mapnik.markers
-defFromName "GroupSymbolizer"          = Just Mapnik.group
-defFromName "DebugSymbolizer"          = Just Mapnik.debug
-defFromName "DotSymbolizer"            = Just Mapnik.dot
+defFromName "PointSymbolizer"          = Just Mapnik.pointSym
+defFromName "LineSymbolizer"           = Just Mapnik.lineSym
+defFromName "LinePatternSymbolizer"    = Just Mapnik.linePatternSym
+defFromName "PolygonSymbolizer"        = Just Mapnik.polygonSym
+defFromName "PolygonPatternSymbolizer" = Just Mapnik.polygonPatternSym
+defFromName "RasterSymbolizer"         = Just Mapnik.rasterSym
+defFromName "ShieldSymbolizer"         = Just Mapnik.shieldSym
+defFromName "TextSymbolizer"           = Just Mapnik.textSym
+defFromName "BuildingSymbolizer"       = Just Mapnik.buildingSym
+defFromName "MarkersSymbolizer"        = Just Mapnik.markersSym
+defFromName "GroupSymbolizer"          = Just Mapnik.groupSym
+defFromName "DebugSymbolizer"          = Just Mapnik.debugSym
+defFromName "DotSymbolizer"            = Just Mapnik.dotSym
 defFromName _                          = Nothing
 
 castSym :: Mapnik.Symbolizer
         -> Ptr SymbolizerBase -> IO (Ptr Symbolizer)
-castSym Mapnik.Point{} p =
+castSym Mapnik.PointSymbolizer{} p =
   [CU.block|symbolizer *{ new symbolizer(*static_cast<point_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.Line{} p =
+castSym Mapnik.LineSymbolizer{} p =
   [CU.block|symbolizer *{ new symbolizer(*static_cast<line_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.LinePattern{} p =
+castSym Mapnik.LinePatternSymbolizer{} p =
   [CU.block|symbolizer *{ new symbolizer(*static_cast<line_pattern_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.Polygon{} p =
+castSym Mapnik.PolygonSymbolizer{} p =
   [CU.block|symbolizer *{ new symbolizer(*static_cast<polygon_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.PolygonPattern{} p =
+castSym Mapnik.PolygonPatternSymbolizer{} p =
   [CU.block|symbolizer *{ new symbolizer(*static_cast<polygon_pattern_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.Raster{} p =
+castSym Mapnik.RasterSymbolizer{} p =
   [CU.block|symbolizer *{ new symbolizer(*static_cast<raster_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.Shield{} p =
+castSym Mapnik.ShieldSymbolizer{} p =
   [CU.block|symbolizer *{ new symbolizer(*static_cast<shield_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.Text{} p =
+castSym Mapnik.TextSymbolizer{} p =
   [CU.block|symbolizer *{ new symbolizer(*static_cast<text_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.Building{} p =
+castSym Mapnik.BuildingSymbolizer{} p =
   [CU.block|symbolizer *{ new symbolizer(*static_cast<building_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.Markers{} p =
+castSym Mapnik.MarkersSymbolizer{} p =
   [CU.block|symbolizer *{ new symbolizer(*static_cast<markers_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.Group{} p =
+castSym Mapnik.GroupSymbolizer{} p =
   [CU.block|symbolizer *{ new symbolizer(*static_cast<group_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.Debug{} p =
+castSym Mapnik.DebugSymbolizer{} p =
   [CU.block|symbolizer *{ new symbolizer(*static_cast<debug_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.Dot{} p =
+castSym Mapnik.DotSymbolizer{} p =
   [CU.block|symbolizer *{ new symbolizer(*static_cast<dot_symbolizer*>($(symbolizer_base *p)));}|]
 
 
@@ -230,7 +230,7 @@ data Key a where
 
 symbolizerProps :: Lens' Mapnik.Symbolizer Properties
 symbolizerProps = lens getProps setProps where
-  setProps sym@Mapnik.Point{} = foldr step sym  where
+  setProps sym@Mapnik.PointSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
     step (File               :=> v) = file ?~ v
     step (Opacity            :=> v) = opacity ?~ v
@@ -240,13 +240,13 @@ symbolizerProps = lens getProps setProps where
     step (ImageTransform     :=> v) = imageTransform ?~ v
     step p                          = stepBase p
 
-  setProps sym@Mapnik.Line{} = foldr step sym  where
+  setProps sym@Mapnik.LineSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
     step (Opacity :=> v) = opacity ?~ v
     step (Offset  :=> v) = offset ?~ v
     step p               = stepStroke p
 
-  setProps sym@Mapnik.LinePattern{} = foldr step sym  where
+  setProps sym@Mapnik.LinePatternSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
     step (File            :=> v) = file ?~ v
     step (Opacity         :=> v) = opacity ?~ v
@@ -254,7 +254,7 @@ symbolizerProps = lens getProps setProps where
     step (ImageTransform  :=> v) = imageTransform ?~ v
     step p                       = stepBase p
 
-  setProps sym@Mapnik.Polygon{} = foldr step sym  where
+  setProps sym@Mapnik.PolygonSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
     step (Fill        :=> v) = fill ?~ v
     step (FillOpacity :=> v) = fillOpacity ?~ v
@@ -262,7 +262,7 @@ symbolizerProps = lens getProps setProps where
     step (GammaMethod :=> v) = gammaMethod ?~ v
     step p                   = stepBase p
 
-  setProps sym@Mapnik.PolygonPattern{} = foldr step sym  where
+  setProps sym@Mapnik.PolygonPatternSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
     step (File           :=> v) = file ?~ v
     step (Opacity        :=> v) = opacity ?~ v
@@ -272,7 +272,7 @@ symbolizerProps = lens getProps setProps where
     step (Alignment      :=> v) = alignment ?~ v
     step p                      = stepBase p
 
-  setProps sym@Mapnik.Raster{} = foldr step sym  where
+  setProps sym@Mapnik.RasterSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
     step (Scaling       :=> Val v        ) = scaling ?~ v
     step (Opacity       :=> Val v        ) = rasterOpacity ?~ v
@@ -282,7 +282,7 @@ symbolizerProps = lens getProps setProps where
     step (ColorizerKey :=> Val v        ) = colorizer ?~ v
     step p                                 = stepBase p
 
-  setProps sym@Mapnik.Shield{} = foldr step sym  where
+  setProps sym@Mapnik.ShieldSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
     step (TextPlacementsKey :=> Val v) = placements ?~ v
     step (ImageTransform :=> v) = imageTransform ?~ v
@@ -294,7 +294,7 @@ symbolizerProps = lens getProps setProps where
     step (HaloRasterizer :=> v) = haloRasterizer ?~ v
     step p                      = stepBase p
 
-  setProps sym@Mapnik.Text{} = foldr step sym  where
+  setProps sym@Mapnik.TextSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
     step (TextPlacementsKey :=> Val v) = placements ?~ v
     step (HaloCompOp     :=> v) = haloCompOp ?~ v
@@ -302,14 +302,14 @@ symbolizerProps = lens getProps setProps where
     step (HaloTransform  :=> v) = haloTransform ?~ v
     step p                      = stepBase p
 
-  setProps sym@Mapnik.Building{} = foldr step sym  where
+  setProps sym@Mapnik.BuildingSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
     step (Fill        :=> v) = fill ?~ v
     step (FillOpacity :=> v) = fillOpacity ?~ v
     step (Height      :=> v) = height ?~ v
     step p                   = stepBase p
 
-  setProps sym@Mapnik.Markers{} = foldr step sym  where
+  setProps sym@Mapnik.MarkersSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
     step (File                 :=> v) = file ?~ v
     step (Opacity              :=> v) = opacity ?~ v
@@ -329,7 +329,7 @@ symbolizerProps = lens getProps setProps where
     step (Direction            :=> v) = direction ?~ v
     step p                            = stepStroke p
 
-  setProps sym@Mapnik.Group{} = foldr step sym  where
+  setProps sym@Mapnik.GroupSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
     step (GroupPropertiesKey :=> v) = groupProperties ?~ v
     step (NumColumns      :=> v) = numColumns ?~ v
@@ -338,12 +338,12 @@ symbolizerProps = lens getProps setProps where
     step (TextPlacementsKey :=> Val v) = placements ?~ v
     step p                       = stepBase p
 
-  setProps sym@Mapnik.Debug{} = foldr step sym  where
+  setProps sym@Mapnik.DebugSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
     step (Mode :=> Val v) = mode ?~ v
     step p                = stepBase p
 
-  setProps sym@Mapnik.Dot{} = foldr step sym  where
+  setProps sym@Mapnik.DotSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
     step (Fill    :=> v) = fill ?~ v
     step (Opacity :=> v) = opacity ?~ v
@@ -395,7 +395,7 @@ symbolizerProps = lens getProps setProps where
 , GET_BASE_PROPS
 
   getProps sym = catMaybes $ case sym of
-    Mapnik.Point{} ->
+    Mapnik.PointSymbolizer{} ->
       [ fmap (File               :=>) (sym^?!file)
       , fmap (Opacity            :=>) (sym^?!opacity)
       , fmap (AllowOverlap       :=>) (sym^?!allowOverlap)
@@ -404,26 +404,26 @@ symbolizerProps = lens getProps setProps where
       , fmap (ImageTransform     :=>) (sym^?!imageTransform)
       , GET_BASE_PROPS
       ]
-    Mapnik.Line{} ->
+    Mapnik.LineSymbolizer{} ->
       [ fmap (Offset         :=>) (sym^?!offset)
       , fmap (LineRasterizer :=>) (sym^?!lineRasterizer)
       , GET_STROKE_PROPS
       ]
-    Mapnik.LinePattern{} ->
+    Mapnik.LinePatternSymbolizer{} ->
       [ fmap (File           :=>) (sym^?!file)
       , fmap (Opacity        :=>) (sym^?!opacity)
       , fmap (Offset         :=>) (sym^?!offset)
       , fmap (ImageTransform :=>) (sym^?!imageTransform)
       , GET_BASE_PROPS
       ]
-    Mapnik.Polygon{} ->
+    Mapnik.PolygonSymbolizer{} ->
       [ fmap (Fill        :=>) (sym^?!fill)
       , fmap (FillOpacity :=>) (sym^?!fillOpacity)
       , fmap (Gamma       :=>) (sym^?!gamma)
       , fmap (GammaMethod :=>) (sym^?!gammaMethod)
       , GET_BASE_PROPS
       ]
-    Mapnik.PolygonPattern{} ->
+    Mapnik.PolygonPatternSymbolizer{} ->
       [ fmap (File           :=>) (sym^?!file)
       , fmap (Opacity        :=>) (sym^?!opacity)
       , fmap (Gamma          :=>) (sym^?!gamma)
@@ -432,7 +432,7 @@ symbolizerProps = lens getProps setProps where
       , fmap (Alignment      :=>) (sym^?!alignment)
       , GET_BASE_PROPS
       ]
-    Mapnik.Raster{} ->
+    Mapnik.RasterSymbolizer{} ->
       [ fmap ((Scaling       :=>) . Val) (sym^?!scaling)
       , fmap ((Opacity       :=>) . Val) (sym^?!rasterOpacity)
       , fmap ((FilterFactor  :=>) . Val) (sym^?!filterFactor)
@@ -441,7 +441,7 @@ symbolizerProps = lens getProps setProps where
       , fmap ((ColorizerKey :=>) . Val) (sym^?!colorizer)
       , GET_BASE_PROPS
       ]
-    Mapnik.Shield{} ->
+    Mapnik.ShieldSymbolizer{} ->
       [ fmap ((TextPlacementsKey :=>) . Val) (sym^?!placements)
       , fmap (GeometryTransform :=>) (sym^?!imageTransform)
       , fmap (ShieldDx          :=>) (sym^?!dx)
@@ -452,20 +452,20 @@ symbolizerProps = lens getProps setProps where
       , fmap (HaloRasterizer    :=>) (sym^?!haloRasterizer)
       , GET_BASE_PROPS
       ]
-    Mapnik.Text{} ->
+    Mapnik.TextSymbolizer{} ->
       [ fmap ((TextPlacementsKey :=>) . Val) (sym^?!placements)
       , fmap (HaloCompOp        :=>) (sym^?!haloCompOp)
       , fmap (HaloRasterizer    :=>) (sym^?!haloRasterizer)
       , fmap (GeometryTransform :=>) (sym^?!haloTransform)
       , GET_BASE_PROPS
       ]
-    Mapnik.Building{} ->
+    Mapnik.BuildingSymbolizer{} ->
       [ fmap (Fill        :=>) (sym^?!fill)
       , fmap (FillOpacity :=>) (sym^?!fillOpacity)
       , fmap (Height      :=>) (sym^?!height)
       , GET_BASE_PROPS
       ]
-    Mapnik.Markers{} ->
+    Mapnik.MarkersSymbolizer{} ->
       [ fmap (File                 :=>) (sym^?!file)
       , fmap (Opacity              :=>) (sym^?!opacity)
       , fmap (Fill                 :=>) (sym^?!fill)
@@ -484,7 +484,7 @@ symbolizerProps = lens getProps setProps where
       , fmap (Direction            :=>) (sym^?!direction)
       , GET_STROKE_PROPS
       ]
-    Mapnik.Group{} ->
+    Mapnik.GroupSymbolizer{} ->
       [ fmap (GroupPropertiesKey :=>) (sym^?!groupProperties)
       , fmap (NumColumns      :=>) (sym^?!numColumns)
       , fmap (StartColumn     :=>) (sym^?!startColumn)
@@ -492,11 +492,11 @@ symbolizerProps = lens getProps setProps where
       , fmap ((TextPlacementsKey :=>) . Val) (sym^?!placements)
       , GET_BASE_PROPS
       ]
-    Mapnik.Debug{} ->
+    Mapnik.DebugSymbolizer{} ->
       [ fmap ((Mode :=>) . Val)  (sym^?!mode)
       , GET_BASE_PROPS
       ]
-    Mapnik.Dot{} ->
+    Mapnik.DotSymbolizer{} ->
       [ fmap (Fill    :=>) (sym^?!fill)
       , fmap (Opacity :=>) (sym^?!opacity)
       , fmap (Width   :=>) (sym^?!width)

@@ -15,7 +15,7 @@ module Mapnik.Bindings.SymbolizerValue (
 
 import qualified Mapnik
 import           Mapnik.Enums
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Variant
 import qualified Mapnik.Bindings.GroupProperties as GroupProperties

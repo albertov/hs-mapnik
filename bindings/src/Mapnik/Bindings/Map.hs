@@ -12,6 +12,8 @@ module Mapnik.Bindings.Map (
 , create
 , loadXml
 , loadXmlFile
+, fromXml
+, fromXmlFile
 , zoom
 , zoomAll
 , zoomToBox
@@ -42,7 +44,7 @@ module Mapnik.Bindings.Map (
 ) where
 
 import           Mapnik (Color(..), StyleName, AspectFixMode(..), CompositeMode)
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans()
 import qualified Mapnik.Bindings.Layer as Layer
@@ -95,11 +97,17 @@ loadXmlFile m (fromString -> path) =
   mapnik::load_map(*$fptr-ptr:(Map *m), std::string($bs-ptr:path, $bs-len:path));
   |]
 
+fromXmlFile :: FilePath -> IO Map
+fromXmlFile f = do {m <- create; loadXmlFile m f; return m}
+
 loadXml :: Map -> ByteString -> IO ()
 loadXml m str =
   [C.catchBlock|
   mapnik::load_map_string(*$fptr-ptr:(Map *m), std::string($bs-ptr:str, $bs-len:str));
   |]
+
+fromXml :: ByteString -> IO Map
+fromXml s = do {m <- create; loadXml m s; return m}
 
 getBackground :: Map -> IO (Maybe Color)
 getBackground m = newMaybe $ \(has,p) ->

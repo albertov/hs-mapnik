@@ -6,13 +6,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Mapnik.Bindings.Image (
   Image
+, Size
 , unsafeNew
 , serialize
 , fromRgba8
 , toRgba8
 ) where
 
-import           Mapnik.Bindings
+import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import           Control.Monad ((<=<))
 import           Data.ByteString (ByteString)
