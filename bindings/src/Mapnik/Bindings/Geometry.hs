@@ -14,6 +14,7 @@ module Mapnik.Bindings.Geometry (
 , toWkt
 , toWkb
 , unsafeNew
+, unsafeNewMaybe
 ) where
 
 import           Mapnik.Bindings
@@ -33,6 +34,7 @@ C.context mapnikCtx
 
 C.include "<string>"
 C.include "<mapnik/geometry.hpp>"
+C.include "<mapnik/geometry_is_empty.hpp>"
 C.include "<mapnik/wkb.hpp>"
 C.include "<mapnik/wkt/wkt_factory.hpp>"
 C.include "<mapnik/wkt/wkt_grammar.hpp>"
@@ -56,8 +58,7 @@ fromWkb :: ByteString -> Maybe Geometry
 fromWkb wkb = unsafePerformIO $ unsafeNewMaybe $ \p ->
   [CU.block|void{
   geometry_t geom = geometry_utils::from_wkb($bs-ptr:wkb, $bs-len:wkb, mapnik::wkbAuto);
-  // TODO: Check validity
-  if (true) {
+  if (! geometry::is_empty(geom) ) {
     *$(geometry_t **p) = new geometry_t(geom);
   } else {
     *$(geometry_t **p) = nullptr;

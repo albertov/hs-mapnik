@@ -58,7 +58,7 @@ serialize (fromString -> fmt) im = unsafePerformIO $ newByteStringMaybe $ \(ptr,
     if (s.length() ) {
       *$(int* len) = s.length();
       *$(char** ptr) = static_cast<char*>(malloc(s.length()));
-      memcpy( *$(char** ptr), s.c_str(), s.length());
+      std::memcpy( *$(char** ptr), s.c_str(), s.length());
     }
   } catch (...) {
     // pass
@@ -79,7 +79,7 @@ toRgba8 im = unsafePerformIO $ do
   vec <- MV.unsafeNew (w*h)
   [CU.block|void {
   mapnik::image_rgba8 *im = $fptr-ptr:(image_rgba8 *im);
-  memcpy($vec-ptr:(pixel_rgba8 *vec), im->data(), im->size());
+  std::memcpy($vec-ptr:(pixel_rgba8 *vec), im->data(), im->size());
   }|]
   (,) <$> pure (w,h) <*> V.unsafeFreeze vec
 {-# NOINLINE toRgba8 #-}

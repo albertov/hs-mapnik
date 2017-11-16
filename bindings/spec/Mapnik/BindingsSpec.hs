@@ -12,6 +12,7 @@ import           Mapnik.Enums
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Registry (registerDefaults)
 import           Mapnik.Bindings.Map as Map
+import           Mapnik.Bindings.Feature as Feature
 import           Mapnik.Bindings.Geometry as Geometry
 import           Mapnik.Bindings.Image as Image
 import           Mapnik.Bindings.Raster as Raster
@@ -249,7 +250,7 @@ spec = beforeAll_ registerDefaults $ do
       length feats `shouldBe` 192
       G.toList fs `shouldMatchList` props
       G.toList (fields (head feats)) `shouldMatchList` [TextValue "Sorel-Tracy", IntValue 0]
-      Geometry.toWkt (geometry (head feats)) `shouldBe` "POINT(1681422.74999858 -39049.2656230889)"
+      Geometry.toWkt (fromJust (geometry (head feats))) `shouldBe` "POINT(1681422.74999858 -39049.2656230889)"
 
   describe "Image" $ do
     it "can convert to rgba8 data and read it back" $ do
@@ -327,27 +328,36 @@ spec = beforeAll_ registerDefaults $ do
       loadFixture m
       Map.removeAllLayers m
       Map.setSrs m "+init=epsg:3857"
+      let theExtent = Box 0 0 100 100
+
+      imgBase <- render m (renderSettings 512 512 theExtent)
+      BS.writeFile "map.webp" (fromJust (Image.serialize "webp" imgBase))
+      snd (toRgba8 imgBase) `shouldSatisfy` G.all (== transparent)
+
       l <- Layer.create "fooo"
       Layer.setSrs l "+init=epsg:3857"
       ref <- newIORef Nothing
-      let theExtent = Box 0 0 100 100
       ds <- createHsDatasource HsVector
         { name = "fooo"
         , extent = theExtent
         , fieldNames = ["aString", "anInt", "aBool", "aDouble", "aNull"]
         , getFeatures = \q -> do
             writeIORef ref (Just q)
-            return [ Feature { fid=105
-                             , geometry="LINESTRING (30 10, 10 30, 40 40)"
-                             , fields=["batróñ~", IntValue 3, BoolValue False, DoubleValue 3.2, NullValue]
-                             }
+            return [ feature
+                     { fid=105
+                     , geometry=Just "LINESTRING (30 10, 10 30, 40 40)"
+                     , fields=["batróñ~", IntValue 3, BoolValue False, DoubleValue 3.2, NullValue]
+                     }
                    ]
         , getFeaturesAtPoint = \_ _ -> return []
         }
+      (_,feats) <- Datasource.features ds (queryBox theExtent)
+      raster (head feats) `shouldSatisfy` isNothing
       Layer.setDatasource l ds
       Layer.addStyle l "provlines"
       Map.addLayer m l
-      _ <- render m (renderSettings 512 512 theExtent)
+      img <- render m (renderSettings 512 512 theExtent)
+      snd (toRgba8 img) `shouldSatisfy` G.any (/= transparent)
       Just q <- readIORef ref
       box q `shouldBe` theExtent
       unBufferedBox q `shouldBe` theExtent
@@ -363,6 +373,7 @@ spec = beforeAll_ registerDefaults $ do
       Layer.setSrs l "+init=epsg:3857"
       let theExtent = Box 0 0 100 100
           boxes = [Box 0 0 50 50, Box 50 50 100 100]
+          thePixels = G.generate (50*50) fromIntegral :: St.Vector Int32
       ds <- createHsDatasource HsRaster
         { name = "fooo"
         , extent = theExtent
@@ -376,10 +387,13 @@ spec = beforeAll_ registerDefaults $ do
                 , width = 50
                 , height = 50
                 , nodata = Nothing
-                , pixels = G.generate (50*50) fromIntegral :: St.Vector Int32
+                , pixels = thePixels
                 }
         , getFeaturesAtPoint = \_ _ -> return []
         }
+      (_,feats) <- Datasource.features ds (queryBox theExtent)
+      let Just r = raster (head feats)
+      getPixels r `shouldBe` Just thePixels
       Layer.setDatasource l ds
       Layer.addStyle l "raster-style"
       Map.addLayer m l
@@ -387,7 +401,6 @@ spec = beforeAll_ registerDefaults $ do
       img <- render m (rSettings { extent = theExtent, width=w, height=h })
       --BS.writeFile "map.webp" (fromJust (Image.serialize "webp" img))
       let (_, imData) = toRgba8 img
-          transparent = PixelRgba8 0xFFFFFFFF
       imData G.! 0 `shouldBe` transparent
       imData G.! 128 `shouldNotBe` transparent
       imData G.! (256*128) `shouldNotBe` transparent
@@ -429,6 +442,9 @@ loadFixture m = do
 
 loadFixtureFrom :: String -> Map -> IO ()
 loadFixtureFrom p m = Map.loadXml m =<< BS.readFile p
+
+transparent :: PixelRgba8
+transparent = PixelRgba8 0xFFFFFFFF
 
 aBox :: Box
 aBox = Box (-8024477.28459) 5445190.38849 (-7381388.20071) 5662941.44855

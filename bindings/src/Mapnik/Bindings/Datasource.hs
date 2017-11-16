@@ -37,7 +37,8 @@ import           Mapnik.Parameter as X (Value(..), Parameter, (.=))
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()
-import           Mapnik.Bindings.Feature as Feature
+import           Mapnik.Bindings.Feature (Feature(..), feature)
+import qualified Mapnik.Bindings.Feature as Feature
 import           Mapnik.Bindings.Variant
 import           Mapnik.Bindings.Raster
 
@@ -231,7 +232,7 @@ data HsDatasource where
     , getFeatures        :: !(Query -> IO [Feature])
     , getFeaturesAtPoint :: !(Pair -> Double -> IO [Feature])
     } -> HsDatasource
-  HsRaster :: Variant RasterPtr (Raster a) =>
+  HsRaster :: RasterType a =>
     { name               :: !Text
     , extent             :: !Box
     , fieldNames         :: !(Vector Text)
@@ -294,7 +295,7 @@ createHsDatasource HsRaster{..} = with extent $ \e -> unsafeNew $ \ ptr -> do
     getFeatures' ctx fs q = catchingExceptions "getRaster" $ do
       rs <- getRasters =<< unCreateQuery q
       forM_ rs $ \r -> do
-        f <- createRasterFeature ctx r
+        f <- Feature.create ctx $ feature {raster=Just (SomeRaster r)}
         [CU.block|void {
           $(feature_list *fs)->push_back(*$fptr-ptr:(feature_ptr *f)); }
         |]
@@ -305,7 +306,7 @@ createHsDatasource HsRaster{..} = with extent $ \e -> unsafeNew $ \ ptr -> do
 
 pushBack :: Ptr FeatureCtx -> Ptr FeatureList -> Feature -> IO ()
 pushBack ctx fs = \f -> do
-  f' <- createFeature ctx f
+  f' <- Feature.create ctx f
   [CU.block|void {
     $(feature_list *fs)->push_back(*$fptr-ptr:(feature_ptr *f')); }
   |]
