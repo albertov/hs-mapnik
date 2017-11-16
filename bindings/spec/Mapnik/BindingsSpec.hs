@@ -6,7 +6,7 @@ module Mapnik.BindingsSpec (main, spec) where
 import qualified Data.ByteString as BS
 import           Test.Hspec
 import qualified Mapnik
-import           Mapnik ( Color(..), Dash(..), DashArray, Prop(..))
+import           Mapnik (Color (..), Dash(..), DashArray, Prop(..))
 import qualified Mapnik.Lens as L
 import           Mapnik.Enums
 import           Mapnik.Bindings
@@ -259,15 +259,15 @@ spec = beforeAll_ registerDefaults $ do
           Just img2  = Image.fromRgba8 rgba8
           w = Render.width rSettings
           h = Render.height rSettings
-      BS.length (snd rgba8)  `shouldBe` (w * h * 4)
+      G.length (snd rgba8)  `shouldBe` (w * h)
       --BS.writeFile "map.webp" (Image.serialize "webp" img2)
       Image.serialize "png8" img `shouldBe` Image.serialize "png8" img2
 
     it "cannot create empty image" $
-      Image.fromRgba8 ((0,0), "") `shouldSatisfy` isNothing
+      Image.fromRgba8 ((0,0), G.empty) `shouldSatisfy` isNothing
 
     it "doesnt serialize bad format" $ do
-      let Just img = Image.fromRgba8 ((10, 10), (BS.replicate (4*10*10) 0))
+      let Just img = Image.fromRgba8 ((10, 10), (G.replicate (10*10) (PixelRgba8 0)))
       Image.serialize "bad" img `shouldSatisfy` isNothing
 
   describe "Expression" $ do
@@ -355,7 +355,6 @@ spec = beforeAll_ registerDefaults $ do
 
   describe "HsRaster" $ do
     it "can create and render" $ do
-      let w = 256; h=256
       m <- Map.create
       loadFixture m
       Map.removeAllLayers m
@@ -368,7 +367,7 @@ spec = beforeAll_ registerDefaults $ do
         { name = "fooo"
         , extent = theExtent
         , fieldNames = []
-        , getRasters = \q ->
+        , getRasters = \_ ->
             return $ flip map boxes $ \b ->
               Raster
                 { extent = b
@@ -384,9 +383,15 @@ spec = beforeAll_ registerDefaults $ do
       Layer.setDatasource l ds
       Layer.addStyle l "raster-style"
       Map.addLayer m l
-      _img <- render m (rSettings { extent = theExtent })
-      BS.writeFile "map.webp" (fromJust (Image.serialize "webp" _img))
-      return ()
+      let h=256; w=256
+      img <- render m (rSettings { extent = theExtent, width=w, height=h })
+      --BS.writeFile "map.webp" (fromJust (Image.serialize "webp" img))
+      let (_, imData) = toRgba8 img
+          transparent = PixelRgba8 0xFFFFFFFF
+      imData G.! 0 `shouldBe` transparent
+      imData G.! 128 `shouldNotBe` transparent
+      imData G.! (256*128) `shouldNotBe` transparent
+      imData G.! (256*128+128) `shouldBe` transparent
 
   it "can pass render variables" $ do
     m <- Map.create

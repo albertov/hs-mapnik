@@ -88,7 +88,7 @@ instance Variant RasterPtr (Raster HS) where { \
   peekV _TODO = error "TODO" \
 }
 
-RASTER_VARIANT(RGBA8,pixel_rgba8,image_dtype_rgba8)
+RASTER_VARIANT(PixelRgba8,pixel_rgba8,image_dtype_rgba8)
 RASTER_VARIANT(Word8,pixel_gray8,image_dtype_gray8)
 RASTER_VARIANT(Int8,pixel_gray8s,image_dtype_gray8s)
 RASTER_VARIANT(Word16,pixel_gray16,image_dtype_gray16)

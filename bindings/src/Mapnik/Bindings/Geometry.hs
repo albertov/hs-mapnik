@@ -36,21 +36,12 @@ C.include "<mapnik/geometry.hpp>"
 C.include "<mapnik/wkb.hpp>"
 C.include "<mapnik/wkt/wkt_factory.hpp>"
 C.include "<mapnik/wkt/wkt_grammar.hpp>"
-C.include "<mapnik/wkt/wkt_grammar_impl.hpp>"
 C.include "<mapnik/wkt/wkt_generator_grammar.hpp>"
-C.include "<mapnik/wkt/wkt_generator_grammar_impl.hpp>"
 C.include "<mapnik/util/geometry_to_wkt.hpp>"
 
 C.using "namespace mapnik"
 C.using "mapnik::geometry_utils"
 C.using "geometry_t = geometry::geometry<double>"
-
-C.using "sink_type = std::back_insert_iterator<std::string>"
-C.using "iterator_type = std::string::const_iterator"
--- Mapnik does not export these template instantiations that the inlined
--- from_wkt and to_wkt need so we instantiate them here
-C.verbatim "template struct mapnik::wkt::wkt_generator_grammar<sink_type, geometry_t>;"
-C.verbatim "template struct mapnik::wkt::wkt_grammar<iterator_type>;"
 
 
 foreign import ccall "&hs_mapnik_destroy_Geometry" destroyGeometry :: FinalizerPtr Geometry

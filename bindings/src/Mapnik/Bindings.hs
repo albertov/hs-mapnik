@@ -1,5 +1,6 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -30,7 +31,6 @@ module Mapnik.Bindings (
 , TextSymProperties (..)
 , GroupProperties (..)
 , FontSet(..)
-, Color(..)
 , Colorizer(..)
 , Box (..)
 , Datasource (..)
@@ -43,7 +43,7 @@ module Mapnik.Bindings (
 , QueryPtr
 , Geometry (..)
 , FeaturePtr (..)
-, RGBA8 (..)
+, PixelRgba8 (..)
 , RasterPtr
 , Value
 , Param
@@ -53,8 +53,11 @@ module Mapnik.Bindings (
 , mapnikCtx
 ) where
 
-import           Mapnik (Box(..), Color(..), Dash(..), Value)
+import           Mapnik (Color, Box(..), Dash(..), Value)
+import           Mapnik.Lens (HasRed(..), HasBlue(..), HasGreen(..), HasAlpha(..))
 
+import           Control.Lens (lens)
+import           Data.Bits
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
 import           Data.Monoid (mempty, (<>))
@@ -112,9 +115,21 @@ type MapnikInt = C.CLong
 type MapnikInt = C.CInt
 #endif
 
-newtype RGBA8 = RGBA8 Word32
-  deriving (Eq, Storable)
+newtype PixelRgba8 = PixelRgba8 { unRgba8 :: Word32 }
+  deriving (Eq, Show, Storable)
 
+#define COLOR_LENS(cname, name, off) \
+instance cname PixelRgba8 Word8 where {\
+  {-# INLINE name #-}; \
+  name = lens \
+    (fromIntegral . (.&. 0xFF) . (`unsafeShiftR` off) . unRgba8) \
+    (\(PixelRgba8 c) v -> PixelRgba8 (c .&. complement (0xFF `unsafeShiftL` off) .|. (fromIntegral v `unsafeShiftL` off))) \
+  };
+
+COLOR_LENS(HasRed,   red,    0)
+COLOR_LENS(HasGreen, green,  8)
+COLOR_LENS(HasBlue,  blue,  16)
+COLOR_LENS(HasAlpha, alpha, 24)
 
 type Attributes = M.HashMap Text Mapnik.Value
 
@@ -129,7 +144,6 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "parameters", [t| Parameters |])
       , (C.TypeName "projection", [t| Projection |])
       , (C.TypeName "proj_transform", [t| ProjTransform |])
-      , (C.TypeName "color", [t| Color |])
       , (C.TypeName "feature_type_style", [t| Style |])
       , (C.TypeName "rule", [t| Rule |])
       , (C.TypeName "symbolizer", [t| Symbolizer |])
@@ -169,7 +183,7 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "attributes", [t| Attributes |])
       , (C.TypeName "features_callback", [t|FunPtr (Ptr FeatureCtx -> Ptr FeatureList -> Ptr QueryPtr -> IO ())|])
       , (C.TypeName "features_at_point_callback", [t|FunPtr (Ptr FeatureCtx -> Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ())|])
-      , (C.TypeName "pixel_rgba8", [t| RGBA8 |])
+      , (C.TypeName "pixel_rgba8", [t| PixelRgba8 |])
       , (C.TypeName "pixel_gray8", [t| Word8 |])
       , (C.TypeName "pixel_gray8s", [t| Int8 |])
       , (C.TypeName "pixel_gray16", [t| Word16 |])

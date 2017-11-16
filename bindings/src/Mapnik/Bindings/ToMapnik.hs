@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -26,27 +25,11 @@ class ToMapnik a where
   toMapnik :: a -> IO (MapnikType a)
 
 
-#define toMapnikId(X) \
-instance ToMapnik X where {\
-  type MapnikType X = X;\
-  toMapnik = return;\
-}
-
-toMapnikId(Map)
-toMapnikId(Layer)
-toMapnikId(Datasource)
-toMapnikId(Parameters)
-toMapnikId(Color)
-toMapnikId(Style)
-toMapnikId(Rule)
-toMapnikId(Symbolizer)
-toMapnikId(Expression)
-
 instance ToMapnik Mapnik.Map where
   type MapnikType Mapnik.Map = Map
   toMapnik Mapnik.Map{..} = do
     m' <- Map.create
-    forM_ backgroundColor        (setBackground m' <=< toMapnik)
+    forM_ backgroundColor        (setBackground m')
     forM_ backgroundImage        (setBackgroundImage m')
     forM_ backgroundImageCompOp  (setBackgroundImageCompOp m')
     forM_ backgroundImageOpacity (setBackgroundImageOpacity m')

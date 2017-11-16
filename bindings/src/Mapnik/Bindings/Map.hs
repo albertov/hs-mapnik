@@ -41,7 +41,7 @@ module Mapnik.Bindings.Map (
 , removeAllLayers
 ) where
 
-import           Mapnik (StyleName, AspectFixMode(..), CompositeMode)
+import           Mapnik (Color(..), StyleName, AspectFixMode(..), CompositeMode)
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans()

@@ -15,10 +15,12 @@ module Mapnik.Bindings.Image (
 import           Mapnik.Bindings
 import           Mapnik.Bindings.Util
 import           Control.Monad ((<=<))
+import           Data.ByteString (ByteString)
 import           Data.String (fromString)
-import           Data.ByteString as BS (ByteString, length)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
+import qualified Data.Vector.Storable as V
+import qualified Data.Vector.Storable.Mutable as MV
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Unsafe as CU
@@ -33,6 +35,7 @@ C.include "<mapnik/image.hpp>"
 C.include "<mapnik/image_util.hpp>"
 
 C.using "namespace mapnik"
+C.using "pixel_rgba8 = std::uint32_t"
 
 -- * Image
 
@@ -65,35 +68,34 @@ serialize (fromString -> fmt) im = unsafePerformIO $ newByteStringMaybe $ \(ptr,
 type Size = (Int,Int)
 
 
-toRgba8 :: Image -> (Size, ByteString)
+toRgba8 :: Image -> (Size, V.Vector PixelRgba8)
 toRgba8 im = unsafePerformIO $ do
-  ((fromIntegral -> w, fromIntegral -> h), bs) <- C.withPtrs $ \(w,h) ->
-    newByteString $ \(ptr, len) ->
-      [CU.block|void {
-      static char empty='\0';
-      mapnik::image_rgba8 *im = $fptr-ptr:(image_rgba8 *im);
-      int len = *$(int* len) = im->size();
-      *$(size_t *w) = im->width();
-      *$(size_t *h) = im->height();
-      if (len > 0) {
-        *$(char** ptr) = static_cast<char*>(malloc(len));
-        memcpy(*$(char** ptr), im->data(), len);
-      } else {
-        *$(char** ptr) = &empty;
-      }
-      }|]
-  return ((w,h), bs)
+  (fromIntegral -> w, fromIntegral -> h) <- C.withPtrs_ $ \(w,h) ->
+    [CU.block|void {
+    mapnik::image_rgba8 *im = $fptr-ptr:(image_rgba8 *im);
+    *$(size_t *w) = im->width();
+    *$(size_t *h) = im->height();
+    }|]
+  vec <- MV.unsafeNew (w*h)
+  [CU.block|void {
+  mapnik::image_rgba8 *im = $fptr-ptr:(image_rgba8 *im);
+  memcpy($vec-ptr:(pixel_rgba8 *vec), im->data(), im->size());
+  }|]
+  (,) <$> pure (w,h) <*> V.unsafeFreeze vec
 {-# NOINLINE toRgba8 #-}
 
-fromRgba8 :: (Size, ByteString) -> Maybe Image
+fromRgba8 :: (Size, V.Vector PixelRgba8) -> Maybe Image
 fromRgba8 ((width, height), rgba8)
-  | 0 == BS.length rgba8 = Nothing
+  | 0 == V.length rgba8 = Nothing
   | height < 0 || width < 0 = Nothing
-  | width*height*4 /= BS.length rgba8 = Nothing
+  | width*height /= V.length rgba8 = Nothing
 fromRgba8 ((fromIntegral -> width, fromIntegral -> height), rgba8) = unsafePerformIO $ fmap Just $ unsafeNew $ \ptr ->
   [CU.block|void {
   *$(image_rgba8 **ptr) =
-    new mapnik::image_rgba8($(int width), $(int height), reinterpret_cast<unsigned char*>($bs-ptr:rgba8));
+    new mapnik::image_rgba8(
+      $(int width), $(int height),
+      reinterpret_cast<unsigned char*>($vec-ptr:(pixel_rgba8 *rgba8))
+      );
   }|]
 {-# NOINLINE fromRgba8 #-}
   
