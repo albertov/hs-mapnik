@@ -40,7 +40,7 @@ rSettings :: RenderSettings
 rSettings = renderSettings 256 256 aBox
 
 spec :: Spec
-spec = beforeAll_ registerDefaults $ do
+spec = beforeAll_ registerDefaults $ parallel $ do
 
   describe "Map" $ do
     it "renders as PNG" $ do

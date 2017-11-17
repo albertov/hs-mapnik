@@ -54,6 +54,7 @@ fromProj4 (encodeUtf8 -> s) =
     [C.catchBlock|*$(projection **p) = new projection(std::string($bs-ptr:s, $bs-len:s));|]
   where
     showExc = either (Left . show @C.CppException) Right
+{-# NOINLINE fromProj4 #-}
 
 foreign import ccall "&hs_mapnik_destroy_ProjTransform" destroyProjTransform :: FinalizerPtr ProjTransform
 

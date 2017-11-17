@@ -95,7 +95,7 @@ fromRgba8 ((fromIntegral -> width, fromIntegral -> height), rgba8) = unsafePerfo
   *$(image_rgba8 **ptr) =
     new mapnik::image_rgba8(
       $(int width), $(int height),
-      reinterpret_cast<unsigned char*>($vec-ptr:(pixel_rgba8 *rgba8))
+      $vec-ptr:(pixel_rgba8 *rgba8)
       );
   }|]
 {-# NOINLINE fromRgba8 #-}
