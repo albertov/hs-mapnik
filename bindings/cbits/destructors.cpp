@@ -14,6 +14,8 @@
 #include <mapnik/text/text_properties.hpp>
 #include <mapnik/feature.hpp>
 
+#include "hs_proj_transform.hpp"
+
 extern "C" {
 
 MAPNIK_DECL void hs_mapnik_destroy_Image(void *p) {
@@ -36,12 +38,8 @@ MAPNIK_DECL void hs_mapnik_destroy_Parameters(void *p) {
   delete static_cast<mapnik::parameters*>(p);
 }
 
-MAPNIK_DECL void hs_mapnik_destroy_Projection(void *p) {
-  delete static_cast<mapnik::projection*>(p);
-}
-
 MAPNIK_DECL void hs_mapnik_destroy_ProjTransform(void *p) {
-  delete static_cast<mapnik::proj_transform*>(p);
+  delete static_cast<hs_proj_transform*>(p);
 }
 
 MAPNIK_DECL void hs_mapnik_destroy_Style(void *p) {

@@ -4,23 +4,21 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Mapnik.Bindings.Projection (
-  fromProj4
-, toProj4
-, projTransform
+  projTransform
 , CanTransform (..)
+, NumPoints
 ) where
 
 import           Mapnik (Proj4)
 import           Mapnik.Bindings.Types
-import           Mapnik.Bindings.Util (newText)
 import           Mapnik.Bindings.Orphans()
 
 import           Control.Exception (try)
-import           Control.Monad ((<=<))
 import           Data.Text.Encoding (encodeUtf8)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
-import           Foreign.Ptr (Ptr)
 import           Foreign.Marshal.Utils (with)
 
 import qualified Language.C.Inline.Unsafe as CU
@@ -36,44 +34,25 @@ C.include "<string>"
 C.include "<mapnik/box2d.hpp>"
 C.include "<mapnik/projection.hpp>"
 C.include "<mapnik/proj_transform.hpp>"
+C.include "hs_proj_transform.hpp"
 
 C.using "namespace mapnik"
 C.verbatim "typedef box2d<double> bbox;"
 
 -- * Projection
 
-
-foreign import ccall "&hs_mapnik_destroy_Projection" destroyProjection :: FinalizerPtr Projection
-
-unsafeNew :: (Ptr (Ptr Projection) -> IO ()) -> IO Projection
-unsafeNew = fmap Projection . newForeignPtr destroyProjection <=< C.withPtr_
-
-fromProj4 :: Proj4 -> Either String Projection
-fromProj4 (encodeUtf8 -> s) =
-  unsafePerformIO $ fmap showExc $ try $ unsafeNew $ \p ->
-    [C.catchBlock|*$(projection **p) = new projection(std::string($bs-ptr:s, $bs-len:s));|]
-  where
-    showExc = either (Left . show @C.CppException) Right
-{-# NOINLINE fromProj4 #-}
-
 foreign import ccall "&hs_mapnik_destroy_ProjTransform" destroyProjTransform :: FinalizerPtr ProjTransform
 
-projTransform :: Projection -> Projection -> ProjTransform
-projTransform src dst = unsafePerformIO $ do
-  ptr <- [CU.exp|proj_transform * {
-    new proj_transform(*$fptr-ptr:(projection *src), *$fptr-ptr:(projection *dst))
-    }|]
+projTransform :: Proj4 -> Proj4 -> Either String ProjTransform
+projTransform (encodeUtf8->src) (encodeUtf8->dst) = unsafePerformIO $ fmap showExc $ try $ do
+  ptr <- C.withPtr_ $ \ptr ->
+    [C.catchBlock|
+    *$(hs_proj_transform **ptr) = new hs_proj_transform($bs-ptr:src, $bs-ptr:dst);
+    |]
   ProjTransform <$> newForeignPtr destroyProjTransform ptr
+  where
+    showExc = either (Left . show @C.CppException) Right
 
-  
-toProj4 :: Projection -> Proj4
-toProj4 pr = unsafePerformIO $ newText $ \(ptr,len) ->
-    [CU.block|void {
-    std::string const &s = $fptr-ptr:(projection *pr)->params();
-    *$(char** ptr) = strdup(s.c_str());
-    *$(int* len) = s.length();
-    }|]
-    
 class CanTransform p where
   forward :: ProjTransform -> p -> p
   backward :: ProjTransform -> p -> p
@@ -82,14 +61,27 @@ instance CanTransform Box where
   forward p box =
     unsafePerformIO $ with box $ \boxPtr -> C.withPtr_ $ \ret ->
       [CU.block|void {
-      auto res = *$(bbox *boxPtr);
-      $fptr-ptr:(proj_transform *p)->forward(res);
-      *$(bbox *ret) = res;
+      *$(bbox *ret) = *$(bbox *boxPtr);
+      $fptr-ptr:(hs_proj_transform *p)->trans().forward(*$(bbox *ret));
     }|]
   backward p box =
     unsafePerformIO $ with box $ \boxPtr -> C.withPtr_ $ \ret ->
       [CU.block|void {
-      auto res = *$(bbox *boxPtr);
-      $fptr-ptr:(proj_transform *p)->backward(res);
-      *$(bbox *ret) = res;
+      *$(bbox *ret) = *$(bbox *boxPtr);
+      $fptr-ptr:(hs_proj_transform *p)->trans().backward(*$(bbox *ret));
+    }|]
+
+type NumPoints = Int
+instance CanTransform (Box,NumPoints) where
+  forward p (box, n'@(fromIntegral -> n)) =
+    (,n') $ unsafePerformIO $ with box $ \boxPtr -> C.withPtr_ $ \ret ->
+      [CU.block|void {
+      *$(bbox *ret) = *$(bbox *boxPtr);
+      $fptr-ptr:(hs_proj_transform *p)->trans().forward(*$(bbox *ret), $(int n));
+    }|]
+  backward p (box, n'@(fromIntegral -> n)) =
+    (,n') $ unsafePerformIO $ with box $ \boxPtr -> C.withPtr_ $ \ret ->
+      [CU.block|void {
+      *$(bbox *ret) = *$(bbox *boxPtr);
+      $fptr-ptr:(hs_proj_transform *p)->trans().backward(*$(bbox *ret), $(int n));
     }|]

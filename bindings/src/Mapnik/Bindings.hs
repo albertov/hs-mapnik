@@ -35,15 +35,10 @@ module Mapnik.Bindings (
 , fromWkb
 , fromWkt
 
--- * Projection
-, Projection
-, fromProj4
-, toProj4
-
 -- * ProjTransform
 , ProjTransform
-, CanTransform (..)
 , projTransform
+, CanTransform (..)
 
 -- * Render
 , RenderSettings (..)

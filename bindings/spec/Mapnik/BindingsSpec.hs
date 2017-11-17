@@ -7,7 +7,6 @@ import           Mapnik.Bindings
 import qualified Mapnik.Lens as L
 import qualified Mapnik.Bindings.Map as Map
 import qualified Mapnik.Bindings.Layer as Layer
-import qualified Mapnik.Bindings.Projection as Projection
 import qualified Mapnik.Bindings.Rule as Rule
 import qualified Mapnik.Bindings.Style as Style
 import qualified Mapnik.Bindings.Transform as Transform
@@ -17,13 +16,13 @@ import qualified Mapnik.Bindings.Symbolizer as Symbolizer
 import qualified Mapnik.Bindings.TextPlacements as TextPlacements
 
 import           Control.Lens hiding ((.=))
-import           Control.Monad (void)
+import           Control.Monad
 import           Data.Text (Text)
 import           Data.Int
 import           Data.IORef
 import           Data.Maybe
 import           Data.List (lookup)
-import           Data.Either (isLeft, isRight)
+import           Data.Either
 import qualified Data.Vector.Storable as St
 import qualified Data.Vector.Generic as G
 import qualified Data.ByteString as BS
@@ -40,7 +39,7 @@ rSettings :: RenderSettings
 rSettings = renderSettings 256 256 aBox
 
 spec :: Spec
-spec = beforeAll_ registerDefaults $ parallel $ do
+spec = beforeAll_ registerDefaults $ parallel $ replicateM_ 100 $ do
 
   describe "Map" $ do
     it "renders as PNG" $ do
@@ -106,26 +105,28 @@ spec = beforeAll_ registerDefaults $ parallel $ do
       render m (renderSettings (-1) (-1) aBox) `shouldThrow` cppStdException
 
   describe "Projection" $ do
-    it "can create valid" $
-      Projection.fromProj4 merc `shouldSatisfy` isRight
-
-    it "can toText valid" $
-      fmap Projection.toProj4 (Projection.fromProj4 merc) `shouldBe` Right "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over"
-
-
-    it "cannot create invalid" $
-      Projection.fromProj4 "foo" `shouldSatisfy` isLeft
-
     it "can trasform" $ do
-      let Right src = Projection.fromProj4 merc
-          Right dst = Projection.fromProj4 "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
-          trans = projTransform src dst
+      let dst = "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
+          Right trans = projTransform merc dst
           expected = Box { minx = 1372637.1001942465
                          , miny = -247003.8133187965
                          , maxx = 1746737.6177269476
                          , maxy = -25098.59307479199
                          }
       forward trans aBox `shouldBe` expected
+
+    it "can trasform with num points" $ do
+      let dst = "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
+          Right trans = projTransform merc dst
+          expected = Box { minx = 1373921.9835390863
+                         , miny = -247003.81331879605
+                         , maxx = 1746737.6177269486
+                         , maxy = -25098.593074791526
+                         }
+      fst (forward trans (aBox,100::Int)) `shouldBe` expected
+
+    it "cannot create invalid" $
+      projTransform merc "foo" `shouldSatisfy` isLeft
 
   describe "Color" $ do
     it "can set good" $ do
