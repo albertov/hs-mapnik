@@ -1,11 +1,9 @@
-
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 module Mapnik.Bindings.GroupProperties (
   unsafeNew
 , unsafeNewMaybe
@@ -40,8 +38,12 @@ unsafeNew = mkUnsafeNew GroupProperties destroyGroupProperties
 unsafeNewMaybe :: (Ptr (Ptr GroupProperties) -> IO ()) -> IO (Maybe GroupProperties)
 unsafeNewMaybe = mkUnsafeNewMaybe GroupProperties destroyGroupProperties
 
-create :: Mapnik.GroupProperties -> IO Colorizer
-create = undefined
+create :: Mapnik.GroupProperties -> IO GroupProperties
+create Mapnik.GroupProperties = unsafeNew $ \p ->
+  [CU.block|void{
+    auto ret = std::make_shared<group_symbolizer_properties>();
+    *$(group_symbolizer_properties_ptr **p) = new group_symbolizer_properties_ptr(ret);
+  }|]
 
 unCreate :: GroupProperties -> IO Mapnik.GroupProperties
-unCreate = undefined
+unCreate p = return Mapnik.GroupProperties

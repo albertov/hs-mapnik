@@ -242,7 +242,7 @@ instance Variant SymbolizerValue Mapnik.DashArray where
     [CU.block|void {
       std::vector<dash_t> dashes($vec-len:dashes);
       for (int i=0; i<$vec-len:dashes; i++) {
-        dashes.emplace_back($vec-ptr:(dash_t *dashes)[i]);
+        dashes[i] = $vec-ptr:(dash_t *dashes)[i];
       }
       *$(sym_value_type *p) = sym_value_type(dashes);
     }|]
