@@ -2,6 +2,7 @@
 , filepath, hspec, hspec-core, process, stdenv
 , bytestring, icu, harfbuzz, mapnik, boost, inline-c-cpp
 , inline-c, hs-mapnik, hs-mapnik-setup, text, which
+, QuickCheck, quickcheck-io
 }:
 mkDerivation {
   pname = "hs-mapnik-bindings";
@@ -11,7 +12,8 @@ mkDerivation {
   libraryHaskellDepends = [ base bytestring inline-c-cpp inline-c hs-mapnik hs-mapnik-setup ];
   librarySystemDepends = [ mapnik boost.dev icu.dev harfbuzz.dev ];
   testHaskellDepends = [
-    base bytestring hspec hspec-core text hs-mapnik
+    base bytestring hspec hspec-core text hs-mapnik QuickCheck
+    quickcheck-io
   ];
   homepage = "https://github.com/albertov/hs-mapnik#readme";
   description = "Haskel bindings for Mapnik";

@@ -30,6 +30,7 @@ instance ToJSON a => ToJSON (Prop a) where
 
 type PropValue a = Maybe (Prop a)
 
+type FaceName = Text
 
 data Stop = Stop
   { value :: !Double
@@ -74,7 +75,7 @@ data TextProperties = TextProperties
 deriveMapnikJSON ''TextProperties
 
 data TextFormatProperties = TextFormatProperties
-  { faceName         :: !(Maybe Text)
+  { faceName         :: !(Maybe FaceName)
   , fontSet          :: !(Maybe FontSet)
   , textSize         :: !(PropValue Double)
   , characterSpacing :: !(PropValue Double)
@@ -95,7 +96,7 @@ data TextLayoutProperties = TextLayoutProperties
   , orientation         :: !(PropValue Double)
   , textRatio           :: !(PropValue Double)
   , wrapWidth           :: !(PropValue Double)
-  , wrapChar            :: !(PropValue Text)
+  , wrapChar            :: !(PropValue Char)
   , wrapBefore          :: !(PropValue Bool)
   , repeatWrapChar      :: !(PropValue Bool)
   , rotateDisplacement  :: !(PropValue Double)
@@ -110,7 +111,7 @@ data Format
   = FormatExp    !Expression
   | FormatList   ![Format]
   | Format
-    { faceName         :: !(Maybe Text)
+    { faceName         :: !(Maybe FaceName)
     , fontSet          :: !(Maybe FontSet)
     , textSize         :: !(PropValue Double)
     , characterSpacing :: !(PropValue Double)
@@ -130,7 +131,7 @@ data Format
     , orientation         :: !(PropValue Double)
     , textRatio           :: !(PropValue Double)
     , wrapWidth           :: !(PropValue Double)
-    , wrapChar            :: !(PropValue Text)
+    , wrapChar            :: !(PropValue Char)
     , wrapBefore          :: !(PropValue Bool)
     , repeatWrapChar      :: !(PropValue Bool)
     , rotateDisplacement  :: !(PropValue Double)

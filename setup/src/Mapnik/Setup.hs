@@ -21,7 +21,10 @@ configureWithMapnikConfig lbi flags = do
   myExtraLibDirs <- getFlagValues 'L' <$> mapnikConfig ["--ldflags"]
   myIncludeDirs  <- getFlagValues 'I' <$> mapnikConfig ["--includes", "--dep-includes"]
   myCppOptions   <- words <$> mapnikConfig ["--defines"]
-  myCcOptions    <- words <$> mapnikConfig ["--defines", "--cxxflags"]
+  -- Strip optimization flags to avoid -O3 on development. We can still set it with
+  -- "cc-options"
+  myCcOptions    <- filter (not . isPrefixOf "-O") . words
+                <$> mapnikConfig ["--defines", "--cxxflags"]
   myLdOptions    <- words <$> mapnikConfig ["--ldflags"]
   icuLdOptions    <- words <$> icuConfig ["--ldflags"]
   mapnikInputPluginDir <- (escapeWinPathSep . head . words) <$>

@@ -25,6 +25,7 @@ import qualified Mapnik.Bindings.Transform as Transform
 import           Mapnik.Bindings.Orphans ()
 
 import           Control.Exception
+import           Data.Char
 import           Data.Text (Text, pack, unpack)
 import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Vector.Storable.Mutable as VM
@@ -33,6 +34,7 @@ import           Foreign.Ptr (Ptr, castPtr, nullPtr)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Marshal.Alloc (finalizerFree)
 import           Foreign.Marshal.Utils (with)
+import           Foreign.Storable
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
 import qualified Language.C.Inline.Unsafe as CU
@@ -165,9 +167,30 @@ instance Variant SymbolizerValue Text where
       }
       }|]
   pokeV p (encodeUtf8 -> v) =
-    [C.catchBlock|
+    [CU.block|void {
       *$(sym_value_type *p) = sym_value_type(std::string($bs-ptr:v, $bs-len:v));
-    |]
+    }|]
+
+instance Variant SymbolizerValue Char where
+  peekV p = do
+    ptr <- C.withPtr_ $ \ret ->
+      [CU.block|void {
+      try {
+        *$(char **ret) = const_cast<char*>(
+          util::get<std::string>(*$(sym_value_type *p)).c_str()
+          );
+      } catch(std::exception) {
+        *$(char **ret) = nullptr;
+      }
+      }|]
+    if ptr == nullPtr
+      then throwIO VariantTypeError
+      else chr . fromIntegral <$> peek ptr
+
+  pokeV p (fromIntegral . ord -> c) =
+    [CU.block|void {
+      *$(sym_value_type *p) = sym_value_type(std::string(&$(char c), 1));
+    }|]
 
 instance Variant SymbolizerValue String where
   peekV = fmap unpack . peekV

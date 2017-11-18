@@ -10,6 +10,7 @@ maintainer:          allberto@toscat.net
 copyright:           2017 Alberto Valverde González
 build-type:          Simple
 cabal-version:       >=1.10
+data-files:          spec/proj4s.txt
 
 library
   hs-source-dirs:      src
@@ -26,8 +27,10 @@ library
                      , Mapnik.Symbolizer
                      , Mapnik.Symbolizer.Lens
                      , Mapnik.Symbolizer.Property
+                     , Mapnik.QuickCheck
   other-modules:       Mapnik.Imports
                      , Mapnik.TH
+                     , Paths_hs_mapnik
   build-depends:       base                >= 4.7  && < 5
                      , text
                      , aeson
@@ -37,6 +40,7 @@ library
                      , vector
                      , data-default
                      , template-haskell
+                     , QuickCheck
   default-language:    Haskell2010
   ghc-options:         -Wall
 
@@ -46,6 +50,8 @@ test-suite spec
                   , hspec
                   , hspec-core >= 1.13
                   , hs-mapnik
+                  , QuickCheck
+                  , aeson
 
   hs-source-dirs:   spec
   main-is:          Main.hs

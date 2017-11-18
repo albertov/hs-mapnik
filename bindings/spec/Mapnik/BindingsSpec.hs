@@ -1,4 +1,8 @@
 {-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 module Mapnik.BindingsSpec (main, spec) where
@@ -14,6 +18,7 @@ import qualified Mapnik.Bindings.Expression as Expression
 import qualified Mapnik.Bindings.Datasource as Datasource
 import qualified Mapnik.Bindings.Symbolizer as Symbolizer
 import qualified Mapnik.Bindings.TextPlacements as TextPlacements
+import           Mapnik.QuickCheck ()
 
 import           Control.Lens hiding ((.=))
 import           Control.Monad
@@ -21,12 +26,16 @@ import           Data.Text (Text)
 import           Data.Int
 import           Data.IORef
 import           Data.Maybe
+import           Data.Proxy
 import           Data.List (lookup)
 import           Data.Either
 import qualified Data.Vector.Storable as St
 import qualified Data.Vector.Generic as G
 import qualified Data.ByteString as BS
 import           Test.Hspec
+import           Test.Hspec.QuickCheck
+import           Test.QuickCheck
+import           Test.QuickCheck.IO ()
 
 
 main :: IO ()
@@ -39,7 +48,7 @@ rSettings :: RenderSettings
 rSettings = renderSettings 256 256 aBox
 
 spec :: Spec
-spec = beforeAll_ registerDefaults $ parallel $ replicateM_ 100 $ do
+spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
 
   describe "Map" $ do
     it "renders as PNG" $ do
@@ -428,6 +437,34 @@ spec = beforeAll_ registerDefaults $ parallel $ replicateM_ 100 $ do
     _ <- render m (renderSettings 512 512 theExtent) { variables = vars }
     Just q <- readIORef ref
     Datasource.variables q `shouldBe` vars
+
+
+  describe "property tests" $ do
+    describe "Symbolizer" $
+      toFromMapnikProp (Proxy @Symbolizer) id
+    --describe "Layer" $
+      --toFromMapnikProp (Proxy @Layer) (L.dataSource ?~ existingDatasource)
+
+
+toFromMapnikProp
+  :: forall p a.
+     ( ToMapnik a
+     , FromMapnik (MapnikType a)
+     , HsType (MapnikType a) ~ a
+     , Arbitrary a
+     , Show a, Eq a
+     )
+  => p a -> (a -> a) -> SpecWith ()
+toFromMapnikProp _ f =
+  prop "toMapnik >=> fromMapnik = return" $ \(a :: a) ->
+    (toMapnik >=> fromMapnik) (f a) `shouldReturn` f a
+  
+existingDatasource :: Datasource
+existingDatasource = Datasource
+  [ "type"     .= ("shape" :: String)
+  , "encoding" .= ("latin1" :: String)
+  , "file"     .= ("spec/data/popplaces" :: String)
+  ]
 
 loadFixture :: Map.Map -> IO ()
 loadFixture = loadFixtureFrom "spec/map.xml"

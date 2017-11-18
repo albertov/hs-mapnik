@@ -70,10 +70,64 @@ unsafeNew = fmap Symbolizer . newForeignPtr destroySymbolizer
 create :: Mapnik.Symbolizer -> IO Symbolizer
 create sym = bracket alloc dealloc $ \p -> do
   mapM_ (`setProperty` p) (sym^.symbolizerProps)
-  unsafeNew =<< castSym sym p
+  unsafeNew =<< toSym p
   where
-    alloc = [CU.exp|symbolizer_base * { new symbolizer_base() }|]
     dealloc p = [CU.block|void { delete $(symbolizer_base *p);}|]
+    alloc = case sym of
+      Mapnik.PointSymbolizer{} ->
+        [CU.exp|symbolizer_base *{ new point_symbolizer}|]
+      Mapnik.LineSymbolizer{} ->
+        [CU.exp|symbolizer_base *{ new line_symbolizer}|]
+      Mapnik.LinePatternSymbolizer{} ->
+        [CU.exp|symbolizer_base *{ new line_pattern_symbolizer}|]
+      Mapnik.PolygonSymbolizer{} ->
+        [CU.exp|symbolizer_base *{ new polygon_symbolizer}|]
+      Mapnik.PolygonPatternSymbolizer{} ->
+        [CU.exp|symbolizer_base *{ new polygon_pattern_symbolizer}|]
+      Mapnik.RasterSymbolizer{} ->
+        [CU.exp|symbolizer_base *{ new raster_symbolizer}|]
+      Mapnik.ShieldSymbolizer{} ->
+        [CU.exp|symbolizer_base *{ new shield_symbolizer}|]
+      Mapnik.TextSymbolizer{} ->
+        [CU.exp|symbolizer_base *{ new text_symbolizer}|]
+      Mapnik.BuildingSymbolizer{} ->
+        [CU.exp|symbolizer_base *{ new building_symbolizer}|]
+      Mapnik.MarkersSymbolizer{} ->
+        [CU.exp|symbolizer_base *{ new markers_symbolizer}|]
+      Mapnik.GroupSymbolizer{} ->
+        [CU.exp|symbolizer_base *{ new group_symbolizer}|]
+      Mapnik.DebugSymbolizer{} ->
+        [CU.exp|symbolizer_base *{ new debug_symbolizer}|]
+      Mapnik.DotSymbolizer{} ->
+        [CU.exp|symbolizer_base *{ new dot_symbolizer}|]
+
+    toSym p = case sym of
+      Mapnik.PointSymbolizer{} ->
+        [CU.exp|symbolizer *{ new symbolizer(*static_cast<point_symbolizer*>($(symbolizer_base *p)))}|]
+      Mapnik.LineSymbolizer{} ->
+        [CU.exp|symbolizer *{ new symbolizer(*static_cast<line_symbolizer*>($(symbolizer_base *p)))}|]
+      Mapnik.LinePatternSymbolizer{} ->
+        [CU.exp|symbolizer *{ new symbolizer(*static_cast<line_pattern_symbolizer*>($(symbolizer_base *p)))}|]
+      Mapnik.PolygonSymbolizer{} ->
+        [CU.exp|symbolizer *{ new symbolizer(*static_cast<polygon_symbolizer*>($(symbolizer_base *p)))}|]
+      Mapnik.PolygonPatternSymbolizer{} ->
+        [CU.exp|symbolizer *{ new symbolizer(*static_cast<polygon_pattern_symbolizer*>($(symbolizer_base *p)))}|]
+      Mapnik.RasterSymbolizer{} ->
+        [CU.exp|symbolizer *{ new symbolizer(*static_cast<raster_symbolizer*>($(symbolizer_base *p)))}|]
+      Mapnik.ShieldSymbolizer{} ->
+        [CU.exp|symbolizer *{ new symbolizer(*static_cast<shield_symbolizer*>($(symbolizer_base *p)))}|]
+      Mapnik.TextSymbolizer{} ->
+        [CU.exp|symbolizer *{ new symbolizer(*static_cast<text_symbolizer*>($(symbolizer_base *p)))}|]
+      Mapnik.BuildingSymbolizer{} ->
+        [CU.exp|symbolizer *{ new symbolizer(*static_cast<building_symbolizer*>($(symbolizer_base *p)))}|]
+      Mapnik.MarkersSymbolizer{} ->
+        [CU.exp|symbolizer *{ new symbolizer(*static_cast<markers_symbolizer*>($(symbolizer_base *p)))}|]
+      Mapnik.GroupSymbolizer{} ->
+        [CU.exp|symbolizer *{ new symbolizer(*static_cast<group_symbolizer*>($(symbolizer_base *p)))}|]
+      Mapnik.DebugSymbolizer{} ->
+        [CU.exp|symbolizer *{ new symbolizer(*static_cast<debug_symbolizer*>($(symbolizer_base *p)))}|]
+      Mapnik.DotSymbolizer{} ->
+        [CU.exp|symbolizer *{ new symbolizer(*static_cast<dot_symbolizer*>($(symbolizer_base *p)))}|]
 
 unCreate :: Symbolizer -> IO Mapnik.Symbolizer
 unCreate sym = do
@@ -126,35 +180,6 @@ defFromName "GroupSymbolizer"          = Just Mapnik.groupSym
 defFromName "DebugSymbolizer"          = Just Mapnik.debugSym
 defFromName "DotSymbolizer"            = Just Mapnik.dotSym
 defFromName _                          = Nothing
-
-castSym :: Mapnik.Symbolizer
-        -> Ptr SymbolizerBase -> IO (Ptr Symbolizer)
-castSym Mapnik.PointSymbolizer{} p =
-  [CU.block|symbolizer *{ new symbolizer(*static_cast<point_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.LineSymbolizer{} p =
-  [CU.block|symbolizer *{ new symbolizer(*static_cast<line_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.LinePatternSymbolizer{} p =
-  [CU.block|symbolizer *{ new symbolizer(*static_cast<line_pattern_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.PolygonSymbolizer{} p =
-  [CU.block|symbolizer *{ new symbolizer(*static_cast<polygon_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.PolygonPatternSymbolizer{} p =
-  [CU.block|symbolizer *{ new symbolizer(*static_cast<polygon_pattern_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.RasterSymbolizer{} p =
-  [CU.block|symbolizer *{ new symbolizer(*static_cast<raster_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.ShieldSymbolizer{} p =
-  [CU.block|symbolizer *{ new symbolizer(*static_cast<shield_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.TextSymbolizer{} p =
-  [CU.block|symbolizer *{ new symbolizer(*static_cast<text_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.BuildingSymbolizer{} p =
-  [CU.block|symbolizer *{ new symbolizer(*static_cast<building_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.MarkersSymbolizer{} p =
-  [CU.block|symbolizer *{ new symbolizer(*static_cast<markers_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.GroupSymbolizer{} p =
-  [CU.block|symbolizer *{ new symbolizer(*static_cast<group_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.DebugSymbolizer{} p =
-  [CU.block|symbolizer *{ new symbolizer(*static_cast<debug_symbolizer*>($(symbolizer_base *p)));}|]
-castSym Mapnik.DotSymbolizer{} p =
-  [CU.block|symbolizer *{ new symbolizer(*static_cast<dot_symbolizer*>($(symbolizer_base *p)));}|]
 
 
 data Property where
@@ -443,7 +468,7 @@ symbolizerProps = lens getProps setProps where
       ]
     Mapnik.ShieldSymbolizer{} ->
       [ fmap ((TextPlacementsKey :=>) . Val) (sym^?!placements)
-      , fmap (GeometryTransform :=>) (sym^?!imageTransform)
+      , fmap (ImageTransform :=>) (sym^?!imageTransform)
       , fmap (ShieldDx          :=>) (sym^?!dx)
       , fmap (ShieldDy          :=>) (sym^?!dy)
       , fmap (Opacity           :=>) (sym^?!opacity)
@@ -456,7 +481,7 @@ symbolizerProps = lens getProps setProps where
       [ fmap ((TextPlacementsKey :=>) . Val) (sym^?!placements)
       , fmap (HaloCompOp        :=>) (sym^?!haloCompOp)
       , fmap (HaloRasterizer    :=>) (sym^?!haloRasterizer)
-      , fmap (GeometryTransform :=>) (sym^?!haloTransform)
+      , fmap (HaloTransform :=>) (sym^?!haloTransform)
       , GET_BASE_PROPS
       ]
     Mapnik.BuildingSymbolizer{} ->
@@ -478,7 +503,7 @@ symbolizerProps = lens getProps setProps where
       , fmap (AllowOverlap         :=>) (sym^?!allowOverlap)
       , fmap (AvoidEdges           :=>) (sym^?!avoidEdges)
       , fmap (IgnorePlacement      :=>) (sym^?!ignorePlacement)
-      , fmap (GeometryTransform    :=>) (sym^?!imageTransform)
+      , fmap (ImageTransform       :=>) (sym^?!imageTransform)
       , fmap (MarkersPlacementKey :=>) (sym^?!placement)
       , fmap (MarkersMultipolicy   :=>) (sym^?!multiPolicy)
       , fmap (Direction            :=>) (sym^?!direction)

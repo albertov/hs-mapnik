@@ -67,6 +67,8 @@ test-suite spec
   type:             exitcode-stdio-1.0
   build-depends:    base
                   , hspec
+                  , QuickCheck
+                  , quickcheck-io
                   , hspec-core >= 1.13
                   , hs-mapnik
                   , hs-mapnik-bindings
