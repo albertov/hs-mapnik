@@ -126,7 +126,7 @@ instance Variant RasterPtr (Raster HS) where { \
     SomeRaster (r :: Raster b) <- peekV p; \
     case eqT :: Maybe (HS :~: b) of { \
       Just Refl -> return r; \
-      Nothing   -> throwIO VariantTypeError; \
+      Nothing   -> throwIO (VariantTypeError "RasterPtr"); \
       }\
     };\
 }
@@ -216,4 +216,4 @@ instance Variant RasterPtr SomeRaster where
       DTYPE_CASE(DTypeGray64, Word64)
       DTYPE_CASE(DTypeGray64s, Int64)
       DTYPE_CASE(DTypeGray64f, Double)
-      _ -> throwIO VariantTypeError
+      _ -> throwIO (VariantTypeError "SomeRaster")

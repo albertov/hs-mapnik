@@ -29,6 +29,7 @@ import qualified Language.C.Inline.Unsafe as CU
 C.context mapnikCtx
 
 C.include "<string>"
+C.include "<cassert>"
 C.include "<mapnik/symbolizer_base.hpp>"
 C.include "<mapnik/text/placements/base.hpp>"
 C.include "<mapnik/text/placements/dummy.hpp>"
@@ -49,7 +50,6 @@ unsafeNew = mkUnsafeNew TextPlacements destroyTextPlacements
 unsafeNewMaybe :: (Ptr (Ptr TextPlacements) -> IO ()) -> IO (Maybe TextPlacements)
 unsafeNewMaybe = mkUnsafeNewMaybe TextPlacements destroyTextPlacements
 
---TODO
 create :: Mapnik.TextPlacements -> IO TextPlacements
 create (Mapnik.Dummy defs) = unsafeNew $ \p -> do
   defaults <- Props.create defs
@@ -59,29 +59,25 @@ create (Mapnik.Dummy defs) = unsafeNew $ \p -> do
     placements->defaults = *$fptr-ptr:(text_symbolizer_properties *defaults);
   }|]
 
+--FIXME
 unCreate :: TextPlacements -> IO Mapnik.TextPlacements
-unCreate (TextPlacements fp) = withForeignPtr fp $ \p -> do
-  ptr <- C.withPtr_ $ \ptr -> [CU.block|void {
-    // Cannot dynamic_cast on simple or list placements since they're not exposed
-    *$(text_placements **ptr) =
-      dynamic_cast<text_placements_dummy *>($(text_placements_ptr *p)->get());
-    }|]
-  when (ptr == nullPtr) $
-    throwIO (userError "Unsupported placement type")
-  fmap Mapnik.Dummy . Props.unCreate =<< [CU.exp|text_symbolizer_properties * {
-    // Assumes p is not null since ptr isnt
-    &$(text_placements *ptr)->defaults
-  }|]
+unCreate (TextPlacements fp) = withForeignPtr fp $ \p ->
+  fmap Mapnik.Dummy . Props.unCreate =<< C.withPtr_ (\ret ->
+    [CU.block|void {
+    auto ptr = dynamic_cast<text_placements_dummy *>($(text_placements_ptr *p)->get());
+    assert(ptr);
+    *$(text_symbolizer_properties **ret) = &ptr->defaults;
+    }|])
 
 
 instance Variant SymbolizerValue Mapnik.TextPlacements where
   peekV p = unCreate =<<
-    justOrTypeError (unsafeNewMaybe $ \ret ->
+    justOrTypeError "TextPlacements" (unsafeNewMaybe $ \ret ->
       [CU.block|void {
       try {
         *$(text_placements_ptr **ret) =
           new text_placements_ptr(util::get<text_placements_ptr>(*$(sym_value_type *p)));
-      } catch (std::exception) {
+      } catch (mapbox::util::bad_variant_access) {
         *$(text_placements_ptr **ret) = nullptr;
       }
       }|])

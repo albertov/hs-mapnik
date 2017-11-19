@@ -40,6 +40,7 @@ C.include "<mapnik/wkt/wkt_factory.hpp>"
 C.include "<mapnik/wkt/wkt_grammar.hpp>"
 C.include "<mapnik/wkt/wkt_generator_grammar.hpp>"
 C.include "<mapnik/util/geometry_to_wkt.hpp>"
+C.include "util.hpp"
 
 C.using "namespace mapnik"
 C.using "mapnik::geometry_utils"
@@ -90,8 +91,7 @@ toWkt g = unsafePerformIO $ newByteString $ \(p, len) ->
   [CU.block|void{
   std::string result;
   if (util::to_wkt(result, *$fptr-ptr:(geometry_t *g))) {
-    *$(char **p) = strdup(result.c_str());
-    *$(int *len) = result.size();
+    mallocedString(result, $(char **p), $(int *len));
   } else {
     *$(char **p) = nullptr;
   }

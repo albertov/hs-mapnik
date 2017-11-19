@@ -41,7 +41,7 @@ import           Mapnik.Bindings.Orphans()
 import qualified Mapnik.Bindings.Datasource as Datasource
 import           Data.IORef
 import           Data.Text (Text)
-import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
+import           Data.Text.Encoding (encodeUtf8)
 import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
 import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Marshal.Utils (with)
@@ -57,9 +57,10 @@ C.context mapnikCtx
 C.include "<string>"
 C.include "<mapnik/layer.hpp>"
 C.include "<mapnik/datasource.hpp>"
+C.include "util.hpp"
 
 C.using "namespace mapnik"
-C.verbatim "typedef box2d<double> bbox;"
+C.using "bbox = box2d<double>"
 
 --
 -- * Layer
@@ -84,22 +85,24 @@ getStyles l = do
   stylesRef <- newIORef []
   let callback :: CString -> C.CInt -> IO ()
       callback ptr (fromIntegral -> len) = do
-        styleName <- decodeUtf8 <$> unsafePackMallocCStringLen (ptr, len)
+        styleName <- unsafePackMallocCStringLen (ptr, len)
         modifyIORef' stylesRef (styleName:)
   [C.block|void {
   typedef std::vector<std::string> style_list;
   style_list const& styles = $fptr-ptr:(layer *l)->styles();
   for (style_list::const_iterator it=styles.begin(); it!=styles.end(); ++it) {
-    $fun:(void (*callback)(char*, int))(strdup(it->c_str()), it->size());
+    char *key;
+    int len;
+    mallocedString(*it, &key, &len);
+    $fun:(void (*callback)(char*, int))(key, len);
   }
   }|]
-  reverse <$> readIORef stylesRef
+  reverse <$> (mapM (decodeUtf8Ctx "Layer.getStyles") =<< readIORef stylesRef)
 
 getGroupBy :: Layer -> IO Text
-getGroupBy l = newText $ \(p,len) -> [CU.block|void {
+getGroupBy l = newText "Layer.getGroupBy" $ \(p,len) -> [CU.block|void {
   std::string const &srs = $fptr-ptr:(layer *l)->group_by();
-  *$(int *len) = srs.size();
-  *$(char **p) = strdup (srs.c_str());
+  mallocedString(srs, $(char **p), $(int *len));
   }|]
 
 setGroupBy :: Layer -> Text -> IO ()
@@ -107,10 +110,9 @@ setGroupBy l (encodeUtf8 -> srs) =
   [CU.block|void { $fptr-ptr:(layer *l)->set_group_by(std::string($bs-ptr:srs, $bs-len:srs)); }|]
 
 getName :: Layer -> IO Text
-getName l = newText $ \(p,len) -> [CU.block|void {
-  std::string const &srs = $fptr-ptr:(layer *l)->name();
-  *$(int *len) = srs.size();
-  *$(char **p) = strdup (srs.c_str());
+getName l = newText "Layer.getName" $ \(p,len) -> [CU.block|void {
+  std::string const &name = $fptr-ptr:(layer *l)->name();
+  mallocedString(name, $(char **p), $(int *len));
   }|]
 
 setName :: Layer -> Text -> IO ()
@@ -118,10 +120,9 @@ setName l (encodeUtf8 -> v) =
   [CU.block|void { $fptr-ptr:(layer *l)->set_name(std::string($bs-ptr:v, $bs-len:v)); }|]
 
 getSrs :: Layer -> IO Text
-getSrs l = newText $ \(p,len) -> [CU.block|void {
+getSrs l = newText "Layer.getSrs" $ \(p,len) -> [CU.block|void {
   std::string const &srs = $fptr-ptr:(layer *l)->srs();
-  *$(int *len) = srs.size();
-  *$(char **p) = strdup (srs.c_str());
+  mallocedString(srs, $(char **p), $(int *len));
   }|]
 
 setSrs :: Layer -> Text -> IO ()
@@ -132,7 +133,7 @@ getBufferSize :: Layer -> IO (Maybe Int)
 getBufferSize l = do
   (has, fromIntegral -> ret) <- C.withPtrs_ $ \(has,ret) ->
     [CU.block|void {
-      auto ret = $fptr-ptr:(layer *l)->buffer_size();
+      boost::optional<int> ret = $fptr-ptr:(layer *l)->buffer_size();
       if (ret) {
         *$(int *has) = 1;
         *$(int *ret) = *ret;

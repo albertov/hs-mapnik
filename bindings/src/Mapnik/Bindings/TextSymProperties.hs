@@ -25,8 +25,8 @@ import           Control.Monad (forM_)
 import           Data.IORef
 import           Data.Text.Encoding (encodeUtf8)
 import           Foreign.ForeignPtr (FinalizerPtr, withForeignPtr)
-import           Foreign.Ptr (Ptr, nullPtr, castPtr)
-import           Foreign.Storable (peek, poke)
+import           Foreign.Ptr (Ptr)
+import           Foreign.Storable (poke)
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Unsafe as CU
@@ -41,6 +41,7 @@ C.include "<mapnik/text/formatting/text.hpp>"
 C.include "<mapnik/text/formatting/list.hpp>"
 C.include "<mapnik/text/formatting/format.hpp>"
 C.include "<mapnik/text/formatting/layout.hpp>"
+C.include "util.hpp"
 
 C.using "namespace mapnik"
 C.using "namespace mapnik::formatting"
@@ -233,7 +234,8 @@ unCreate ps = do
 #define GET_OPT_PROP(TY,HS,CPP) \
   HS <- readPropWith $ \(has, ret) -> \
     [CU.block|void{\
-      auto val = $(TY *node)->CPP;\
+      auto const node = dynamic_cast<TY*>($(node_ptr *p)->get()); \
+      auto val = node->CPP;\
       if (val) {\
         *$(int *has) = 1;\
         *$(sym_value_type** ret) = &(*val);\
@@ -244,125 +246,120 @@ unCreate ps = do
 
 unFormat :: Format -> IO Mapnik.Format
 unFormat (Format fp) = withForeignPtr fp $ \p -> do
-  (ty,ptr) <- C.withPtrs_ $ \(ty,ptr) ->
+  ty <- C.withPtr_ $ \ty ->
     [CU.block|void { do {
+      *$(int *ty) = -1;
       node_ptr node = *$(node_ptr *p);
       if (!node) {
-        *$(void **ptr) = nullptr;
         break;
       }
 
       text_node *text = dynamic_cast<text_node*>(node.get());
       if (text) {
         *$(int *ty) = 0;
-        *$(void **ptr) = text;
         break;
       }
 
       format_node *fmt = dynamic_cast<format_node*>(node.get());
       if (fmt) {
         *$(int *ty) = 1;
-        *$(void **ptr) = fmt;
         break;
       }
 
       layout_node *lay = dynamic_cast<layout_node*>(node.get());
       if (lay) {
         *$(int *ty) = 2;
-        *$(void **ptr) = lay;
         break;
       }
 
       list_node *lst = dynamic_cast<list_node*>(node.get());
       if (lst) {
         *$(int *ty) = 3;
-        *$(void **ptr) = lst;
         break;
       }
 
     } while(0);}|]
-  if ptr == nullPtr then return Mapnik.NullFormat else
-    case ty of
-      0 -> fmap (Mapnik.FormatExp . Mapnik.Expression) $ newText $ \(ret,len) ->
-          [CU.block|void {
-            text_node *text = static_cast<text_node*>($(void *ptr));
-            auto exp = text->get_text();
-            std::string s = to_expression_string(*exp);
-            *$(char** ret) = strdup(s.c_str());
-            *$(int* len) = s.length();
-          }|]
-
-      1 -> do {
-        node <- peek (castPtr ptr);
-        faceName <- newTextMaybe $ \(ret,len) ->
-          [CU.block|void {
-          auto v = $(format_node *node)->face_name;
-          if (v) {
-            *$(char **ret) = strdup(v->c_str());
-            *$(int *len) = v->size();
-          } else {
-            *$(char **ret) = nullptr;
-          }
-          }|];
-        fontSet <- return Nothing; --TODO
-        GET_OPT_PROP(format_node, textSize, text_size);
-        GET_OPT_PROP(format_node, characterSpacing, character_spacing);
-        GET_OPT_PROP(format_node, lineSpacing, line_spacing);
-        GET_OPT_PROP(format_node, wrapBefore, wrap_before);
-        GET_OPT_PROP(format_node, repeatWrapChar, repeat_wrap_char);
-        GET_OPT_PROP(format_node, textTransform, text_transform);
-        GET_OPT_PROP(format_node, fill, fill);
-        GET_OPT_PROP(format_node, haloFill, halo_fill);
-        GET_OPT_PROP(format_node, haloRadius, halo_radius);
-        GET_OPT_PROP(format_node, ffSettings, ff_settings);
-
-        next <- unFormat =<< unsafeNewFormat (\pf -> [CU.block|void{
-          *$(node_ptr **pf) =
-            new node_ptr($(format_node *node)->get_child());
-          }|]);
-        return Mapnik.Format{..};
-      }
-
-      2 -> do {
-        node <- peek (castPtr ptr);
-        GET_OPT_PROP(layout_node, dx, dx);
-        GET_OPT_PROP(layout_node, dy, dy);
-        GET_OPT_PROP(layout_node, orientation, orientation);
-        GET_OPT_PROP(layout_node, textRatio, text_ratio);
-        GET_OPT_PROP(layout_node, wrapWidth, wrap_width);
-        GET_OPT_PROP(layout_node, wrapChar, wrap_char);
-        GET_OPT_PROP(layout_node, wrapBefore, wrap_before);
-        GET_OPT_PROP(layout_node, repeatWrapChar, repeat_wrap_char);
-        GET_OPT_PROP(layout_node, rotateDisplacement, rotate_displacement);
-        GET_OPT_PROP(layout_node, horizontalAlignment, halign);
-        GET_OPT_PROP(layout_node, justifyAlignment, jalign);
-        GET_OPT_PROP(layout_node, verticalAlignment, valign);
-
-        next <- unFormat =<< unsafeNewFormat (\pf -> [CU.block|void{
-          *$(node_ptr **pf) =
-            new node_ptr($(layout_node *node)->get_child());
-          }|]);
-        return Mapnik.FormatLayout{..};
-      }
-
-      3 -> do
-        node <- peek (castPtr ptr);
-        childRef <- newIORef []
-        let callback :: Ptr Format -> IO ()
-            callback cp = do
-              child <- unsafeNewFormat (`poke` cp)
-              modifyIORef' childRef (child:)
-        [C.block|void {
-          auto children = $(list_node *node)->get_children();
-          for (auto it=children.begin(); it!=children.end(); ++it) {
-            $fun:(void (*callback)(node_ptr *))(new node_ptr(*it));
-          }
+  case ty of
+    (-1) -> return Mapnik.NullFormat
+    0 -> fmap (Mapnik.FormatExp . Mapnik.Expression) $ newText "unFormat(FormatExp)" $ \(ret,len) ->
+        [CU.block|void {
+          text_node *text = dynamic_cast<text_node*>($(node_ptr *p)->get());
+          auto exp = text->get_text();
+          std::string s = to_expression_string(*exp);
+          mallocedString(s, $(char **ret), $(int *len));
         }|]
-        fmap (Mapnik.FormatList . reverse)
-          .  mapM unFormat
-          =<< readIORef childRef
 
-      _ -> throwIO (userError "Unsupported node_ptr type")
+    1 -> do {
+      faceName <- newTextMaybe "unFormat(Format.faceName)" $ \(ret,len) ->
+        [CU.block|void {
+        auto const node = dynamic_cast<format_node*>($(node_ptr *p)->get());
+        auto v = node->face_name;
+        if (v) {
+          mallocedString(*v, $(char **ret), $(int *len));
+        } else {
+          *$(char **ret) = nullptr;
+        }
+        }|];
+      fontSet <- return Nothing; --TODO
+      GET_OPT_PROP(format_node, textSize, text_size);
+      GET_OPT_PROP(format_node, characterSpacing, character_spacing);
+      GET_OPT_PROP(format_node, lineSpacing, line_spacing);
+      GET_OPT_PROP(format_node, wrapBefore, wrap_before);
+      GET_OPT_PROP(format_node, repeatWrapChar, repeat_wrap_char);
+      GET_OPT_PROP(format_node, textTransform, text_transform);
+      GET_OPT_PROP(format_node, fill, fill);
+      GET_OPT_PROP(format_node, haloFill, halo_fill);
+      GET_OPT_PROP(format_node, haloRadius, halo_radius);
+      GET_OPT_PROP(format_node, ffSettings, ff_settings);
+
+      next <- unFormat =<< unsafeNewFormat (\pf -> [CU.block|void{
+        auto const node = dynamic_cast<format_node*>($(node_ptr *p)->get());
+        *$(node_ptr **pf) =
+          new node_ptr(node->get_child());
+        }|]);
+      return Mapnik.Format{..};
+    }
+
+    2 -> do {
+      GET_OPT_PROP(layout_node, dx, dx);
+      GET_OPT_PROP(layout_node, dy, dy);
+      GET_OPT_PROP(layout_node, orientation, orientation);
+      GET_OPT_PROP(layout_node, textRatio, text_ratio);
+      GET_OPT_PROP(layout_node, wrapWidth, wrap_width);
+      GET_OPT_PROP(layout_node, wrapChar, wrap_char);
+      GET_OPT_PROP(layout_node, wrapBefore, wrap_before);
+      GET_OPT_PROP(layout_node, repeatWrapChar, repeat_wrap_char);
+      GET_OPT_PROP(layout_node, rotateDisplacement, rotate_displacement);
+      GET_OPT_PROP(layout_node, horizontalAlignment, halign);
+      GET_OPT_PROP(layout_node, justifyAlignment, jalign);
+      GET_OPT_PROP(layout_node, verticalAlignment, valign);
+
+      next <- unFormat =<< unsafeNewFormat (\pf -> [CU.block|void{
+        auto const node = dynamic_cast<layout_node*>($(node_ptr *p)->get());
+        *$(node_ptr **pf) =
+          new node_ptr(node->get_child());
+        }|]);
+      return Mapnik.FormatLayout{..};
+    }
+
+    3 -> do
+      childRef <- newIORef []
+      let callback :: Ptr Format -> IO ()
+          callback cp = do
+            child <- unsafeNewFormat (`poke` cp)
+            modifyIORef' childRef (child:)
+      [C.block|void {
+        auto const node = dynamic_cast<list_node*>($(node_ptr *p)->get());
+        auto children = node->get_children();
+        for (auto it=children.begin(); it!=children.end(); ++it) {
+          $fun:(void (*callback)(node_ptr *))(new node_ptr(*it));
+        }
+      }|]
+      fmap (Mapnik.FormatList . reverse)
+        .  mapM unFormat
+        =<< readIORef childRef
+
+    _ -> throwIO (userError "Unsupported node_ptr type")
 
 
 readPropWith
@@ -385,13 +382,12 @@ readPropWith f = do
 
 unFormatProperties :: Ptr TextFormatProperties -> IO Mapnik.TextFormatProperties
 unFormatProperties p = do
-  faceName <- newTextMaybe $ \(ret,len) ->
+  faceName <- newTextMaybe "unFormatProperties(faceName)" $ \(ret,len) ->
     [CU.block|void {
     const format_properties def;
     auto v = $(format_properties *p)->face_name;
     if (v != def.face_name) {
-      *$(char **ret) = strdup(v.c_str());
-      *$(int *len) = v.size();
+      mallocedString(v, $(char **ret), $(int *len));
     } else {
       *$(char **ret) = nullptr;
     }

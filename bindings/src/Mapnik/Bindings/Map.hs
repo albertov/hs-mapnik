@@ -13,6 +13,7 @@ module Mapnik.Bindings.Map (
 , loadXml
 , loadXmlFile
 , fromXml
+, toXml
 , fromXmlFile
 , zoom
 , zoomAll
@@ -54,7 +55,7 @@ import           Data.IORef
 import           Data.String (fromString)
 import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
 import           Data.Text (Text, unpack)
-import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
+import           Data.Text.Encoding (encodeUtf8)
 import           Data.ByteString (ByteString)
 import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
@@ -75,9 +76,11 @@ C.include "<mapnik/feature_type_style.hpp>"
 C.include "<mapnik/map.hpp>"
 C.include "<mapnik/layer.hpp>"
 C.include "<mapnik/load_map.hpp>"
+C.include "<mapnik/save_map.hpp>"
+C.include "util.hpp"
 
 C.using "namespace mapnik"
-C.verbatim "typedef box2d<double> bbox;"
+C.using "bbox = box2d<double>"
 
 --
 -- * Map
@@ -92,7 +95,7 @@ create :: IO Map
 create = unsafeNew $ \p -> [CU.block|void{*$(Map** p) = new Map();}|]
 
 loadXmlFile :: Map -> FilePath -> IO ()
-loadXmlFile m (fromString -> path) =
+loadXmlFile m (encodeUtf8 . fromString -> path) =
   [C.catchBlock|
   mapnik::load_map(*$fptr-ptr:(Map *m), std::string($bs-ptr:path, $bs-len:path));
   |]
@@ -104,6 +107,13 @@ loadXml :: Map -> ByteString -> IO ()
 loadXml m str =
   [C.catchBlock|
   mapnik::load_map_string(*$fptr-ptr:(Map *m), std::string($bs-ptr:str, $bs-len:str));
+  |]
+
+toXml :: Map -> IO ByteString
+toXml m = newByteString $ \(p, len) ->
+  [C.catchBlock|
+  auto s = mapnik::save_map_to_string(*$fptr-ptr:(Map *m));
+  mallocedString(s, $(char **p), $(int *len));
   |]
 
 fromXml :: ByteString -> IO Map
@@ -128,20 +138,20 @@ setBackground m col = with col $ \colPtr ->
   }|]
 
 setBackgroundImage :: Map -> FilePath -> IO ()
-setBackgroundImage m (fromString -> path) =
+setBackgroundImage m (encodeUtf8 . fromString -> path) =
   [CU.block| void {
   $fptr-ptr:(Map *m)->set_background_image(std::string($bs-ptr:path, $bs-len:path));
   }|]
 
+
 getBackgroundImage :: Map -> IO (Maybe FilePath)
-getBackgroundImage m = fmap (fmap unpack) $ newTextMaybe $ \(p,len) ->
+getBackgroundImage m = fmap (fmap unpack) $ newTextMaybe "Map.getBackgroundImage" $ \(p,len) ->
   [CU.block| void {
   auto mPath = $fptr-ptr:(Map *m)->background_image();
   if (mPath) {
-    *$(int *len) = mPath->size();
-    *$(char **p) = strdup(mPath->c_str());
+    mallocedString(*mPath, $(char **p), $(int *len));
   } else {
-    *$(char **p) = NULL;
+    *$(char **p) = nullptr;
   }
   }|]
 
@@ -177,26 +187,25 @@ getBackgroundImageOpacity m = realToFrac <$>
   [CU.exp| float { $fptr-ptr:(Map *m)->background_image_opacity() }|]
 
 setBasePath :: Map -> FilePath -> IO ()
-setBasePath m (fromString -> path) =
+setBasePath m (encodeUtf8 . fromString -> path) =
   [CU.block| void {
   $fptr-ptr:(Map *m)->set_base_path(std::string($bs-ptr:path, $bs-len:path));
   }|]
 
 setFontDirectory :: Map -> FilePath -> IO ()
-setFontDirectory m (fromString -> path) =
+setFontDirectory m (encodeUtf8 . fromString -> path) =
   [CU.block| void {
   $fptr-ptr:(Map *m)->set_font_directory(std::string($bs-ptr:path, $bs-len:path));
   }|]
 
 getFontDirectory :: Map -> IO (Maybe FilePath)
-getFontDirectory m = fmap (fmap unpack) $ newTextMaybe $ \(p,len) ->
+getFontDirectory m = fmap (fmap unpack) $ newTextMaybe "Map.getFontDirectory" $ \(p,len) ->
   [CU.block| void {
   auto mPath = $fptr-ptr:(Map *m)->font_directory();
   if (mPath) {
-    *$(int *len) = mPath->size();
-    *$(char **p) = strdup(mPath->c_str());
+    mallocedString(*mPath, $(char **p), $(int *len));
   } else {
-    *$(char **p) = NULL;
+    *$(char **p) = nullptr;
   }
   }|]
   
@@ -205,10 +214,9 @@ setSrs m (encodeUtf8 -> srs) =
   [CU.block|void { $fptr-ptr:(Map *m)->set_srs(std::string($bs-ptr:srs, $bs-len:srs));}|]
 
 getSrs :: Map -> IO Text
-getSrs m = newText $ \(p,len) -> [CU.block|void {
+getSrs m = newText "Map.getSrs" $ \(p,len) -> [CU.block|void {
   std::string const &srs = $fptr-ptr:(Map *m)->srs();
-  *$(int *len) = srs.size();
-  *$(char **p) = strdup (srs.c_str());
+  mallocedString(srs, $(char **p), $(int *len));
   }|]
 
 setAspectFixMode :: Map -> AspectFixMode -> IO ()
@@ -264,16 +272,19 @@ getStyles m = do
   let callback :: CString -> C.CInt -> Ptr Style -> IO ()
       callback ptr (fromIntegral -> len) ptrStyle = do
         style <- Style.unsafeNew (`poke` ptrStyle)
-        styleName <- decodeUtf8 <$> unsafePackMallocCStringLen (ptr, len)
+        styleName <- unsafePackMallocCStringLen (ptr, len)
         modifyIORef' stylesRef ((styleName,style):)
   [C.block|void {
   typedef std::map<std::string,feature_type_style> style_map;
   style_map const& styles = $fptr-ptr:(Map *m)->styles();
   for (style_map::const_iterator it=styles.begin(); it!=styles.end(); ++it) {
-    $fun:(void (*callback)(char*, int, feature_type_style*))(strdup(it->first.c_str()), it->first.size(), new feature_type_style(it->second));
+    char *buf;
+    int len;
+    mallocedString(it->first, &buf, &len);
+    $fun:(void (*callback)(char*, int, feature_type_style*))(buf, len, new feature_type_style(it->second));
   }
   }|]
-  reverse <$> readIORef stylesRef
+  reverse <$> (decodeUtf8Keys "Map.getStyles" =<< readIORef stylesRef)
 
 
 insertStyle :: Map -> StyleName -> Style -> IO ()

@@ -22,7 +22,7 @@ import           Foreign.Ptr (Ptr, nullPtr)
 import           Control.Exception (bracket)
 import           Control.Monad (forM_)
 import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
-import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
+import           Data.Text.Encoding (encodeUtf8)
 import           Data.IORef
 import           Foreign.Storable (peek)
 import qualified Language.C.Inline.Cpp as C
@@ -34,6 +34,7 @@ C.context mapnikCtx
 
 C.include "<string>"
 C.include "<mapnik/raster_colorizer.hpp>"
+C.include "util.hpp"
 
 C.using "namespace mapnik"
 
@@ -50,11 +51,11 @@ unsafeNewMaybe = mkUnsafeNewMaybe Colorizer destroyColorizer
 
 create :: Mapnik.Colorizer -> IO Colorizer
 create Mapnik.Colorizer{..} = unsafeNew $ \p -> do
-  ret <- [CU.block|void *{
+  ret <- C.withPtr_ $ \ret -> [CU.block|void {
     *$(raster_colorizer_ptr **p) = new raster_colorizer_ptr(
       std::make_shared<raster_colorizer>()
       );
-    (*$(raster_colorizer_ptr **p))->get();
+    *$(void **ret) = (*$(raster_colorizer_ptr **p))->get();
   }|]
   forM_ mode $ \(fromIntegral . fromEnum -> m) ->
     [CU.block|void {
@@ -81,11 +82,11 @@ withStop Mapnik.Stop
   , ..
   } fun = with color $ \c -> bracket (alloc c) dealloc enter
   where
-    alloc c =
-      [CU.block|colorizer_stop * {
+    alloc c = C.withPtr_ $ \ret ->
+      [CU.block|void {
       auto ret = new colorizer_stop($(float val));
       ret->set_color(*$(color *c));
-      ret;
+      *$(colorizer_stop **ret) = ret;
       }|]
     dealloc p = [CU.exp|void { delete $(colorizer_stop *p) }|]
     enter p = do
@@ -118,8 +119,7 @@ unCreateStop p = do
       }
       *$(color **col) = const_cast<color*>(&stop.get_color());
       if (stop.get_label() != def.get_label()) {
-        *$(char **ptr) = strdup(stop.get_label().c_str());
-        *$(int *len) = stop.get_label().size();
+        mallocedString(stop.get_label(), $(char **ptr), $(int *len));
       } else {
         *$(char **ptr) = nullptr;
       }
@@ -130,8 +130,8 @@ unCreateStop p = do
           else return (Just (toEnum (fromIntegral mMode)))
   label <- if labelPtr == nullPtr
            then return Nothing
-           else Just . decodeUtf8
-            <$> unsafePackMallocCStringLen (labelPtr,labelLen)
+           else Just
+            <$> (decodeUtf8Ctx "unCreateStop" =<< unsafePackMallocCStringLen (labelPtr,labelLen))
   return Mapnik.Stop{..}
 
 

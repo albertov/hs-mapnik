@@ -44,6 +44,7 @@ C.include "<string>"
 C.include "<mapnik/rule.hpp>"
 C.include "<mapnik/symbolizer.hpp>"
 C.include "<mapnik/expression_string.hpp>"
+C.include "util.hpp"
 
 C.using "namespace mapnik"
 
@@ -64,12 +65,11 @@ setName l (encodeUtf8 -> s) =
   [CU.block|void { $fptr-ptr:(rule *l)->set_name(std::string($bs-ptr:s, $bs-len:s)); }|]
 
 getName :: Rule -> IO Text
-getName r = newText $ \(ptr,len) ->
-    [CU.block|void {
-    std::string const &s = $fptr-ptr:(rule *r)->get_name();
-    *$(char** ptr) = strdup(s.c_str());
-    *$(int* len) = s.length();
-    }|]
+getName r = newText "Rule.getName" $ \(p,len) ->
+  [CU.block|void {
+  std::string const &s = $fptr-ptr:(rule *r)->get_name();
+  mallocedString(s, $(char **p), $(int *len));
+  }|]
 
 getMinScale :: Rule -> IO Double
 getMinScale r = realToFrac <$> [CU.exp|double { $fptr-ptr:(rule *r)->get_min_scale()}|]

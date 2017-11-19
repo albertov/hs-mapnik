@@ -25,8 +25,8 @@ import qualified Mapnik.Bindings.Transform as Transform
 import           Mapnik.Bindings.Orphans ()
 
 import           Control.Exception
-import           Data.Char
 import           Data.Text (Text, pack, unpack)
+import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Vector.Storable.Mutable as VM
 import qualified Data.Vector.Storable         as V
@@ -34,7 +34,6 @@ import           Foreign.Ptr (Ptr, castPtr, nullPtr)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Marshal.Alloc (finalizerFree)
 import           Foreign.Marshal.Utils (with)
-import           Foreign.Storable
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
 import qualified Language.C.Inline.Unsafe as CU
@@ -48,6 +47,7 @@ C.include "<mapnik/symbolizer.hpp>"
 C.include "<mapnik/expression_string.hpp>"
 C.include "<mapnik/transform_processor.hpp>"
 C.include "<mapnik/util/variant.hpp>"
+C.include "util.hpp"
 
 C.using "namespace mapnik"
 C.verbatim "typedef symbolizer_base::value_type sym_value_type;"
@@ -75,7 +75,7 @@ instance Variant SymbolizerValue Mapnik.HS where {\
       try {\
         *$(CPP **ret) =\
           new CPP(util::get<CPP>(*$(sym_value_type *p)));\
-      } catch (std::exception) {\
+      } catch (mapbox::util::bad_variant_access) {\
         *$(CPP **ret) = nullptr;\
       }\
       }|]) ;\
@@ -90,16 +90,16 @@ SYM_VAL_PTR(Colorizer,raster_colorizer_ptr)
 SYM_VAL_PTR(GroupProperties,group_symbolizer_properties_ptr)
 
 
-#define SYM_VAL(HS,CPP,CONV) \
+#define SYM_VAL(HS,CPP,CONV,MSG) \
 instance Variant SymbolizerValue HS where {\
   pokeV p (CONV -> v) = \
     [CU.block|void { *$(sym_value_type *p) = sym_value_type($(CPP v)); }|]; \
-  peekV p = fmap CONV $ justOrTypeError $ newMaybe (\(has,ret) -> \
+  peekV p = fmap CONV $ justOrTypeError MSG $ newMaybe (\(has,ret) -> \
     [CU.block|void { \
     try { \
       *$(CPP *ret) = util::get<CPP>(*$(sym_value_type *p)); \
       *$(int *has) = 1; \
-    } catch (std::exception) { \
+    } catch (mapbox::util::bad_variant_access) { \
       *$(int *has) = 0; \
     } \
     }|]) \
@@ -109,21 +109,19 @@ instance Variant SymbolizerValue HS where {\
 instance Variant SymbolizerValue HS where {\
   pokeV p (fromIntegral . fromEnum -> v) = \
     [CU.block|void { *$(sym_value_type *p) = enumeration_wrapper(static_cast<CPP>($(int v)));}|]; \
-  peekV p = fmap (toEnum . fromIntegral) $ justOrTypeError $ newMaybe $ \(has,ret) -> \
+  peekV p = fmap (toEnum . fromIntegral) $ justOrTypeError "sYM_VAL_ENUM" $ newMaybe $ \(has,ret) -> \
     [CU.block|void { \
     try { \
       *$(int *ret) = static_cast<int>(util::get<enumeration_wrapper>(*$(sym_value_type *p))); \
       *$(int *has) = 1; \
-    } catch (std::exception) { \
+    } catch (mapbox::util::bad_variant_access) { \
       *$(int *has) = 0; \
     } \
     }|] \
 }
 
-
-SYM_VAL(Int,value_integer,fromIntegral)
-SYM_VAL(Double,double,realToFrac)
-SYM_VAL_ENUM(Bool,bool)
+SYM_VAL(Int,value_integer,fromIntegral,"Int")
+SYM_VAL(Double,double,realToFrac,"Double")
 SYM_VAL_ENUM(CompositeMode,composite_mode_e)
 SYM_VAL_ENUM(LineCap,line_cap_enum)
 SYM_VAL_ENUM(LineJoin,line_join_enum)
@@ -145,24 +143,36 @@ SYM_VAL_ENUM(GammaMethod,gamma_method_enum)
 SYM_VAL_ENUM(ScalingMethod,scaling_method_e)
 SYM_VAL_ENUM(SimplifyAlgorithm,simplify_algorithm_e)
 
+instance Variant SymbolizerValue Bool where
+  pokeV p (fromIntegral . fromEnum -> v) =
+    [CU.block|void { *$(sym_value_type *p) = sym_value_type($(int v)?true:false); }|];
+  peekV p = fmap (toEnum . fromIntegral) $ justOrTypeError "Bool" $ newMaybe (\(has,ret) ->
+    [CU.block|void {
+    try {
+      *$(int *ret) = static_cast<int>(util::get<bool>(*$(sym_value_type *p)));
+      *$(int *has) = 1;
+    } catch (mapbox::util::bad_variant_access) {
+      *$(int *has) = 0;
+    }
+    }|])
+
 instance Variant SymbolizerValue a => Variant SymbolizerValue (Mapnik.Prop a) where
   peekV p = do
     val <- try (peekV p)
     case val of
       Right v -> return (Mapnik.Exp v)
-      Left VariantTypeError -> Mapnik.Val <$> peekV p
+      Left (VariantTypeError _) -> Mapnik.Val <$> peekV p
   pokeV p (Mapnik.Exp a) = pokeV p a
   pokeV p (Mapnik.Val a) = pokeV p a
 
 instance Variant SymbolizerValue Text where
-  peekV p = justOrTypeError $
-    newTextMaybe $ \(ptr, len) ->
+  peekV p = justOrTypeError "Text" $
+    newTextMaybe "peekV(Text)" $ \(ptr, len) ->
       [CU.block|void {
       try {
-        auto v = util::get<std::string>(*$(sym_value_type *p));
-        *$(char** ptr) = strdup(v.c_str());
-        *$(int* len) = v.length();
-      } catch(std::exception) {
+        auto const v = util::get<std::string>(*$(sym_value_type *p));
+        mallocedString(v, $(char **ptr), $(int *len));
+      } catch (mapbox::util::bad_variant_access) {
         *$(char** ptr) = nullptr;
       }
       }|]
@@ -173,24 +183,11 @@ instance Variant SymbolizerValue Text where
 
 instance Variant SymbolizerValue Char where
   peekV p = do
-    ptr <- C.withPtr_ $ \ret ->
-      [CU.block|void {
-      try {
-        *$(char **ret) = const_cast<char*>(
-          util::get<std::string>(*$(sym_value_type *p)).c_str()
-          );
-      } catch(std::exception) {
-        *$(char **ret) = nullptr;
-      }
-      }|]
-    if ptr == nullPtr
-      then throwIO VariantTypeError
-      else chr . fromIntegral <$> peek ptr
-
-  pokeV p (fromIntegral . ord -> c) =
-    [CU.block|void {
-      *$(sym_value_type *p) = sym_value_type(std::string(&$(char c), 1));
-    }|]
+    s <- peekV p
+    case T.uncons s of
+      Just (c,_) -> return c
+      Nothing    -> throwIO (userError "Unexpected empty string")
+  pokeV p (T.singleton -> c) = pokeV p c
 
 instance Variant SymbolizerValue String where
   peekV = fmap unpack . peekV
@@ -198,18 +195,17 @@ instance Variant SymbolizerValue String where
 
 instance Variant SymbolizerValue Mapnik.Expression where
   peekV p = 
-    fmap Mapnik.Expression $ justOrTypeError $ newTextMaybe $ \(ret, len) ->
+    fmap Mapnik.Expression $ justOrTypeError "Expression" $ newTextMaybe "peekV(Expression)" $ \(ret, len) ->
       [CU.block|void {
       try {
         auto expr = util::get<expression_ptr>(*$(sym_value_type *p));
         if (expr) {
           std::string s = to_expression_string(*expr);
-          *$(char** ret) = strdup(s.c_str());
-          *$(int* len) = s.length();
+          mallocedString(s, $(char **ret), $(int *len));
         } else {
           *$(char** ret) = nullptr;
         }
-      } catch (std::exception) {
+      } catch (mapbox::util::bad_variant_access) {
         *$(char** ret) = nullptr;
       }
       }|]
@@ -221,14 +217,13 @@ instance Variant SymbolizerValue Mapnik.Expression where
 
 instance Variant SymbolizerValue Mapnik.FontFeatureSettings where
   peekV p =
-    fmap Mapnik.FontFeatureSettings $ justOrTypeError $ newTextMaybe $ \(ptr, len) ->
+    fmap Mapnik.FontFeatureSettings $ justOrTypeError "FFs" $ newTextMaybe "peekV(FontFeatureSettings)" $ \(ptr, len) ->
       [CU.block|void {
       try {
         auto v = util::get<font_feature_settings>(*$(sym_value_type *p));
         std::string s = v.to_string();
-        *$(char** ptr) = strdup(s.c_str());
-        *$(int* len) = s.length();
-      } catch(std::exception) {
+        mallocedString(s, $(char **ptr), $(int *len));
+      } catch (mapbox::util::bad_variant_access) {
         *$(char** ptr) = nullptr;
       }
       }|]
@@ -259,22 +254,22 @@ instance Variant SymbolizerValue Mapnik.DashArray where
         for (dash_array::const_iterator it=arr.begin(); it!=arr.end(); ++it, ++i) {
           dashes[i] = *it;
         }
-      } catch(std::exception) {
+      } catch (mapbox::util::bad_variant_access) {
         *$(dash_t **ptr) = nullptr;
       }
       }|]
     if ptr /= nullPtr then do
       fp <- newForeignPtr finalizerFree ptr
       V.freeze (VM.unsafeFromForeignPtr0 fp len)
-    else throwIO VariantTypeError
+    else throwIO (VariantTypeError "DashArray")
 
 instance Variant SymbolizerValue Mapnik.Color where
-  peekV p = justOrTypeError $ newMaybe $ \(has,ret) ->
+  peekV p = justOrTypeError "Color" $ newMaybe $ \(has,ret) ->
     [CU.block|void {
     try {
       *$(color *ret) = util::get<color>(*$(sym_value_type *p));
       *$(int *has) = 1;
-    } catch(std::exception) {
+    } catch (mapbox::util::bad_variant_access) {
       *$(int *has) = 0;
     }
     }|]
@@ -289,18 +284,17 @@ instance Variant SymbolizerValue Mapnik.Transform where
       Left e -> throwIO (userError e)
 
   peekV p =
-    fmap Mapnik.Transform $ justOrTypeError $ newTextMaybe $ \(ptr, len) ->
+    fmap Mapnik.Transform $ justOrTypeError "Transform" $ newTextMaybe "peekV(Transform)" $ \(ptr, len) ->
       [CU.block|void {
       try {
         auto t = util::get<transform_type>(*$(sym_value_type *p));
         if (t) {
           std::string s = transform_processor_type::to_string(*t);
-          *$(char** ptr) = strdup(s.c_str());
-          *$(int* len) = s.length();
+          mallocedString(s, $(char **ptr), $(int *len));
         } else {
           *$(char** ptr) = nullptr;
         }
-      } catch(std::exception) {
+      } catch (mapbox::util::bad_variant_access) {
         *$(char** ptr) = nullptr;
       }
       }|]

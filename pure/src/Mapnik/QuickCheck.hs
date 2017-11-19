@@ -11,12 +11,11 @@ module Mapnik.QuickCheck (
 import           Mapnik
 
 import qualified Data.HashMap.Strict as M
-import           Data.Monoid
 import qualified Data.Text as T
 import           Data.Text.IO as T
-import qualified Data.Vector.Storable as SV
 import           System.IO.Unsafe (unsafePerformIO)
 import           Test.QuickCheck hiding (label)
+import           Test.QuickCheck.Instances ()
 import           Prelude hiding (filter)
 import           Paths_hs_mapnik (getDataFileName)
 
@@ -35,15 +34,12 @@ instance Arbitrary Map where
     pure Map{..}
 
 instance Arbitrary Layer where
-  arbitrary = arbitraryLayer =<< listOf arbitraryText
+  arbitrary = arbitraryLayer =<< listOf arbitrary
 
 instance Arbitrary Datasource where
   arbitrary = pure $ Datasource
     [ "type" .= ("memory" :: T.Text)
     ]
-
-instance Arbitrary Styles where
-  arbitrary = M.fromList <$> listOf ((,) <$> arbitraryText <*> arbitrary)
 
 instance Arbitrary Style where
   arbitrary = do
@@ -54,7 +50,7 @@ instance Arbitrary Style where
 
 instance Arbitrary Rule where
   arbitrary = do
-    name                      <- maybeArb arbitraryText
+    name                      <- maybeArb arbitrary
     symbolizers               <- resize 5 arbitrary
     filter                    <- arbitrary
     ( minimumScaleDenominator
@@ -336,14 +332,11 @@ instance Arbitrary PlacementDirection where arbitrary = arbitraryEnum
 instance Arbitrary TextTransform where arbitrary = arbitraryEnum
 
 instance Arbitrary a => Arbitrary (Prop a) where
-  arbitrary = oneof [ Exp <$> arbitrary, Val <$> arbitrary ]
+  arbitrary = oneof [ {-Exp <$> arbitrary,-} Val <$> arbitrary ]
 
 instance Arbitrary Dash where
   arbitrary = Dash <$> (getPositive <$> arbitrary)
                    <*> (getPositive <$> arbitrary)
-
-instance Arbitrary DashArray where
-  arbitrary = SV.fromList <$> arbitrary
 
 instance Arbitrary Colorizer where
   arbitrary = do
@@ -357,7 +350,7 @@ instance Arbitrary Stop where
     value <- arbitrary
     color <- arbitrary
     mode  <- arbitrary
-    label <- maybeArb arbitraryText
+    label <- maybeArb arbitrary
     pure Stop{..}
 
 instance Arbitrary GroupProperties where
@@ -484,20 +477,13 @@ instance Arbitrary FontSet where
   arbitrary = pure FontSet --TODO
 
 instance Arbitrary FontFeatureSettings where
-  arbitrary = FontFeatureSettings <$> (T.intercalate ", " <$> listOf parts)
+  arbitrary = FontFeatureSettings <$> parts
     where
       parts = oneof
-        [ pure "normal"
-        , pure "\"smcp\""
-        , pure "\"hist\""
-        , pure "\"frac\""
-        , ("\"smcp\" " <>) <$> onOf
-        , ("\"swsh\" " <>) <$> (num <$> choose (0,4))
-        , ("\"liga\" " <>) <$> (num <$> choose (0,4))
+        [ pure "smcp"
+        , pure "hist"
+        , pure "frac"
         ]
-      onOf = elements ["on", "off"]
-      num :: Int -> T.Text
-      num = T.pack . show
 
 
 -----------------------------------------------------------------------------
@@ -526,7 +512,7 @@ arbitraryMinMaxScaleDenom = do
 
 arbitraryLayer :: [StyleName] -> Gen Layer
 arbitraryLayer stylesInMap = do
-  name                    <- arbitraryText
+  name                    <- arbitrary
   dataSource              <- arbitrary
   styles                  <- if null stylesInMap then pure [] else
                              listOf (elements stylesInMap)
@@ -536,13 +522,10 @@ arbitraryLayer stylesInMap = do
   queryable               <- arbitrary
   clearLabelCache         <- arbitrary
   cacheFeatures           <- arbitrary
-  groupBy                 <- maybeArb arbitraryText
+  groupBy                 <- maybeArb arbitrary
   bufferSize              <- maybeArb (getNonNegative <$> arbitrary)
   maximumExtent           <- arbitrary
   pure Layer{..}
-
-arbitraryText :: Gen T.Text
-arbitraryText = T.pack <$> arbitrary
 
 maybeArb :: Gen a -> Gen (Maybe a)
 maybeArb gen = oneof [pure Nothing, Just <$> gen]

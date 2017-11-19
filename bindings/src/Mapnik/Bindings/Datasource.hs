@@ -47,12 +47,12 @@ import           System.IO
 import           Control.Exception (catch, bracket, SomeException)
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
-import           Control.Monad (forM_, (>=>))
-import           Data.ByteString (packCString)
+import           Control.Monad (forM_)
+import           Data.ByteString (packCStringLen)
 import           Data.Text (Text)
 import           Data.List (sortBy)
 import           Data.Function (on)
-import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
+import           Data.Text.Encoding (encodeUtf8)
 import           Data.IORef
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
@@ -130,9 +130,9 @@ emptyValues = fmap Parameters . newForeignPtr destroyParameters =<< [CU.exp|para
 paramsToList :: Parameters -> [(Text,Value)]
 paramsToList p = unsafePerformIO $ do
   ref <- newIORef []
-  let cb :: CString -> Ptr Param -> IO ()
-      cb k v = do
-        key <- decodeUtf8 <$> packCString k
+  let cb :: CString -> C.CInt -> Ptr Param -> IO ()
+      cb k l v = do
+        key <- packCStringLen (k, fromIntegral l)
         val <- peekV v
         modifyIORef' ref ((key,val):)
   [C.block|void {
@@ -140,27 +140,29 @@ paramsToList p = unsafePerformIO $ do
           it != $fptr-ptr:(parameters *p)->end();
           ++it)
      {
-       $fun:(void (*cb)(char*, value_holder*))(
+       $fun:(void (*cb)(char*, int, value_holder*))(
           const_cast<char*>(it->first.c_str()),
+          it->first.size(),
           const_cast<value_holder*>(&it->second)
           );
      }
   }|]
-  readIORef ref
+  decodeUtf8Keys "paramsToList" =<< readIORef ref
+
 
 type FeatureSet = (Vector Text, [Feature])
 
 features :: Datasource -> Query -> IO FeatureSet
 features ds query = withQuery query $ \q -> do
   feats <- newIORef []
-  fields <- newIORef [] :: IO (IORef [(Text, C.CSize)])
+  fields <- newIORef []
   let cbFeat :: Ptr FeaturePtr -> IO ()
       cbFeat p = do
         f <- Feature.unCreate p
         modifyIORef' feats (f:)
-      cbField :: CString -> C.CSize -> IO ()
-      cbField p ix= do
-        f <- decodeUtf8 <$> packCString p
+      cbField :: CString -> C.CInt -> C.CSize -> IO ()
+      cbField p len ix = do
+        f <- packCStringLen (p, fromIntegral len)
         modifyIORef' fields ((f,ix):)
   [C.block|void { do {
     auto ds = $fptr-ptr:(datasource_ptr *ds)->get();
@@ -175,16 +177,19 @@ features ds query = withQuery query $ \q -> do
     if (last && last->context()) {
       auto ctx = last->context();
       for (auto it=ctx->begin(); it!=ctx->end(); ++it) {
-        $fun:(void (*cbField)(char *, size_t))(
+        $fun:(void (*cbField)(char *, int, size_t))(
           const_cast<char*>(it->first.c_str()),
+          it->first.size(),
           it->second
         );
       }
     }
   } while(0);}|]
-
-  (,) <$> (V.fromList . map fst . sortBy (compare `on` snd) <$> readIORef fields)
+  fs <- V.fromList . map fst . sortBy (compare `on` snd)
+    <$> (decodeUtf8Keys "features" =<< readIORef fields)
+  (,) <$> pure fs
       <*> (reverse  <$> readIORef feats)
+  where
 
 featuresAtPoint :: Datasource -> Pair -> Double -> IO FeatureSet
 featuresAtPoint = undefined
@@ -370,15 +375,15 @@ unCreateQuery q = do
     *$(attributes **vs) = const_cast<attributes*>(&q.variables());
     }|]
   ref <- newIORef  []
-  let cb :: CString -> IO ()
-      cb = packCString >=> \s -> modifyIORef' ref (decodeUtf8 s:)
+  let cb :: CString -> C.CInt -> IO ()
+      cb s l = packCStringLen (s,fromIntegral l) >>= \s' -> modifyIORef' ref (s':)
   [C.block|void {
-    auto names = $(query *q)->property_names(); //TODO use const_iter
+    auto const names = $(query *q)->property_names();
     for (auto it=names.begin(); it!=names.end(); ++it) {
-      $fun:(void (*cb)(char *))(const_cast<char *>(it->c_str()));
+      $fun:(void (*cb)(char *, int))(const_cast<char *>(it->c_str()), it->size());
     }
   }|]
-  propertyNames <- readIORef ref
+  propertyNames <- mapM (decodeUtf8Ctx "unCreateQuery") =<< readIORef ref
   variables <- extractAttributes varPtr
   return Query{resolution=Pair resx resy, ..}
 
@@ -396,21 +401,22 @@ withAttributes attrs f = bracket alloc dealloc enter where
 
 extractAttributes :: Ptr Attributes -> IO Attributes
 extractAttributes p = do
-  ref <- newIORef M.empty
-  let cb :: CString -> Ptr Value -> IO ()
-      cb k v = do
-        key <- decodeUtf8 <$> packCString k
+  ref <- newIORef []
+  let cb :: CString -> C.CInt -> Ptr Value -> IO ()
+      cb k l v = do
+        key <- packCStringLen (k, fromIntegral l)
         val <- peekV v
-        modifyIORef' ref (M.insert key val)
+        modifyIORef' ref ((key,val):)
   [C.block|void {
      for (attributes::const_iterator it = $(attributes *p)->begin();
           it != $(attributes *p)->end();
           ++it)
      {
-       $fun:(void (*cb)(char*, value*))(
+       $fun:(void (*cb)(char*, int, value*))(
           const_cast<char*>(it->first.c_str()),
+          it->first.size(),
           const_cast<value*>(&it->second)
           );
      }
   }|]
-  readIORef ref
+  fmap M.fromList . decodeUtf8Keys "extractAttributes" =<< readIORef ref

@@ -7,6 +7,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 module Mapnik.BindingsSpec (main, spec) where
 
+import qualified Mapnik
 import           Mapnik.Bindings
 import qualified Mapnik.Lens as L
 import qualified Mapnik.Bindings.Map as Map
@@ -21,12 +22,12 @@ import qualified Mapnik.Bindings.TextPlacements as TextPlacements
 import           Mapnik.QuickCheck ()
 
 import           Control.Lens hiding ((.=))
+import           Control.Exception
 import           Control.Monad
 import           Data.Text (Text)
 import           Data.Int
 import           Data.IORef
 import           Data.Maybe
-import           Data.Proxy
 import           Data.List (lookup)
 import           Data.Either
 import qualified Data.Vector.Storable as St
@@ -34,7 +35,6 @@ import qualified Data.Vector.Generic as G
 import qualified Data.ByteString as BS
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
-import           Test.QuickCheck
 import           Test.QuickCheck.IO ()
 
 
@@ -440,25 +440,27 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
 
 
   describe "property tests" $ do
-    describe "Symbolizer" $
-      toFromMapnikProp (Proxy @Symbolizer) id
-    --describe "Layer" $
-      --toFromMapnikProp (Proxy @Layer) (L.dataSource ?~ existingDatasource)
-
-
-toFromMapnikProp
-  :: forall p a.
-     ( ToMapnik a
-     , FromMapnik (MapnikType a)
-     , HsType (MapnikType a) ~ a
-     , Arbitrary a
-     , Show a, Eq a
-     )
-  => p a -> (a -> a) -> SpecWith ()
-toFromMapnikProp _ f =
-  prop "toMapnik >=> fromMapnik = return" $ \(a :: a) ->
-    (toMapnik >=> fromMapnik) (f a) `shouldReturn` f a
+    prop "toMapnik >=> fromMapnik = return" $ \(a :: Mapnik.Map) -> do
+      writeFile "test_map.txt" (show a)
+      m <- toMapnik (a & L.layers . traverse . L.dataSource ?~ existingDatasource)
+      putStrLn "toMapnik OK"
+      xml <- Map.toXml m
+      BS.writeFile "test_map.xml" xml
+      putStrLn "toXmlOk OK"
+      a2 <- fromMapnik m
+      putStrLn "fromMapnik OK"
+      m2 <- toMapnik a2
+      putStrLn "toMapnik OK"
+      xml2 <- Map.toXml m2
+      putStrLn "toXml OK"
+      xml `shouldBe` xml2
   
+    prop "backgroundImage/setBackgroundImage" $ \(a :: FilePath) -> do
+      m <- Map.create
+      Map.setBackgroundImage m a
+      a' <- Map.getBackgroundImage m
+      a' `shouldBe` Just a
+
 existingDatasource :: Datasource
 existingDatasource = Datasource
   [ "type"     .= ("shape" :: String)

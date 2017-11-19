@@ -31,6 +31,7 @@ C.include "<string>"
 C.include "<mapnik/expression.hpp>"
 C.include "<mapnik/expression_string.hpp>"
 C.include "<mapnik/expression_evaluator.hpp>"
+C.include "util.hpp"
 
 C.using "namespace mapnik"
 
@@ -53,9 +54,8 @@ parse (encodeUtf8 -> s) =
     showExc = either (Left . show @C.CppException) Right
 
 toText :: Expression -> Text
-toText expr = unsafePerformIO $ newText $ \(ptr,len) ->
+toText expr = unsafePerformIO $ newText "Expression.toText" $ \(p,len) ->
   [CU.block|void {
   std::string s = to_expression_string(**$fptr-ptr:(expression_ptr *expr));
-  *$(char** ptr) = strdup(s.c_str());
-  *$(int* len) = s.length();
-    }|]
+  mallocedString(s, $(char **p), $(int *len));
+  }|]

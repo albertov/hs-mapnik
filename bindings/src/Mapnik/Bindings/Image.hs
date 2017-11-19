@@ -34,6 +34,7 @@ C.context mapnikCtx
 C.include "<string>"
 C.include "<mapnik/image.hpp>"
 C.include "<mapnik/image_util.hpp>"
+C.include "util.hpp"
 
 C.using "namespace mapnik"
 C.using "pixel_rgba8 = std::uint32_t"
@@ -52,17 +53,12 @@ unsafeNew = fmap Image . newForeignPtr destroyImage <=< C.withPtr_
 serialize :: String -> Image -> Maybe ByteString
 serialize (fromString -> fmt) im = unsafePerformIO $ newByteStringMaybe $ \(ptr, len) ->
   [CU.block|void {
-  std::string fmt = std::string($bs-ptr:fmt, $bs-len:fmt);
-  *$(char** ptr) = NULL;
+  std::string const fmt = std::string($bs-ptr:fmt, $bs-len:fmt);
   try {
     std::string s = save_to_string(*$fptr-ptr:(image_rgba8 *im), fmt);
-    if (s.length() ) {
-      *$(int* len) = s.length();
-      *$(char** ptr) = static_cast<char*>(malloc(s.length()));
-      std::memcpy( *$(char** ptr), s.c_str(), s.length());
-    }
+    mallocedString(s, $(char **ptr), $(int *len));
   } catch (...) {
-    // pass
+    *$(char** ptr) = nullptr;
   }
   }|]
 

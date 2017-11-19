@@ -32,6 +32,7 @@ C.include "<string>"
 C.include "<mapnik/transform_expression.hpp>"
 C.include "<mapnik/parse_transform.hpp>"
 C.include "<mapnik/transform_processor.hpp>"
+C.include "util.hpp"
 
 C.using "namespace mapnik"
 
@@ -55,9 +56,8 @@ parse (encodeUtf8 -> s) =
 
 
 toText :: Transform -> Text
-toText trans = unsafePerformIO $ newText $ \(ptr,len) ->
+toText trans = unsafePerformIO $ newText "Transform.toText" $ \(ptr,len) ->
   [CU.block|void {
   std::string s = transform_processor_type::to_string(**$fptr-ptr:(transform_type *trans));
-  *$(char** ptr) = strdup(s.c_str());
-  *$(int* len) = s.length();
+  mallocedString(s, $(char **ptr), $(int *len));
   }|]

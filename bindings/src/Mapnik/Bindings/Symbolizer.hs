@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE CPP #-}
@@ -35,9 +36,11 @@ import           Data.IORef
 import           Control.Exception
 import           Control.Lens hiding (has)
 import           Data.Maybe (catMaybes)
+import           Data.Typeable
 import           Data.Text (Text, unpack)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
+import           System.IO
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Unsafe as CU
@@ -54,6 +57,7 @@ C.include "<mapnik/expression_string.hpp>"
 C.include "<mapnik/expression_evaluator.hpp>"
 C.include "<mapnik/text/font_feature_settings.hpp>"
 C.include "symbolizer_util.hpp"
+C.include "util.hpp"
 
 C.using "namespace mapnik"
 C.verbatim "typedef symbolizer_base::value_type sym_value_type;"
@@ -142,8 +146,10 @@ getProperties :: Symbolizer -> IO [Property]
 getProperties sym' = bracket alloc dealloc $ \sym -> do
   ret <- newIORef []
   let cb :: Ptr SymbolizerValue -> C.CUChar -> IO ()
-      cb p = withKey $ \k -> do prop <- peekV p
-                                modifyIORef ret ((k :=> prop):)
+      cb p = withKey $ \(k :: Key a) -> do
+             print (k, typeRep (Proxy :: Proxy a))
+             prop <- peekV p
+             modifyIORef ret ((k :=> prop):)
   [C.block|void {
     symbolizer_base::cont_type const& props =
       $(symbolizer_base *sym)->properties;
@@ -158,11 +164,10 @@ getProperties sym' = bracket alloc dealloc $ \sym -> do
     dealloc p = [CU.block|void { delete $(symbolizer_base *p);}|]
 
 getName :: Symbolizer -> IO Text
-getName s = newText $ \(ptr, len) ->
+getName s = newText "Symbolizer.getName" $ \(p, len) ->
   [CU.block|void {
   std::string s = symbolizer_name(*$fptr-ptr:(symbolizer *s));
-  *$(char** ptr)= strdup(s.c_str());
-  *$(int* len) = s.length();
+  mallocedString(s, $(char **p), $(int *len));
   }|]
 
 defFromName :: Text -> Maybe Mapnik.Symbolizer
@@ -252,6 +257,7 @@ data Key a where
     AvoidEdges :: Key Bool
     FfSettings :: Key Mapnik.FontFeatureSettings
 
+deriving instance Show (Key a)
 
 symbolizerProps :: Lens' Mapnik.Symbolizer Properties
 symbolizerProps = lens getProps setProps where
@@ -537,7 +543,9 @@ setProperty ((keyIndex -> k) :=> (flip pokeV -> cb)) sym =
     $(symbolizer_base *sym)->properties[$(keys k)] = val;
   }|]
 
-withKey :: (forall a. Variant SymbolizerValue a => Key a -> IO b) -> C.CUChar -> IO b
+withKey
+  :: (forall a. (Typeable a, Variant SymbolizerValue a) => Key a -> IO b)
+  -> C.CUChar -> IO b
 withKey f = \k -> if
   | k == [CU.pure|keys{keys::gamma}|] -> f Gamma
   | k == [CU.pure|keys{keys::gamma_method}|] -> f GammaMethod
