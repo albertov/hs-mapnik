@@ -13,10 +13,10 @@ import qualified Data.HashMap.Strict as M
 
 
 data Value = TextValue !Text
-                | DoubleValue !Double
-                | IntValue    !Int
-                | BoolValue   !Bool
-                | NullValue
+           | DoubleValue !Double
+           | IntValue    !Int
+           | BoolValue   !Bool
+           | NullValue
   deriving (Show, Eq, Generic)
 deriveMapnikJSON ''Value
 

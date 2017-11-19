@@ -20,9 +20,11 @@ import qualified Mapnik.Bindings.Map as Map
 import           Control.Exception (bracket)
 import           Control.Monad (forM_)
 import           Data.Monoid (mempty)
+import           Data.ByteString (useAsCStringLen)
 import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.HashMap.Strict as M
 import           Foreign.Marshal.Utils (with)
+import           Foreign.Ptr
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Unsafe as CU
@@ -53,11 +55,14 @@ data RenderSettings = RenderSettings
 renderSettings :: Int -> Int -> Box -> RenderSettings
 renderSettings w h e = RenderSettings w h e mempty 1 Nothing Respect
 
+-- | It is not safe to call this function on the same 'Map' from different
+-- threads. It is the responsability of the caller to implement locking, a
+-- reosurce pool...
 render :: Map -> RenderSettings-> IO Image
 render m cfg = Image.unsafeNew $ \ptr ->
                withAttributes $ \vars ->
-               with extent $ \box -> do
-  forM_ srs (Map.setSrs m)
+               with extent $ \box ->
+               withMaybeSrs srs $ \(srsPtr, fromIntegral -> srsLen) -> do
   Map.setAspectFixMode m aspectFixMode
   forM_ (M.toList variables) $ \(encodeUtf8 -> k, val) -> withV val $ \v ->
     [CU.block|void {
@@ -67,16 +72,27 @@ render m cfg = Image.unsafeNew $ \ptr ->
     }|]
   [C.catchBlock|
   mapnik::Map &m = *$fptr-ptr:(Map *m);
-  m.resize($(int w), $(int h)); //FIXME: The query resolution comes out wrong if we dont' do this
-  m.zoom_to_box(*$(bbox *box)); //FIXME: the extent we pass in the request seems to be ignored
+  m.resize($(int w), $(int h)); //FIXME MAPNIK: The query resolution comes out wrong if we dont' do this
+  m.zoom_to_box(*$(bbox *box)); //FIXME MAPNIK: the extent we pass in the request seems to be ignored
   mapnik::request req($(int w), $(int h), *$(bbox *box));
   mapnik::image_rgba8 *im = new mapnik::image_rgba8($(int w), $(int h));
+  std::string oldSrs;
+  if ($(int srsLen)) {
+    oldSrs = m.srs();
+    m.set_srs(std::string($(char *srsPtr), $(int srsLen)));
+  }
   try {
     mapnik::agg_renderer<mapnik::image_rgba8> ren(m, req, *$(attributes *vars), *im, $(double scale));
     ren.apply();
     *$(image_rgba8** ptr) = im;
+    if ($(int srsLen)) {
+      m.set_srs(oldSrs);
+    }
   } catch (...) {
     delete im;
+    if ($(int srsLen)) {
+      m.set_srs(oldSrs);
+    }
     throw;
   }
   |]
@@ -90,3 +106,6 @@ render m cfg = Image.unsafeNew $ \ptr ->
     withAttributes = bracket alloc dealloc where
       alloc = [CU.exp|attributes * { new attributes }|]
       dealloc p = [CU.exp|void { delete $(attributes *p) }|]
+
+    withMaybeSrs Nothing f = f (nullPtr,0)
+    withMaybeSrs (Just (encodeUtf8 -> s)) f = useAsCStringLen s f

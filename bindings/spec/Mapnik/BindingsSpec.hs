@@ -1,9 +1,11 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 module Mapnik.BindingsSpec (main, spec) where
 
@@ -19,7 +21,7 @@ import qualified Mapnik.Bindings.Expression as Expression
 import qualified Mapnik.Bindings.Datasource as Datasource
 import qualified Mapnik.Bindings.Symbolizer as Symbolizer
 import qualified Mapnik.Bindings.TextPlacements as TextPlacements
-import           Mapnik.QuickCheck ()
+import           Mapnik.QuickCheck
 
 import           Control.Lens hiding ((.=))
 import           Control.Monad
@@ -34,6 +36,7 @@ import qualified Data.Vector.Generic as G
 import qualified Data.ByteString as BS
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
+import           Test.QuickCheck
 import           Test.QuickCheck.IO ()
 
 
@@ -439,22 +442,30 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
 
 
   describe "property tests" $ do
-    prop "toMapnik >=> fromMapnik = return" $ \(setExistingDatasources -> a) -> do
+    prop "fromMapnik <=< toMapnik = return" $ \(setExistingDatasources -> a) -> do
       -- We can't really compare equality here because we need to account for
       -- the default values. Instead of re-implementing mapnik's logic we
       -- check that the xml serialization done by mapnik (which normalizes
       -- default values) of an arbitrary map `a` is the same as
-      -- `(toMapnik >=> fromMapnik) a`
-      a' <- (toMapnik >=> fromMapnik) a
-      xml <- Map.toXml =<< toMapnik a
-      xml2 <- Map.toXml =<< toMapnik a'
-      xml `shouldBe` xml2
+      -- `(fromMapnik <=< toMapnik) a`
+      a' <- (fromMapnik <=< toMapnik) a
+      mapXmlEq a a' `shouldReturn` True
   
-    prop "backgroundImage/setBackgroundImage" $ \(a :: FilePath) -> do
-      m <- Map.create
-      Map.setBackgroundImage m a
-      a' <- Map.getBackgroundImage m
-      a' `shouldBe` Just a
+    prop "render preserves Map observable configuration" $ \opts -> do
+      m <- fromFixture
+      xml1 <- Map.toXml m
+      _ <- render m opts
+      xml2 <- Map.toXml m
+      xml1 `shouldBe` xml2
+      
+
+mapXmlEq :: ( MapnikType a2 ~ Map.Map
+            , MapnikType a1 ~ Map.Map
+            , ToMapnik a1, ToMapnik a2
+            ) => a1 -> a2 -> IO Bool
+mapXmlEq a b =
+  (==) <$> (Map.toXml =<< toMapnik a)
+       <*> (Map.toXml =<< toMapnik b)
 
 -- we need to make sure the datasource exists or loadMap will barf
 setExistingDatasources :: Mapnik.Map -> Mapnik.Map
@@ -469,7 +480,10 @@ setExistingDatasources = L.layers . traverse . L.dataSource ?~ existingDatasourc
 loadFixture :: Map.Map -> IO ()
 loadFixture = loadFixtureFrom "spec/map.xml"
 
-loadFixtureFrom :: String -> Map.Map -> IO ()
+fromFixture :: IO Map.Map
+fromFixture = Map.fromXml =<< BS.readFile "spec/map.xml"
+
+loadFixtureFrom :: FilePath -> Map.Map -> IO ()
 loadFixtureFrom p m = Map.loadXml m =<< BS.readFile p
 
 transparent :: PixelRgba8
@@ -484,3 +498,14 @@ merc = "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.
 cppStdException :: Selector CppException
 cppStdException (CppStdException _) = True
 cppStdException _ = False
+
+instance Arbitrary RenderSettings where
+  arbitrary = do
+    width <- getPositive <$> arbitrary
+    height <- getPositive <$> arbitrary
+    extent <- arbitrary
+    variables <- arbitrary
+    scaleFactor <- getPositive <$> arbitrary
+    srs <- maybeArb arbitrarySrs
+    aspectFixMode <- arbitrary
+    return RenderSettings{..}

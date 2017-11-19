@@ -4,9 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Mapnik.QuickCheck (
-  arbitrarySrs
-) where
+module Mapnik.QuickCheck where
 
 import           Mapnik
 
@@ -330,6 +328,7 @@ instance Arbitrary JustifyAlignment where arbitrary = arbitraryEnum
 instance Arbitrary VerticalAlignment where arbitrary = arbitraryEnum
 instance Arbitrary PlacementDirection where arbitrary = arbitraryEnum
 instance Arbitrary TextTransform where arbitrary = arbitraryEnum
+instance Arbitrary AspectFixMode where arbitrary = arbitraryEnum
 
 instance Arbitrary a => Arbitrary (Prop a) where
   arbitrary = oneof [ Exp <$> arbitrary, Val <$> arbitrary ]
@@ -337,6 +336,14 @@ instance Arbitrary a => Arbitrary (Prop a) where
 instance Arbitrary Dash where
   arbitrary = Dash <$> (getPositive <$> arbitrary)
                    <*> (getPositive <$> arbitrary)
+
+instance Arbitrary Value where
+  arbitrary = oneof [ TextValue   <$> arbitrary
+                    , DoubleValue <$> arbitrary
+                    , IntValue    <$> arbitrary
+                    , BoolValue   <$> arbitrary
+                    , pure NullValue
+                    ]
 
 instance Arbitrary Colorizer where
   arbitrary = do
