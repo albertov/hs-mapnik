@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 module Mapnik.BindingsSpec (main, spec) where
@@ -22,7 +22,6 @@ import qualified Mapnik.Bindings.TextPlacements as TextPlacements
 import           Mapnik.QuickCheck ()
 
 import           Control.Lens hiding ((.=))
-import           Control.Exception
 import           Control.Monad
 import           Data.Text (Text)
 import           Data.Int
@@ -440,19 +439,15 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
 
 
   describe "property tests" $ do
-    prop "toMapnik >=> fromMapnik = return" $ \(a :: Mapnik.Map) -> do
-      writeFile "test_map.txt" (show a)
-      m <- toMapnik (a & L.layers . traverse . L.dataSource ?~ existingDatasource)
-      putStrLn "toMapnik OK"
-      xml <- Map.toXml m
-      BS.writeFile "test_map.xml" xml
-      putStrLn "toXmlOk OK"
-      a2 <- fromMapnik m
-      putStrLn "fromMapnik OK"
-      m2 <- toMapnik a2
-      putStrLn "toMapnik OK"
-      xml2 <- Map.toXml m2
-      putStrLn "toXml OK"
+    prop "toMapnik >=> fromMapnik = return" $ \(setExistingDatasources -> a) -> do
+      -- We can't really compare equality here because we need to account for
+      -- the default values. Instead of re-implementing mapnik's logic we
+      -- check that the xml serialization done by mapnik (which normalizes
+      -- default values) of an arbitrary map `a` is the same as
+      -- `(toMapnik >=> fromMapnik) a`
+      a' <- (toMapnik >=> fromMapnik) a
+      xml <- Map.toXml =<< toMapnik a
+      xml2 <- Map.toXml =<< toMapnik a'
       xml `shouldBe` xml2
   
     prop "backgroundImage/setBackgroundImage" $ \(a :: FilePath) -> do
@@ -461,12 +456,15 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
       a' <- Map.getBackgroundImage m
       a' `shouldBe` Just a
 
-existingDatasource :: Datasource
-existingDatasource = Datasource
-  [ "type"     .= ("shape" :: String)
-  , "encoding" .= ("latin1" :: String)
-  , "file"     .= ("spec/data/popplaces" :: String)
-  ]
+-- we need to make sure the datasource exists or loadMap will barf
+setExistingDatasources :: Mapnik.Map -> Mapnik.Map
+setExistingDatasources = L.layers . traverse . L.dataSource ?~ existingDatasource
+  where
+    existingDatasource = Datasource
+      [ "type"     .= ("shape" :: String)
+      , "encoding" .= ("latin1" :: String)
+      , "file"     .= ("spec/data/popplaces" :: String)
+      ]
 
 loadFixture :: Map.Map -> IO ()
 loadFixture = loadFixtureFrom "spec/map.xml"

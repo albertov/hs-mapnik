@@ -332,7 +332,7 @@ instance Arbitrary PlacementDirection where arbitrary = arbitraryEnum
 instance Arbitrary TextTransform where arbitrary = arbitraryEnum
 
 instance Arbitrary a => Arbitrary (Prop a) where
-  arbitrary = oneof [ {-Exp <$> arbitrary,-} Val <$> arbitrary ]
+  arbitrary = oneof [ Exp <$> arbitrary, Val <$> arbitrary ]
 
 instance Arbitrary Dash where
   arbitrary = Dash <$> (getPositive <$> arbitrary)

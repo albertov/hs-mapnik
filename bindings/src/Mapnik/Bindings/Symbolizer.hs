@@ -36,11 +36,9 @@ import           Data.IORef
 import           Control.Exception
 import           Control.Lens hiding (has)
 import           Data.Maybe (catMaybes)
-import           Data.Typeable
 import           Data.Text (Text, unpack)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Ptr (Ptr)
-import           System.IO
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Unsafe as CU
@@ -146,10 +144,8 @@ getProperties :: Symbolizer -> IO [Property]
 getProperties sym' = bracket alloc dealloc $ \sym -> do
   ret <- newIORef []
   let cb :: Ptr SymbolizerValue -> C.CUChar -> IO ()
-      cb p = withKey $ \(k :: Key a) -> do
-             print (k, typeRep (Proxy :: Proxy a))
-             prop <- peekV p
-             modifyIORef ret ((k :=> prop):)
+      cb p = withKey $ \(k :: Key a) -> do prop <- peekV p
+                                           modifyIORef' ret ((k :=> prop):)
   [C.block|void {
     symbolizer_base::cont_type const& props =
       $(symbolizer_base *sym)->properties;
@@ -275,6 +271,7 @@ symbolizerProps = lens getProps setProps where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
     step (Opacity :=> v) = opacity ?~ v
     step (Offset  :=> v) = offset ?~ v
+    step (LineRasterizer :=> v) = lineRasterizer ?~ v
     step p               = stepStroke p
 
   setProps sym@Mapnik.LinePatternSymbolizer{} = foldr step sym  where
@@ -544,7 +541,7 @@ setProperty ((keyIndex -> k) :=> (flip pokeV -> cb)) sym =
   }|]
 
 withKey
-  :: (forall a. (Typeable a, Variant SymbolizerValue a) => Key a -> IO b)
+  :: (forall a. Variant SymbolizerValue a => Key a -> IO b)
   -> C.CUChar -> IO b
 withKey f = \k -> if
   | k == [CU.pure|keys{keys::gamma}|] -> f Gamma

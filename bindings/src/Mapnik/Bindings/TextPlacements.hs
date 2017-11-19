@@ -18,10 +18,8 @@ import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Variant (Variant(..), justOrTypeError)
 import qualified Mapnik.Bindings.TextSymProperties as Props
-import           Control.Exception (throwIO)
-import           Control.Monad (when)
 import           Foreign.ForeignPtr (FinalizerPtr, withForeignPtr)
-import           Foreign.Ptr (Ptr, nullPtr)
+import           Foreign.Ptr (Ptr)
 
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Unsafe as CU

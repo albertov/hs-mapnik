@@ -234,11 +234,10 @@ unCreate ps = do
 #define GET_OPT_PROP(TY,HS,CPP) \
   HS <- readPropWith $ \(has, ret) -> \
     [CU.block|void{\
-      auto const node = dynamic_cast<TY*>($(node_ptr *p)->get()); \
-      auto val = node->CPP;\
-      if (val) {\
+      auto node = dynamic_cast<TY*>($(node_ptr *p)->get()); \
+      if (node->CPP) {\
         *$(int *has) = 1;\
-        *$(sym_value_type** ret) = &(*val);\
+        *$(sym_value_type** ret) = &(*node->CPP);\
       } else {\
         *$(int *has) = 0;\
       }\
