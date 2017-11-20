@@ -6,8 +6,6 @@
 {-# LANGUAGE RecordWildCards #-}
 module Mapnik.Bindings.Map (
   Map
-, Box (..)
-, AspectFixMode (..)
 , unsafeNew
 , create
 , loadXml

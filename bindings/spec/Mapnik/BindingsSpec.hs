@@ -117,21 +117,19 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
     it "can trasform" $ do
       let dst = "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
           Right trans = projTransform merc dst
-          expected = Box { minx = 1372637.1001942465
-                         , miny = -247003.8133187965
-                         , maxx = 1746737.6177269476
-                         , maxy = -25098.59307479199
-                         }
+          expected = Box 1372637.1001942465
+                         (-247003.8133187965)
+                         1746737.6177269476
+                         (-25098.59307479199)
       forward trans aBox `shouldBe` expected
 
     it "can trasform with num points" $ do
       let dst = "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
           Right trans = projTransform merc dst
-          expected = Box { minx = 1373921.9835390863
-                         , miny = -247003.81331879605
-                         , maxx = 1746737.6177269486
-                         , maxy = -25098.593074791526
-                         }
+          expected = Box 1373921.9835390863
+                         (-247003.81331879605)
+                         (1746737.6177269486)
+                         (-25098.593074791526)
       fst (forward trans (aBox,100::Int)) `shouldBe` expected
 
     it "cannot create invalid" $
@@ -241,12 +239,11 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
             , "encoding" .= ("latin1" :: String)
             , "file"     .= ("spec/data/popplaces" :: String)
             ]
-      let theBox = Box { minx = 1372637.1001942465
-                       , miny = -247003.8133187965
-                       , maxx = 1746737.6177269476
-                       , maxy = -25098.59307479199
-                       }
-      let props = ["GEONAME", "SCALE_CAT"]
+      let theBox = Box 1372637.1001942465
+                       (-247003.8133187965)
+                       1746737.6177269476
+                       (-25098.59307479199)
+          props = ["GEONAME", "SCALE_CAT"]
       (fs,feats) <- Datasource.features ds (queryBoxProps theBox props)
       --print feats
       length feats `shouldBe` 192

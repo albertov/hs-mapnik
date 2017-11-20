@@ -7,7 +7,7 @@ module Mapnik.Lens where
 
 import Mapnik.TH
 import qualified Mapnik.Map as Map
-import Mapnik.Common
+import Mapnik.Common hiding (maxx,maxy,minx,miny)
 import Mapnik.Layer
 import Mapnik.Rule
 import Mapnik.Style
@@ -28,30 +28,6 @@ class HasGreen        s a | s -> a where green :: Lens' s a
 class HasBlue         s a | s -> a where blue :: Lens' s a
 class HasAlpha        s a | s -> a where alpha :: Lens' s a
 
---------------------------------------------------------------------------
--- Instances  
---------------------------------------------------------------------------
-
-instance HasStyleLst Map.Map [(StyleName,Style)] where
-  styleLst = lens (M.toList . Map.styles)
-                (\s a -> s { Map.styles = M.fromList a}) 
-
-instance HasParameters Datasource (M.HashMap Text Value) where
-  parameters = lens (\(Datasource s) -> s) (const Datasource) 
-
-instance HasRed Color Word8 where
-  red   = lens (\(RGBA r _ _ _) -> r) (\(RGBA _ g b a) r -> RGBA r g b a)
-  {-# INLINE red #-}
-instance HasGreen Color Word8 where
-  green = lens (\(RGBA _ g _ _) -> g) (\(RGBA r _ b a) g -> RGBA r g b a)
-  {-# INLINE green #-}
-instance HasBlue Color Word8 where
-  blue  = lens (\(RGBA _ _ b _) -> b) (\(RGBA r g _ a) b -> RGBA r g b a)
-  {-# INLINE blue #-}
-instance HasAlpha Color Word8 where
-  alpha = lens (\(RGBA _ _ _ a) -> a) (\(RGBA r g b _) a -> RGBA r g b a)
-  {-# INLINE alpha #-}
-
 -- Needs to be declared First so Traversal's are created instead of Lens'es
 makeMapnikFields ''Symbolizer
 
@@ -69,8 +45,42 @@ makeMapnikFields ''GroupRule
 makeMapnikFields ''GroupLayout
 makeMapnikFields ''Colorizer
 makeMapnikFields ''Stop
+makeMapnikFields ''Box
 makePrisms ''Value
 makePrisms ''Symbolizer
 makePrisms ''Prop
 makePrisms ''Format
 makePrisms ''GroupLayout
+
+
+--------------------------------------------------------------------------
+-- Instances  
+--------------------------------------------------------------------------
+
+instance HasStyleLst Map.Map [(StyleName,Style)] where
+  styleLst = lens (M.toList . Map.styles)
+                  (\s a -> s { Map.styles = M.fromList a}) 
+
+instance HasParameters Datasource (M.HashMap Text Value) where
+  parameters = lens (\(Datasource s) -> s) (const Datasource) 
+
+instance HasRed Color Word8 where
+  red   = lens (\(RGBA r _ _ _) -> r) (\(RGBA _ g b a) r -> RGBA r g b a)
+  {-# INLINE red #-}
+instance HasGreen Color Word8 where
+  green = lens (\(RGBA _ g _ _) -> g) (\(RGBA r _ b a) g -> RGBA r g b a)
+  {-# INLINE green #-}
+instance HasBlue Color Word8 where
+  blue  = lens (\(RGBA _ _ b _) -> b) (\(RGBA r g _ a) b -> RGBA r g b a)
+  {-# INLINE blue #-}
+instance HasAlpha Color Word8 where
+  alpha = lens (\(RGBA _ _ _ a) -> a) (\(RGBA r g b _) a -> RGBA r g b a)
+  {-# INLINE alpha #-}
+
+instance HasWidth Box Double where
+  width = lens (\b -> b^.maxx - b^.minx) (\b w -> b & maxx .~ (b^.minx + w))
+  {-# INLINE width #-}
+
+instance HasHeight Box Double where
+  height = lens (\b -> b^.maxy - b^.miny) (\b h -> b & maxy .~ (b^.miny + h))
+  {-# INLINE height #-}

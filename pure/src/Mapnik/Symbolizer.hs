@@ -22,6 +22,8 @@ import Data.Default (Default(def))
 
 import GHC.Exts (IsList(..))
 
+-- | A 'Prop' are symbolizer properties which can be either a fixed-value 'Val' or
+-- a feature-dependent 'Expression' 'Exp'
 data Prop a = Exp Expression
             | Val a
   deriving (Eq, Show, Functor, Generic)
@@ -31,10 +33,12 @@ instance ToJSON a => ToJSON (Prop a) where
   toJSON = genericToJSON mapnikOptions
   toEncoding = genericToEncoding mapnikOptions
 
+-- | Nullable properties. When 'Nothing', mapnik will use a default value
 type PropValue a = Maybe (Prop a)
 
 type FaceName = Text
 
+-- | See <https://github.com/mapnik/mapnik/wiki/RasterColorizer>
 data Stop = Stop
   { value :: !Double
   , color :: !Color
@@ -42,36 +46,55 @@ data Stop = Stop
   , label :: !(Maybe Text)
   } deriving (Eq, Show, Generic)
 
+stop :: Double -> Color -> Stop
+stop v c = Stop v c Nothing Nothing
+
+-- | See <https://github.com/mapnik/mapnik/wiki/RasterColorizer>
 data Colorizer = Colorizer
   { mode   :: !(Maybe ColorizerMode)
   , color  :: !(Maybe Color)
   , stops  :: ![Stop]
-  } deriving (Eq, Show, Generic)
+  } deriving (Eq, Show, Generic, Default)
 
+instance IsList Colorizer where
+  type Item Colorizer = Stop
+  fromList = Colorizer Nothing Nothing
+  toList   = stops
+
+-- | See <https://github.com/mapnik/mapnik/wiki/GroupSymbolizer>
 data GroupLayout
   = SimpleRowLayout { itemMargin    :: !(Maybe Double) }
   | PairLayout      { itemMargin    :: !(Maybe Double)
                     , maxDifference :: !(Maybe Double) }
   deriving (Eq, Show, Generic)
 
-instance Default GroupLayout where def = SimpleRowLayout def
+rowLayout :: GroupLayout
+rowLayout = SimpleRowLayout Nothing
 
+pairLayout :: GroupLayout
+pairLayout = PairLayout Nothing Nothing
+
+instance Default GroupLayout where def = rowLayout
+
+-- | See <https://github.com/mapnik/mapnik/wiki/GroupSymbolizer>
 data GroupRule = GroupRule
   { symbolizers :: ![Symbolizer]
   , filter      :: !(Maybe Expression)
   , repeatKey   :: !(Maybe Expression)
   } deriving (Eq, Show, Generic, Default)
 
+-- | See <https://github.com/mapnik/mapnik/wiki/GroupSymbolizer>
 data GroupSymProperties = GroupSymProperties
   { layout :: !GroupLayout
   , rules  :: ![GroupRule]
   }
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show, Generic, Default)
 
 data FontSet = FontSet
   deriving (Eq, Show, Generic)
 
 
+-- | See <https://github.com/mapnik/mapnik/wiki/TextSymbolizer>
 data TextProperties = TextProperties
   { labelPlacement          :: !(PropValue LabelPlacement)
   , labelSpacing            :: !(PropValue Double)
@@ -88,6 +111,7 @@ data TextProperties = TextProperties
   , upright                 :: !(PropValue Upright)
   } deriving (Eq, Show, Generic, Default)
 
+-- | <See https://github.com/mapnik/mapnik/wiki/TextSymbolizer#character-formatting-options>
 data TextFormatProperties = TextFormatProperties
   { faceName         :: !(Maybe FaceName)
   , fontSet          :: !(Maybe FontSet)
@@ -103,6 +127,7 @@ data TextFormatProperties = TextFormatProperties
   , ffSettings       :: !(PropValue FontFeatureSettings)
   } deriving (Eq, Show, Generic, Default)
 
+-- | See https://github.com/mapnik/mapnik/wiki/TextSymbolizer#text-layout-options>
 data TextLayoutProperties = TextLayoutProperties
   { dx                  :: !(PropValue Double)
   , dy                  :: !(PropValue Double)
@@ -122,6 +147,7 @@ data TextLayoutProperties = TextLayoutProperties
 data Format
   = FormatExp    !Expression
   | FormatList   ![Format]
+  -- | See <https://github.com/mapnik/mapnik/wiki/TextSymbolizer#formats>
   | Format
     { faceName         :: !(Maybe FaceName)
     , fontSet          :: !(Maybe FontSet)
@@ -137,6 +163,7 @@ data Format
     , ffSettings       :: !(PropValue FontFeatureSettings)
     , next             :: !Format
     }
+  -- | See <https://github.com/mapnik/mapnik/wiki/TextSymbolizer#layouts>
   | FormatLayout
     { dx                  :: !(PropValue Double)
     , dy                  :: !(PropValue Double)
@@ -155,12 +182,15 @@ data Format
   | NullFormat
   deriving (Eq, Show, Generic)
 
+-- See 'FormatExp'
 formatExp :: Expression -> Format
 formatExp = FormatExp
 
+-- See 'FormatList'
 formatList :: [Format] -> Format
 formatList = FormatList
 
+-- See 'Format'
 format_ :: Format
 format_ = Format
   { faceName         = Nothing
@@ -178,6 +208,7 @@ format_ = Format
   , next             = NullFormat
   }
 
+-- See 'FormatLayout'
 formatLayout :: Format
 formatLayout = FormatLayout
   { dx                  = Nothing
@@ -374,6 +405,9 @@ data Symbolizer
 
 pointSym, lineSym, linePatternSym, polygonSym, polygonPatternSym, rasterSym :: Symbolizer
 shieldSym, textSym, buildingSym, markersSym, groupSym, debugSym, dotSym :: Symbolizer
+-- | See <https://github.com/mapnik/mapnik/wiki/PointSymbolizer> and the
+-- 'PointSymbolizer' constructor fields for the available properties and their
+-- meaning.
 pointSym = PointSymbolizer
   { file            = Nothing
   , opacity         = Nothing
@@ -383,11 +417,17 @@ pointSym = PointSymbolizer
   , imageTransform  = Nothing
   , BASE_PROPS_DEFS
   }
+-- | See <https://github.com/mapnik/mapnik/wiki/LineSymbolizer> and the
+-- 'LineSymbolizer' constructor fields for the available properties and their
+-- meaning.
 lineSym = LineSymbolizer
   { offset         = Nothing
   , lineRasterizer = Nothing
   , STROKE_PROPS_DEFS
   }
+-- | See <https://github.com/mapnik/mapnik/wiki/LinePatternSymbolizer> and the
+-- 'LinePatternSymbolizer' constructor fields for the available properties and their
+-- meaning.
 linePatternSym = LinePatternSymbolizer
   { file             = Nothing
   , opacity          = Nothing
@@ -395,6 +435,9 @@ linePatternSym = LinePatternSymbolizer
   , imageTransform   = Nothing
   , BASE_PROPS_DEFS
   }
+-- | See <https://github.com/mapnik/mapnik/wiki/PolygonSymbolizer> and the
+-- 'PolygonSymbolizer' constructor fields for the available properties and their
+-- meaning.
 polygonSym = PolygonSymbolizer
   { fill         = Nothing
   , fillOpacity  = Nothing
@@ -402,6 +445,9 @@ polygonSym = PolygonSymbolizer
   , gammaMethod  = Nothing
   , BASE_PROPS_DEFS
   }
+-- | See <https://github.com/mapnik/mapnik/wiki/PolygonPatternSymbolizer> and
+-- the 'PolygonPatternSymbolizer' constructor fields for the available properties
+-- and their meaning.
 polygonPatternSym = PolygonPatternSymbolizer
   { file            = Nothing
   , opacity         = Nothing
@@ -411,6 +457,9 @@ polygonPatternSym = PolygonPatternSymbolizer
   , alignment       = Nothing
   , BASE_PROPS_DEFS
   }
+-- | See <https://github.com/mapnik/mapnik/wiki/RasterSymbolizer> and the
+-- 'RasterSymbolizer' constructor fields for the available properties
+-- and their meaning.
 rasterSym = RasterSymbolizer
   { scaling       = Nothing
   , rasterOpacity = Nothing
@@ -420,6 +469,9 @@ rasterSym = RasterSymbolizer
   , colorizer     = Nothing
   , BASE_PROPS_DEFS
   }
+-- | See <https://github.com/mapnik/mapnik/wiki/ShieldSymbolizer> and the
+-- 'ShieldSymbolizer' constructor fields for the available properties
+-- and their meaning.
 shieldSym = ShieldSymbolizer
   { placements      = Nothing
   , imageTransform  = Nothing
@@ -431,6 +483,9 @@ shieldSym = ShieldSymbolizer
   , haloRasterizer  = Nothing
   , BASE_PROPS_DEFS
   }
+-- | See <https://github.com/mapnik/mapnik/wiki/TextSymbolizer> and the
+-- 'TextSymbolizer' constructor fields for the available properties
+-- and their meaning.
 textSym = TextSymbolizer
   { placements     = Nothing
   , haloCompOp     = Nothing
@@ -438,12 +493,18 @@ textSym = TextSymbolizer
   , haloTransform  = Nothing
   , BASE_PROPS_DEFS
   }
+-- | See <https://github.com/mapnik/mapnik/wiki/BuildingSymbolizer> and the
+-- 'BuildingSymbolizer' constructor fields for the available properties
+-- and their meaning.
 buildingSym = BuildingSymbolizer
   { fill        = Nothing
   , fillOpacity = Nothing
   , height      = Nothing
   , BASE_PROPS_DEFS
   }
+-- | See <https://github.com/mapnik/mapnik/wiki/MarkersSymbolizer> and the
+-- 'MarkersSymbolizer' constructor fields for the available properties
+-- and their meaning.
 markersSym = MarkersSymbolizer
   { file            = Nothing
   , opacity         = Nothing
@@ -463,6 +524,9 @@ markersSym = MarkersSymbolizer
   , direction       = Nothing
   , STROKE_PROPS_DEFS
   }
+-- | See <https://github.com/mapnik/mapnik/wiki/GroupSymbolizer> and the
+-- 'GroupSymbolizer' constructor fields for the available properties
+-- and their meaning.
 groupSym = GroupSymbolizer
   { groupProperties = Nothing
   , numColumns      = Nothing
@@ -471,10 +535,15 @@ groupSym = GroupSymbolizer
   , placements      = Nothing
   , BASE_PROPS_DEFS
   }
+-- | See <https://github.com/mapnik/mapnik/wiki/DebugSymbolizer> and the
+-- 'DebugSymbolizer' constructor fields for the available properties
+-- and their meaning.
 debugSym = DebugSymbolizer
   { mode = Nothing
   , BASE_PROPS_DEFS
   }
+-- | See <https://github.com/mapnik/mapnik/wiki/DotSymbolizer> and the
+-- 'DotSymbolizer' constructor fields for the available properties
 dotSym = DotSymbolizer
   { fill    = Nothing
   , opacity = Nothing

@@ -11,6 +11,7 @@ module Mapnik.Bindings.Orphans (
 ) where
 
 import qualified Mapnik
+import           Mapnik.Common (Box(..))
 import           Mapnik (Value(..))
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Variant
@@ -61,7 +62,7 @@ instance Storable Mapnik.Color where
       *$(color* p) = color($(unsigned char r), $(unsigned char g), $(unsigned char b), $(unsigned char a));
       }|]
 
-instance Storable Mapnik.Box where
+instance Storable Box where
   sizeOf _ = fromIntegral [CU.pure|size_t { sizeof(bbox) }|]
   alignment _ = fromIntegral [CU.pure|size_t { alignof (bbox) }|]
   peek p = do
@@ -76,11 +77,11 @@ instance Storable Mapnik.Box where
       *$(double *maxx) = c.maxx();
       *$(double *maxy) = c.maxy();
       }|]
-    return Mapnik.Box{..}
+    return Box{..}
 
-  poke p (Mapnik.Box (realToFrac -> minx) (realToFrac -> miny) (realToFrac -> maxx) (realToFrac -> maxy)) =
+  poke p (Box (realToFrac -> x0) (realToFrac -> y0) (realToFrac -> x1) (realToFrac -> y1)) =
     [CU.block|void{
-      *$(bbox* p) = bbox($(double minx), $(double miny), $(double maxx), $(double maxy));
+      *$(bbox* p) = bbox($(double x0), $(double y0), $(double x1), $(double y1));
       }|]
 
 instance VariantPtr Value where

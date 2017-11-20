@@ -1,5 +1,17 @@
-{-# LANGUAGE DuplicateRecordFields #-}
+{-|
+Module : Mapnik.Bindings
+Description : Public API of hs-mapnik-bindings
+Copyright : (c) Alberto 2017
+License : BSD3
+Maintainer : alberto@toscat.net
+Stability : experimental
+Portability : POSIX
+
+This module is the public API of the Haskell Mapnik bindings. The internal
+modules are exported and can be used but their API might change unexpectedly
+-}
 module Mapnik.Bindings (
+-- $doc
 -- * Conversion between pure and impure structures
   FromMapnik (..)
 , ToMapnik (..)
@@ -76,6 +88,9 @@ module Mapnik.Bindings (
 , CppException (..)
 , module Mapnik
 ) where
+
+-- $doc
+-- TBD write examples, etc...
 
 import Mapnik
 import Mapnik.Bindings.Map

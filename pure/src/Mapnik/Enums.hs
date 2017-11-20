@@ -7,6 +7,7 @@ import Mapnik.Imports
 -- WARNING: These *must* be kept in sync with mapnik headers' since
 -- we use to/fromEnum and static_casts for conversion!!
 
+-- | See <https://github.com/mapnik/mapnik/wiki/Compositing>
 data CompositeMode
   = Clear
   | Src

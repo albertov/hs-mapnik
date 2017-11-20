@@ -31,7 +31,7 @@ module Mapnik.Bindings.Types (
 , GroupSymProperties (..)
 , FontSet(..)
 , Colorizer(..)
-, Box (..)
+, Box
 , Datasource (..)
 , Parameters (..)
 , ProjTransform (..)
@@ -52,7 +52,7 @@ module Mapnik.Bindings.Types (
 , mapnikCtx
 ) where
 
-import           Mapnik (Color, Box(..), Dash(..), Value)
+import           Mapnik (Color, Dash(..), Box, Value)
 import           Mapnik.Lens (HasRed(..), HasBlue(..), HasGreen(..), HasAlpha(..))
 
 import           Control.Lens (lens)
