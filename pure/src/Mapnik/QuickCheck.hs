@@ -6,7 +6,15 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Mapnik.QuickCheck where
 
-import           Mapnik
+import           Mapnik.Map
+import           Mapnik.Common
+import           Mapnik.Layer
+import           Mapnik.Datasource
+import           Mapnik.Style
+import           Mapnik.Rule
+import           Mapnik.Symbolizer
+import           Mapnik.Enums
+import           Mapnik.Parameter
 
 import qualified Data.HashMap.Strict as M
 import qualified Data.Text as T

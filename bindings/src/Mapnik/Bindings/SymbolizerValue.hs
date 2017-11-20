@@ -14,6 +14,7 @@ module Mapnik.Bindings.SymbolizerValue (
 ) where
 
 import qualified Mapnik
+import qualified Mapnik.Common as Mapnik
 import           Mapnik.Enums
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util

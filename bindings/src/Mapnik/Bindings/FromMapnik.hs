@@ -6,6 +6,11 @@
 module Mapnik.Bindings.FromMapnik where
 
 import qualified Mapnik
+import qualified Mapnik.Map as Mapnik
+import qualified Mapnik.Layer as Mapnik
+import qualified Mapnik.Style as Mapnik
+import qualified Mapnik.Rule as Mapnik
+import qualified Mapnik.Common as Mapnik
 import           Mapnik.Bindings.Types
 import qualified Mapnik.Bindings.Map as Map
 import qualified Mapnik.Bindings.Layer as Layer

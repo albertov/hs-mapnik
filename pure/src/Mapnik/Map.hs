@@ -10,6 +10,7 @@ import Mapnik.Imports
 import Mapnik.Common
 import Mapnik.Enums
 import Data.Monoid (mempty)
+import Data.Default
 import Mapnik.Style 
 import Mapnik.Layer
 
@@ -30,17 +31,16 @@ data Map = Map
   } deriving (Eq, Show, Generic)
 deriveMapnikJSON ''Map
 
-
-empty :: Map
-empty = Map
-  { backgroundColor        = Nothing
-  , backgroundImage        = Nothing
-  , backgroundImageCompOp  = Nothing
-  , backgroundImageOpacity = Nothing
-  , srs                    = Nothing
-  , bufferSize             = Nothing
-  , maximumExtent          = Nothing
-  , fontDirectory          = Nothing
-  , styles                 = mempty
-  , layers                 = mempty
-  }
+instance Default Map where
+  def = Map
+    { backgroundColor        = Nothing
+    , backgroundImage        = Nothing
+    , backgroundImageCompOp  = Nothing
+    , backgroundImageOpacity = Nothing
+    , srs                    = Nothing
+    , bufferSize             = Nothing
+    , maximumExtent          = Nothing
+    , fontDirectory          = Nothing
+    , styles                 = mempty
+    , layers                 = mempty
+    }

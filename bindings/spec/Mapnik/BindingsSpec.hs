@@ -9,9 +9,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 module Mapnik.BindingsSpec (main, spec) where
 
-import qualified Mapnik
 import           Mapnik.Bindings
-import qualified Mapnik.Lens as L
 import qualified Mapnik.Bindings.Map as Map
 import qualified Mapnik.Bindings.Layer as Layer
 import qualified Mapnik.Bindings.Rule as Rule
@@ -214,8 +212,8 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
       Expression.toText f `shouldBe` "([NOM_FR]='Québec')"
       mSym <- Symbolizer.unCreate sym
       let expected = polygonSym
-                       & L.fill   ?~ Val (RGBA 217 235 203 255)
-                       & L.compOp ?~ Val SrcOver
+                       & fill   ?~ Val (RGBA 217 235 203 255)
+                       & compOp ?~ Val SrcOver
       mSym `shouldBe` expected
 
   describe "Parameters" $ do
@@ -262,7 +260,8 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
       img <- render m rSettings
       let rgba8 = toRgba8 img
           Just img2  = fromRgba8 rgba8
-          RenderSettings{width=w, height=h} = rSettings
+          w = rSettings^?!width
+          h = rSettings^?!height
       G.length (snd rgba8)  `shouldBe` (w * h)
       --BS.writeFile "map.webp" (serialize "webp" img2)
       serialize "png8" img `shouldBe` serialize "png8" img2
@@ -301,22 +300,22 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
       m <- fromMapnik m'
       do
         let lns :: Traversal' Map DashArray
-            lns = L.styles . at "provlines" . _Just
-                . L.rules . ix 0
-                . L.symbolizers . ix 0
-                . L.strokeDashArray
-                . _Just . L._Val
+            lns = styles . at "provlines" . _Just
+                . rules . ix 0
+                . symbolizers . ix 0
+                . strokeDashArray
+                . _Just . _Val
         m^?lns `shouldBe` Just [Dash 8 4, Dash 2 2, Dash 2 2]
       do
         let lns :: Traversal' Map Double
-            lns = L.styles . at "raster-style" . _Just
-                . L.rules . ix 0
-                . L.symbolizers . ix 0
-                . L.colorizer
+            lns = styles . at "raster-style" . _Just
+                . rules . ix 0
+                . symbolizers . ix 0
+                . colorizer
                 . _Just
-                . L.stops
+                . stops
                 . traverse
-                . L.value
+                . value
         m^..lns `shouldBe` [0,100,200,400,800,1600,3200,6400,12800,25600]
 
   describe "TextPlacements" $ do
@@ -341,8 +340,7 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
       Layer.setSrs l "+init=epsg:3857"
       ref <- newIORef Nothing
       ds <- Datasource.createHsDatasource HsVector
-        { name = "fooo"
-        , extent = theExtent
+        { _extent = theExtent
         , fieldNames = ["aString", "anInt", "aBool", "aDouble", "aNull"]
         , getFeatures = \q -> do
             writeIORef ref (Just q)
@@ -362,9 +360,9 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
       img <- render m (renderSettings 512 512 theExtent)
       snd (toRgba8 img) `shouldSatisfy` G.any (/= transparent)
       Just q <- readIORef ref
-      box q `shouldBe` theExtent
-      unBufferedBox q `shouldBe` theExtent
-      resolution q `shouldBe` Pair 5.12 5.12
+      q^.box `shouldBe` theExtent
+      q^.unBufferedBox `shouldBe` theExtent
+      q^.resolution `shouldBe` Pair 5.12 5.12
 
   describe "HsRaster" $ do
     it "can create and render" $ do
@@ -378,20 +376,11 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
           boxes = [Box 0 0 50 50, Box 50 50 100 100]
           thePixels = G.generate (50*50) fromIntegral :: St.Vector Int32
       ds <- Datasource.createHsDatasource HsRaster
-        { name = "fooo"
-        , extent = theExtent
+        { _extent = theExtent
         , fieldNames = []
         , getRasters = \_ ->
             return $ flip map boxes $ \b ->
-              Raster
-                { extent = b
-                , queryExtent = b
-                , filterFactor = 1
-                , width = 50
-                , height = 50
-                , nodata = Nothing
-                , pixels = thePixels
-                }
+              mkRaster b (50,50) thePixels
         , getFeaturesAtPoint = \_ _ -> return []
         }
       (_,feats) <- Datasource.features ds (queryBox theExtent)
@@ -402,7 +391,10 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
       Layer.addStyle l "raster-style"
       Map.addLayer m l
       let h=256; w=256
-      img <- render m (rSettings { extent = theExtent, width=w, height=h })
+      img <- render m $ rSettings
+                      & extent .~ theExtent
+                      & width  .~ w
+                      & height .~ h
       --BS.writeFile "map.webp" (fromJust (serialize "webp" img))
       let (_, imData) = toRgba8 img
       imData G.! 0 `shouldBe` transparent
@@ -418,8 +410,7 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
     ref <- newIORef Nothing
     let theExtent = Box 0 0 100 100
     ds <- Datasource.createHsDatasource HsVector
-      { name = "fooo"
-      , extent = theExtent
+      { _extent = theExtent
       , fieldNames = []
       , getFeatures = \q -> do
           writeIORef ref (Just q)
@@ -436,9 +427,9 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
                , ("mar", BoolValue False)
                , ("car", TextValue "some text wíẗḧ unicode")
                ]
-    _ <- render m (renderSettings 512 512 theExtent) { variables = vars }
+    _ <- render m $ renderSettings 512 512 theExtent & variables .~  vars
     Just q <- readIORef ref
-    Datasource.variables q `shouldBe` vars
+    q^.variables `shouldBe` vars
 
 
   describe "property tests" $ do
@@ -468,8 +459,8 @@ mapXmlEq a b =
        <*> (Map.toXml =<< toMapnik b)
 
 -- we need to make sure the datasource exists or loadMap will barf
-setExistingDatasources :: Mapnik.Map -> Mapnik.Map
-setExistingDatasources = L.layers . traverse . L.dataSource ?~ existingDatasource
+setExistingDatasources :: Map -> Map
+setExistingDatasources = layers . traverse . dataSource ?~ existingDatasource
   where
     existingDatasource = Datasource
       [ "type"     .= ("shape" :: String)
@@ -501,11 +492,11 @@ cppStdException _ = False
 
 instance Arbitrary RenderSettings where
   arbitrary = do
-    width <- getPositive <$> arbitrary
-    height <- getPositive <$> arbitrary
-    extent <- arbitrary
-    variables <- arbitrary
-    scaleFactor <- getPositive <$> arbitrary
-    srs <- maybeArb arbitrarySrs
-    aspectFixMode <- arbitrary
+    _renderSettingsWidth <- getPositive <$> arbitrary
+    _renderSettingsHeight <- getPositive <$> arbitrary
+    _renderSettingsExtent <- arbitrary
+    _renderSettingsVariables <- arbitrary
+    _renderSettingsScaleFactor <- getPositive <$> arbitrary
+    _renderSettingsSrs <- maybeArb arbitrarySrs
+    _renderSettingsAspectFixMode <- arbitrary
     return RenderSettings{..}

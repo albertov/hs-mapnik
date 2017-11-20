@@ -11,10 +11,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-module Mapnik.Symbolizer (
-  module Mapnik.Symbolizer
-, def
-) where
+module Mapnik.Symbolizer where
 
 import Mapnik.Imports
 import Mapnik.Common
@@ -23,6 +20,7 @@ import Mapnik.Enums
 import Data.Text (Text)
 import Data.Default (Default(def))
 
+import GHC.Exts (IsList(..))
 
 data Prop a = Exp Expression
             | Val a
@@ -156,6 +154,53 @@ data Format
     }
   | NullFormat
   deriving (Eq, Show, Generic)
+
+formatExp :: Expression -> Format
+formatExp = FormatExp
+
+formatList :: [Format] -> Format
+formatList = FormatList
+
+format_ :: Format
+format_ = Format
+  { faceName         = Nothing
+  , fontSet          = Nothing
+  , textSize         = Nothing
+  , characterSpacing = Nothing
+  , lineSpacing      = Nothing
+  , wrapBefore       = Nothing
+  , repeatWrapChar   = Nothing
+  , textTransform    = Nothing
+  , fill             = Nothing
+  , haloFill         = Nothing
+  , haloRadius       = Nothing
+  , ffSettings       = Nothing
+  , next             = NullFormat
+  }
+
+formatLayout :: Format
+formatLayout = FormatLayout
+  { dx                  = Nothing
+  , dy                  = Nothing
+  , orientation         = Nothing
+  , textRatio           = Nothing
+  , wrapWidth           = Nothing
+  , wrapChar            = Nothing
+  , wrapBefore          = Nothing
+  , repeatWrapChar      = Nothing
+  , rotateDisplacement  = Nothing
+  , horizontalAlignment = Nothing
+  , justifyAlignment    = Nothing
+  , verticalAlignment   = Nothing
+  , next                = NullFormat
+  }
+
+
+instance IsList Format where
+  type Item Format = Format
+  fromList = formatList
+  toList (FormatList x) = x
+  toList _ = []
 
 instance Default Format where def = NullFormat
 

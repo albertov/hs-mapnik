@@ -5,6 +5,11 @@
 module Mapnik.Bindings.ToMapnik (ToMapnik(..)) where
 
 import qualified Mapnik
+import qualified Mapnik.Map as Mapnik
+import qualified Mapnik.Layer as Mapnik
+import qualified Mapnik.Style as Mapnik
+import qualified Mapnik.Rule as Mapnik
+import qualified Mapnik.Common as Mapnik
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Layer as Layer
 import           Mapnik.Bindings.Map as Map

@@ -1,11 +1,78 @@
-module Mapnik (module X) where
+module Mapnik (
+  Map
+, Layer
+, layer
+, Style
+, StyleName
+, Styles
+, Rule
 
-import Mapnik.Common as X
-import Mapnik.Map as X
-import Mapnik.Layer as X
-import Mapnik.Style as X
-import Mapnik.Rule as X
-import Mapnik.Symbolizer as X
-import Mapnik.Parameter as X
-import Mapnik.Datasource as X
-import Mapnik.Enums as X
+, Symbolizer
+, pointSym
+, lineSym
+, linePatternSym
+, polygonSym
+, polygonPatternSym
+, rasterSym
+, shieldSym
+, textSym
+, buildingSym
+, markersSym
+, groupSym
+, debugSym
+, dotSym
+
+, Prop (..)
+, PropValue
+, Stop
+, Colorizer
+, GroupLayout
+, GroupRule
+, GroupSymProperties
+, TextProperties
+, TextFormatProperties
+, TextLayoutProperties
+, FaceName
+
+, Format
+, formatExp
+, formatList
+, format_
+, formatLayout
+
+, TextSymProperties
+, TextPlacements
+
+, Datasource (..)
+, Parameter
+, (.=)
+, Parameters
+, ToValue (..)
+, Value (..)
+
+, Box (..)
+, Color (..)
+, Transform
+, Expression
+, FontFeatureSettings
+, Dash (..)
+, DashArray
+, Proj4
+
+, def
+, module Mapnik.Lens
+, module Mapnik.Enums
+) where
+
+import Mapnik.Common
+import Mapnik.Map
+import Mapnik.Layer
+import Mapnik.Style
+import Mapnik.Rule
+import Mapnik.Symbolizer
+import Mapnik.Parameter
+import Mapnik.Datasource
+import Mapnik.Enums
+import Mapnik.Lens
+
+import Data.Default (def)

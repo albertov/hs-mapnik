@@ -29,8 +29,8 @@ data Layer = Layer
   } deriving (Eq, Show, Generic)
 deriveMapnikJSON ''Layer
 
-mkLayer :: Text -> Layer
-mkLayer n = Layer
+layer :: Text -> Layer
+layer n = Layer
   { name                    = n
   , dataSource              = Nothing
   , styles                  = []

@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -14,18 +14,24 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 module Mapnik.Bindings.Raster (
-  Raster(..)
+  Raster
+, mkRaster
 , RasterType
 , SomeRaster(..)
 , getPixels
+, HasExtent(..)
+, HasQueryExtent(..)
+, HasNodata(..)
 ) where
 
 import           Mapnik (Box)
+import           Mapnik.Lens
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Orphans()
 import           Mapnik.Bindings.Variant
 
 import           Control.Exception (bracket, throwIO)
+import           Control.Lens
 import           Data.Typeable
 import qualified Data.Vector.Storable as V
 import qualified Language.C.Inline.Cpp as C
@@ -79,19 +85,23 @@ instance Eq SomeRaster where
       Just Refl -> a == b
       Nothing   -> False
 
+mkRaster :: Box -> (Int,Int) -> V.Vector a -> Raster a
+mkRaster b (w,h) = Raster b b 1 w h Nothing
+
 data Raster a = Raster
-  { extent :: !Box
-  , queryExtent :: !Box
-  , filterFactor :: !Double
-  , width  :: !Int
-  , height :: !Int
-  , nodata :: !(Maybe Double)
-  , pixels :: !(V.Vector a)
+  { _rasterExtent :: !Box
+  , _rasterQueryExtent :: !Box
+  , _rasterFilterFactor :: !Double
+  , _rasterWidth  :: !Int
+  , _rasterHeight :: !Int
+  , _rasterNodata :: !(Maybe Double)
+  , _rasterPixels :: !(V.Vector a)
   } deriving (Eq, Show)
+makeFields ''Raster
 
 getPixels :: forall a. RasterType a => SomeRaster -> Maybe (V.Vector a)
 getPixels (SomeRaster (r :: Raster b)) = case eqT :: Maybe (a :~: b) of
-  Just Refl -> Just (pixels r)
+  Just Refl -> Just (r^.pixels)
   Nothing -> Nothing
 
 withMaybe :: V.Storable a => Maybe a -> (Ptr a -> IO b) -> IO b
@@ -105,18 +115,18 @@ instance VariantPtr RasterPtr where
 
 #define RASTER_VARIANT(HS,CPP,DTYPE) \
 instance Variant RasterPtr (Raster HS) where { \
-  pokeV _ Raster{ pixels=px, width=w, height=h } \
+  pokeV _ Raster{ _rasterPixels=px, _rasterWidth=w, _rasterHeight=h } \
     | V.length px /= w*h = throwIO (userError "Invalid vector size"); \
-  pokeV p Raster{ filterFactor = (realToFrac -> ff) \
-                , width        = (fromIntegral -> w) \
-                , height       = (fromIntegral -> h) \
+  pokeV p Raster{ _rasterFilterFactor = (realToFrac -> ff) \
+                , _rasterWidth        = (fromIntegral -> w) \
+                , _rasterHeight       = (fromIntegral -> h) \
                 , .. \
-                } = with extent $ \ext -> \
-                    with queryExtent $ \qext -> \
-                    withMaybe (fmap realToFrac nodata) $ \nd -> \
+                } = with _rasterExtent $ \ext -> \
+                    with _rasterQueryExtent $ \qext -> \
+                    withMaybe (fmap realToFrac _rasterNodata) $ \nd -> \
     [CU.block|void { \
       image_any image($(int w), $(int h), DTYPE); \
-      memcpy(image.bytes(), $vec-ptr:(CPP *pixels), sizeof(CPP)*$vec-len:pixels); \
+      memcpy(image.bytes(), $vec-ptr:(CPP *_rasterPixels), sizeof(CPP)*$vec-len:_rasterPixels); \
       auto ptr = *$(raster_ptr *p) = std::make_shared<raster>(*$(bbox *ext), *$(bbox *qext), std::move(image), $(double ff)); \
       if ( $(double *nd) ) { \
         ptr->set_nodata(*$(double *nd)); \
@@ -162,7 +172,7 @@ data DType
 
 #define DTYPE_CASE(ENUM,TY) \
   ENUM -> \
-    let pixels = V.unsafeFromForeignPtr0 (castForeignPtr bytes) size \
+    let _rasterPixels = V.unsafeFromForeignPtr0 (castForeignPtr bytes) size \
     in return $ SomeRaster (Raster {..} :: Raster TY)
 
 instance Variant RasterPtr SomeRaster where
@@ -176,12 +186,12 @@ instance Variant RasterPtr SomeRaster where
       }|]
     bytes <- mallocForeignPtrBytes numBytes
     (  toEnum . fromIntegral -> dtype
-     , fromIntegral -> width
-     , fromIntegral -> height
-     , extent
-     , queryExtent
+     , fromIntegral -> _rasterWidth
+     , fromIntegral -> _rasterHeight
+     , _rasterExtent
+     , _rasterQueryExtent
      , nodataPtr
-     , realToFrac -> filterFactor
+     , realToFrac -> _rasterFilterFactor
      ) <- C.withPtrs_ $ \(dtype, w, h, ext, qext, nd, ff) ->
       [CU.block|void {
       const raster_ptr &raster = *$(raster_ptr *p);
@@ -200,10 +210,10 @@ instance Variant RasterPtr SomeRaster where
         *$(double **nd) = nullptr;
       }
       }|]
-    let size = width*height
-    nodata <- if nodataPtr==nullPtr
-              then return Nothing
-              else Just . realToFrac <$> peek nodataPtr
+    let size = _rasterWidth*_rasterHeight
+    _rasterNodata <- if nodataPtr==nullPtr
+                     then return Nothing
+                     else Just . realToFrac <$> peek nodataPtr
     case dtype of
       DTYPE_CASE(DTypeRgba8, PixelRgba8)
       DTYPE_CASE(DTypeGray8, Word8)

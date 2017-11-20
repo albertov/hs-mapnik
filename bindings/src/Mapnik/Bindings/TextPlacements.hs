@@ -14,6 +14,7 @@ module Mapnik.Bindings.TextPlacements (
 ) where
 
 import qualified Mapnik
+import qualified Mapnik.Symbolizer as Mapnik
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Variant (Variant(..), justOrTypeError)

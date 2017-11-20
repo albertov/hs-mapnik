@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -31,9 +31,15 @@ module Mapnik.Bindings.Datasource (
 , featuresAtPoint
 , queryBox
 , queryBoxProps
+, HasBox (..)
+, HasUnBufferedBox (..)
+, HasResolution (..)
+, HasScaleDenominator (..)
+, HasVariables (..)
 , module X
 ) where
 
+import           Mapnik.Lens
 import           Mapnik.Parameter as X (Value(..), Parameter, (.=))
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
@@ -44,6 +50,7 @@ import           Mapnik.Bindings.Variant
 import           Mapnik.Bindings.Raster
 
 import           System.IO
+import           Control.Lens
 import           Control.Exception (catch, bracket, SomeException)
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
@@ -117,7 +124,7 @@ instance Exts.IsList Parameters where
 paramsFromList :: [(Text,Value)] -> Parameters
 paramsFromList ps = unsafePerformIO $ do
   p <- emptyValues
-  forM_ ps $ \(encodeUtf8 -> k, value) -> withV value $ \v ->
+  forM_ ps $ \(encodeUtf8 -> k, val) -> withV val $ \v ->
     [CU.block|void {
       std::string k($bs-ptr:k, $bs-len:k);
       (*$fptr-ptr:(parameters *p))[k] = *$(value_holder *v);
@@ -161,9 +168,9 @@ features ds query = withQuery query $ \q -> do
         f <- Feature.unCreate p
         modifyIORef' feats (f:)
       cbField :: CString -> C.CInt -> C.CSize -> IO ()
-      cbField p len ix = do
+      cbField p len i = do
         f <- packCStringLen (p, fromIntegral len)
-        modifyIORef' fields ((f,ix):)
+        modifyIORef' fields ((f,i):)
   [C.block|void { do {
     auto ds = $fptr-ptr:(datasource_ptr *ds)->get();
     if (!ds) break;
@@ -195,50 +202,37 @@ featuresAtPoint :: Datasource -> Pair -> Double -> IO FeatureSet
 featuresAtPoint = undefined
 
 data Query = Query
-  { box              :: !Box
-  , unBufferedBox    :: !Box
-  , resolution       :: !Pair
-  , scaleDenominator :: !Double
-  , filterFactor     :: !Double
-  , propertyNames    :: ![Text] --XXX a set really
-  , variables        :: !Attributes
+  { _queryBox              :: !Box
+  , _queryUnBufferedBox    :: !Box
+  , _queryResolution       :: !Pair
+  , _queryScaleDenominator :: !Double
+  , _queryFilterFactor     :: !Double
+  , _queryPropertyNames    :: ![Text] --XXX a set really
+  , _queryVariables        :: !Attributes
   }
   deriving (Eq, Show)
 
 queryBox :: Box -> Query
 queryBox b = Query
-  { box = b
-  , unBufferedBox = b
-  , resolution=Pair 1 1
-  , scaleDenominator = 1
-  , filterFactor = 1
-  , propertyNames=[]
-  , variables = M.empty
-  }
-
-queryBoxProps :: Box -> [Text] -> Query
-queryBoxProps b ps = Query
-  { box = b
-  , unBufferedBox = b
-  , resolution=Pair 1 1
-  , scaleDenominator = 1
-  , filterFactor = 1
-  , propertyNames=ps
-  , variables = M.empty
+  { _queryBox = b
+  , _queryUnBufferedBox = b
+  , _queryResolution=Pair 1 1
+  , _queryScaleDenominator = 1
+  , _queryFilterFactor = 1
+  , _queryPropertyNames=[]
+  , _queryVariables = M.empty
   }
 
 
 data HsDatasource where
   HsVector ::
-    { name               :: !Text
-    , extent             :: !Box
+    { _extent             :: !Box
     , fieldNames         :: !(Vector Text)
     , getFeatures        :: !(Query -> IO [Feature])
     , getFeaturesAtPoint :: !(Pair -> Double -> IO [Feature])
     } -> HsDatasource
   HsRaster :: RasterType a =>
-    { name               :: !Text
-    , extent             :: !Box
+    { _extent             :: !Box
     , fieldNames         :: !(Vector Text)
     , getRasters         :: !(Query -> IO [Raster a])
     , getFeaturesAtPoint :: !(Pair -> Double -> IO [Feature])
@@ -247,7 +241,7 @@ data HsDatasource where
 
 
 createHsDatasource :: HsDatasource -> IO Datasource
-createHsDatasource HsVector{..} = with extent $ \e -> unsafeNew $ \ ptr -> do
+createHsDatasource HsVector{..} = with _extent $ \e -> unsafeNew $ \ ptr -> do
   fs <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> Ptr QueryPtr -> IO ()|]) getFeatures'
   fsp <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ()|]) getFeaturesAtPoint'
   [CU.block|void {
@@ -275,7 +269,7 @@ createHsDatasource HsVector{..} = with extent $ \e -> unsafeNew $ \ ptr -> do
       catchingExceptions "getFeaturesAtPoint" $
         mapM_ (pushBack ctx fs) =<< getFeaturesAtPoint (Pair x y) tol
 
-createHsDatasource HsRaster{..} = with extent $ \e -> unsafeNew $ \ ptr -> do
+createHsDatasource HsRaster{..} = with _extent $ \e -> unsafeNew $ \ ptr -> do
   fs <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> Ptr QueryPtr -> IO ()|]) getFeatures'
   fsp <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ()|]) getFeaturesAtPoint'
   [CU.block|void {
@@ -322,9 +316,9 @@ catchingExceptions ctx = (`catch` (\e ->
 
 withQuery :: Query -> (Ptr QueryPtr -> IO a) -> IO a
 withQuery query f =
-  with box $ \pBox ->
-  with unBufferedBox $ \uBox ->
-  withAttributes variables $ \attrs ->
+  with _queryBox $ \pBox ->
+  with _queryUnBufferedBox $ \uBox ->
+  withAttributes _queryVariables $ \attrs ->
     let alloc = C.withPtr_ $ \p -> [CU.block|void {
       auto q = new query( *$(bbox *pBox)
                         , std::tuple<double,double>( $(double resx)
@@ -341,14 +335,14 @@ withQuery query f =
   where
     dealloc p = [CU.exp|void { delete $(query *p) }|]
     enter p = do
-      forM_ propertyNames $ \(encodeUtf8 -> name) ->
+      forM_ _queryPropertyNames $ \(encodeUtf8 -> pname) ->
         [CU.block|void {
-          $(query *p)->add_property_name(std::string($bs-ptr:name, $bs-len:name));
+          $(query *p)->add_property_name(std::string($bs-ptr:pname, $bs-len:pname));
         }|]
       f p
-    Query { resolution = Pair (realToFrac -> resx) (realToFrac -> resy)
-          , scaleDenominator = (realToFrac -> scale) 
-          , filterFactor = (realToFrac -> ff) 
+    Query { _queryResolution = Pair (realToFrac -> resx) (realToFrac -> resy)
+          , _queryScaleDenominator = (realToFrac -> scale) 
+          , _queryFilterFactor = (realToFrac -> ff) 
           , ..
           } = query
   
@@ -357,10 +351,10 @@ unCreateQuery :: Ptr QueryPtr -> IO Query
 unCreateQuery q = do
   (   realToFrac -> resx
     , realToFrac -> resy
-    , realToFrac -> scaleDenominator
-    , realToFrac -> filterFactor
-    , box
-    , unBufferedBox
+    , realToFrac -> _queryScaleDenominator
+    , realToFrac -> _queryFilterFactor
+    , _queryBox
+    , _queryUnBufferedBox
     , varPtr
     ) <- C.withPtrs_ $ \(x,y,s,f,b,ub,vs) ->
     [CU.block|void{
@@ -383,9 +377,9 @@ unCreateQuery q = do
       $fun:(void (*cb)(char *, int))(const_cast<char *>(it->c_str()), it->size());
     }
   }|]
-  propertyNames <- mapM (decodeUtf8Ctx "unCreateQuery") =<< readIORef ref
-  variables <- extractAttributes varPtr
-  return Query{resolution=Pair resx resy, ..}
+  _queryPropertyNames <- mapM (decodeUtf8Ctx "unCreateQuery") =<< readIORef ref
+  _queryVariables <- extractAttributes varPtr
+  return Query{_queryResolution=Pair resx resy, ..}
 
 withAttributes :: Attributes -> (Ptr Attributes -> IO a) -> IO a
 withAttributes attrs f = bracket alloc dealloc enter where
@@ -420,3 +414,9 @@ extractAttributes p = do
      }
   }|]
   fmap M.fromList . decodeUtf8Keys "extractAttributes" =<< readIORef ref
+
+makeFields ''Query
+
+queryBoxProps :: Box -> [Text] -> Query
+queryBoxProps b ps = queryBox b & propertyNames .~ ps
+

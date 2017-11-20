@@ -24,7 +24,9 @@ module Mapnik.Bindings (
 , feature
 
 -- * Raster
-, Raster (..)
+, Raster
+, RasterType
+, mkRaster
 , SomeRaster (..)
 , getPixels
 
@@ -57,6 +59,18 @@ module Mapnik.Bindings (
 , registerDefaults
 , registerPluginDir
 , registerFontDir
+
+-- * Lenses
+, HasExtent (..)
+, HasQueryExtent (..)
+, HasNodata (..)
+, HasVariables (..)
+, HasScaleDenominator (..)
+, HasScaleFactor (..)
+, HasAspectFixMode (..)
+, HasBox(..)
+, HasUnBufferedBox(..)
+, HasResolution(..)
 
 -- * Re-exports
 , CppException (..)

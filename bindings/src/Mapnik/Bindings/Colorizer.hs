@@ -12,6 +12,7 @@ module Mapnik.Bindings.Colorizer (
 ) where
 
 import qualified Mapnik
+import qualified Mapnik.Symbolizer as Mapnik
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()

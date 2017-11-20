@@ -23,9 +23,10 @@ module Mapnik.Bindings.Symbolizer (
 ) where
 
 import           Mapnik.Lens
-import qualified Mapnik
+import           Mapnik.Symbolizer (Prop(..))
+import qualified Mapnik.Symbolizer as Mapnik
+import qualified Mapnik.Common as Mapnik
 import           Mapnik.Enums
-import           Mapnik ( Transform(..), Prop (..) )
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans ()
