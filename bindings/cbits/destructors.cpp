@@ -70,7 +70,7 @@ MAPNIK_DECL void hs_mapnik_destroy_TextPlacements(void *p) {
   delete static_cast<mapnik::text_placements_ptr*>(p);
 }
 
-MAPNIK_DECL void hs_mapnik_destroy_GroupProperties(void *p) {
+MAPNIK_DECL void hs_mapnik_destroy_GroupSymProperties(void *p) {
   delete static_cast<mapnik::group_symbolizer_properties_ptr*>(p);
 }
 

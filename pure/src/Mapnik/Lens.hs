@@ -1,11 +1,9 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Mapnik.Lens (
-  module Mapnik.Symbolizer.Lens
-, module Mapnik.Lens
-) where
+module Mapnik.Lens where
 
 import Mapnik.TH
 import qualified Mapnik.Map as Map
@@ -15,37 +13,31 @@ import Mapnik.Rule
 import Mapnik.Style
 import Mapnik.Parameter
 import Mapnik.Datasource
-import Mapnik.Symbolizer.Lens
+import Mapnik.Symbolizer
 
 import Control.Lens
 import qualified Data.HashMap.Strict as M
 import Data.Text (Text)
 import Data.Word (Word8)
 
-makeMapnikFields ''Layer
-makeMapnikFields ''Map.Map
-makeMapnikFields ''Rule
-makeMapnikFields ''Style
 
-makePrisms ''Value
+class HasStyleLst     s a | s -> a where styleLst :: Lens' s a
+class HasParameters   s a | s -> a where parameters :: Lens' s a
+class HasRed          s a | s -> a where red :: Lens' s a
+class HasGreen        s a | s -> a where green :: Lens' s a
+class HasBlue         s a | s -> a where blue :: Lens' s a
+class HasAlpha        s a | s -> a where alpha :: Lens' s a
 
-class HasStyleLst s a | s -> a where
-  styleLst :: Lens' s a
+--------------------------------------------------------------------------
+-- Instances  
+--------------------------------------------------------------------------
 
 instance HasStyleLst Map.Map [(StyleName,Style)] where
   styleLst = lens (M.toList . Map.styles)
                 (\s a -> s { Map.styles = M.fromList a}) 
 
-class HasParameters s a | s -> a where
-  parameters :: Lens' s a
-
 instance HasParameters Datasource (M.HashMap Text Value) where
   parameters = lens (\(Datasource s) -> s) (const Datasource) 
-
-class HasRed   s a | s -> a where red :: Lens' s a
-class HasGreen s a | s -> a where green :: Lens' s a
-class HasBlue  s a | s -> a where blue :: Lens' s a
-class HasAlpha s a | s -> a where alpha :: Lens' s a
 
 instance HasRed Color Word8 where
   red   = lens (\(RGBA r _ _ _) -> r) (\(RGBA _ g b a) r -> RGBA r g b a)
@@ -59,3 +51,26 @@ instance HasBlue Color Word8 where
 instance HasAlpha Color Word8 where
   alpha = lens (\(RGBA _ _ _ a) -> a) (\(RGBA r g b _) a -> RGBA r g b a)
   {-# INLINE alpha #-}
+
+-- Needs to be declared First so Traversal's are created instead of Lens'es
+makeMapnikFields ''Symbolizer
+
+makeMapnikFields ''Layer
+makeMapnikFields ''Map.Map
+makeMapnikFields ''Rule
+makeMapnikFields ''Style
+makeMapnikFields ''Format
+makeMapnikFields ''TextProperties
+makeMapnikFields ''TextFormatProperties
+makeMapnikFields ''TextLayoutProperties
+makeMapnikFields ''TextSymProperties
+makeMapnikFields ''GroupSymProperties
+makeMapnikFields ''GroupRule
+makeMapnikFields ''GroupLayout
+makeMapnikFields ''Colorizer
+makeMapnikFields ''Stop
+makePrisms ''Value
+makePrisms ''Symbolizer
+makePrisms ''Prop
+makePrisms ''Format
+makePrisms ''GroupLayout

@@ -1,7 +1,11 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -9,15 +13,163 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 module Mapnik.Symbolizer (
   module Mapnik.Symbolizer
-, module Mapnik.Symbolizer.Property
+, def
 ) where
 
 import Mapnik.Imports
 import Mapnik.Common
 import Mapnik.Enums
-import Mapnik.Symbolizer.Property
+
+import Data.Text (Text)
+import Data.Default (Default(def))
 
 
+data Prop a = Exp Expression
+            | Val a
+  deriving (Eq, Show, Functor, Generic)
+instance FromJSON a => FromJSON (Prop a) where
+  parseJSON = genericParseJSON mapnikOptions
+instance ToJSON a => ToJSON (Prop a) where
+  toJSON = genericToJSON mapnikOptions
+  toEncoding = genericToEncoding mapnikOptions
+
+type PropValue a = Maybe (Prop a)
+
+type FaceName = Text
+
+data Stop = Stop
+  { value :: !Double
+  , color :: !Color
+  , mode  :: !(Maybe ColorizerMode)
+  , label :: !(Maybe Text)
+  } deriving (Eq, Show, Generic)
+
+data Colorizer = Colorizer
+  { mode   :: !(Maybe ColorizerMode)
+  , color  :: !(Maybe Color)
+  , stops  :: ![Stop]
+  } deriving (Eq, Show, Generic)
+
+data GroupLayout
+  = SimpleRowLayout { itemMargin    :: !(Maybe Double) }
+  | PairLayout      { itemMargin    :: !(Maybe Double)
+                    , maxDifference :: !(Maybe Double) }
+  deriving (Eq, Show, Generic)
+
+instance Default GroupLayout where def = SimpleRowLayout def
+
+data GroupRule = GroupRule
+  { symbolizers :: ![Symbolizer]
+  , filter      :: !(Maybe Expression)
+  , repeatKey   :: !(Maybe Expression)
+  } deriving (Eq, Show, Generic, Default)
+
+data GroupSymProperties = GroupSymProperties
+  { layout :: !GroupLayout
+  , rules  :: ![GroupRule]
+  }
+  deriving (Eq, Show, Generic)
+
+data FontSet = FontSet
+  deriving (Eq, Show, Generic)
+
+
+data TextProperties = TextProperties
+  { labelPlacement          :: !(PropValue LabelPlacement)
+  , labelSpacing            :: !(PropValue Double)
+  , labelPositionTolerance  :: !(PropValue Double)
+  , avoidEdges              :: !(PropValue Bool)
+  , margin                  :: !(PropValue Double)
+  , repeatDistance          :: !(PropValue Double)
+  , minimumDistance         :: !(PropValue Double) -- Deprecated
+  , minimumPadding          :: !(PropValue Double)
+  , minimumPathLength       :: !(PropValue Double)
+  , maxCharAngleDelta       :: !(PropValue Double)
+  , allowOverlap            :: !(PropValue Bool)
+  , largestBoxOnly          :: !(PropValue Bool)
+  , upright                 :: !(PropValue Upright)
+  } deriving (Eq, Show, Generic, Default)
+
+data TextFormatProperties = TextFormatProperties
+  { faceName         :: !(Maybe FaceName)
+  , fontSet          :: !(Maybe FontSet)
+  , textSize         :: !(PropValue Double)
+  , characterSpacing :: !(PropValue Double)
+  , lineSpacing      :: !(PropValue Double)
+  , textOpacity      :: !(PropValue Double)
+  , haloOpacity      :: !(PropValue Double)
+  , textTransform    :: !(PropValue TextTransform)
+  , fill             :: !(PropValue Color)
+  , haloFill         :: !(PropValue Color)
+  , haloRadius       :: !(PropValue Double)
+  , ffSettings       :: !(PropValue FontFeatureSettings)
+  } deriving (Eq, Show, Generic, Default)
+
+data TextLayoutProperties = TextLayoutProperties
+  { dx                  :: !(PropValue Double)
+  , dy                  :: !(PropValue Double)
+  , orientation         :: !(PropValue Double)
+  , textRatio           :: !(PropValue Double)
+  , wrapWidth           :: !(PropValue Double)
+  , wrapChar            :: !(PropValue Char)
+  , wrapBefore          :: !(PropValue Bool)
+  , repeatWrapChar      :: !(PropValue Bool)
+  , rotateDisplacement  :: !(PropValue Double)
+  , horizontalAlignment :: !(PropValue HorizontalAlignment)
+  , justifyAlignment    :: !(PropValue JustifyAlignment)
+  , verticalAlignment   :: !(PropValue VerticalAlignment)
+  , direction           :: !(Maybe PlacementDirection)
+  } deriving (Eq, Show, Generic, Default)
+
+data Format
+  = FormatExp    !Expression
+  | FormatList   ![Format]
+  | Format
+    { faceName         :: !(Maybe FaceName)
+    , fontSet          :: !(Maybe FontSet)
+    , textSize         :: !(PropValue Double)
+    , characterSpacing :: !(PropValue Double)
+    , lineSpacing      :: !(PropValue Double)
+    , wrapBefore       :: !(PropValue Bool)
+    , repeatWrapChar   :: !(PropValue Bool)
+    , textTransform    :: !(PropValue TextTransform)
+    , fill             :: !(PropValue Color)
+    , haloFill         :: !(PropValue Color)
+    , haloRadius       :: !(PropValue Double)
+    , ffSettings       :: !(PropValue FontFeatureSettings)
+    , next             :: !Format
+    }
+  | FormatLayout
+    { dx                  :: !(PropValue Double)
+    , dy                  :: !(PropValue Double)
+    , orientation         :: !(PropValue Double)
+    , textRatio           :: !(PropValue Double)
+    , wrapWidth           :: !(PropValue Double)
+    , wrapChar            :: !(PropValue Char)
+    , wrapBefore          :: !(PropValue Bool)
+    , repeatWrapChar      :: !(PropValue Bool)
+    , rotateDisplacement  :: !(PropValue Double)
+    , horizontalAlignment :: !(PropValue HorizontalAlignment)
+    , justifyAlignment    :: !(PropValue JustifyAlignment)
+    , verticalAlignment   :: !(PropValue VerticalAlignment)
+    , next                :: !Format
+    }
+  | NullFormat
+  deriving (Eq, Show, Generic)
+
+instance Default Format where def = NullFormat
+
+data TextSymProperties = TextSymProperties
+  { properties       :: !TextProperties
+  , layoutProperties :: !TextLayoutProperties
+  , formatProperties :: !TextFormatProperties
+  , format           :: !Format
+  } deriving (Eq, Show, Generic, Default)
+
+
+newtype TextPlacements = Dummy TextSymProperties
+  deriving (Generic)
+  deriving newtype (Eq, Show, Default)
 
 #define BASE_PROPS \
     simplifyTolerance :: !(PropValue Double) \
@@ -154,7 +306,7 @@ data Symbolizer
     , STROKE_PROPS
     }
   | GroupSymbolizer
-    { groupProperties :: !(PropValue GroupProperties)
+    { groupProperties :: !(PropValue GroupSymProperties)
     , numColumns      :: !(PropValue Int)
     , startColumn     :: !(PropValue Int)
     , repeatKey       :: !(PropValue Expression)
@@ -173,7 +325,6 @@ data Symbolizer
     , compOp  :: !(PropValue CompositeMode)
     }
   deriving (Eq, Show, Generic)
-deriveMapnikJSON ''Symbolizer
 
 
 pointSym, lineSym, linePatternSym, polygonSym, polygonPatternSym, rasterSym :: Symbolizer
@@ -286,3 +437,17 @@ dotSym = DotSymbolizer
   , height  = Nothing
   , compOp  = Nothing
   }
+
+deriveMapnikJSON ''Symbolizer
+deriveMapnikJSON ''TextPlacements
+deriveMapnikJSON ''TextSymProperties
+deriveMapnikJSON ''GroupSymProperties
+deriveMapnikJSON ''Format
+deriveMapnikJSON ''TextLayoutProperties
+deriveMapnikJSON ''TextFormatProperties
+deriveMapnikJSON ''TextProperties
+deriveMapnikJSON ''FontSet
+deriveMapnikJSON ''Stop
+deriveMapnikJSON ''Colorizer
+deriveMapnikJSON ''GroupLayout
+deriveMapnikJSON ''GroupRule

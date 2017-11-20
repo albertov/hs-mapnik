@@ -31,7 +31,7 @@ library
                      , Mapnik.Bindings.Colorizer
                      , Mapnik.Bindings.TextPlacements
                      , Mapnik.Bindings.TextSymProperties
-                     , Mapnik.Bindings.GroupProperties
+                     , Mapnik.Bindings.GroupSymProperties
                      , Mapnik.Bindings.Registry
                      , Mapnik.Bindings.Rule
                      , Mapnik.Bindings.Symbolizer

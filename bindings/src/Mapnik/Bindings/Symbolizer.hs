@@ -240,7 +240,7 @@ data Key a where
     NumColumns :: Key Int
     StartColumn :: Key Int
     RepeatKey :: Key Mapnik.Expression
-    GroupPropertiesKey :: Key Mapnik.GroupProperties
+    GroupPropertiesKey :: Key Mapnik.GroupSymProperties
     LargestBoxOnly :: Key Bool
     MinimumPathLength :: Key Double
     HaloCompOp :: Key CompositeMode

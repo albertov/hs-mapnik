@@ -18,7 +18,7 @@ import           Mapnik.Enums
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Variant
-import qualified Mapnik.Bindings.GroupProperties as GroupProperties
+import qualified Mapnik.Bindings.GroupSymProperties as GroupSymProperties
 import qualified Mapnik.Bindings.Colorizer as Colorizer
 import qualified Mapnik.Bindings.Expression as Expression
 import qualified Mapnik.Bindings.Transform as Transform
@@ -87,7 +87,7 @@ instance Variant SymbolizerValue Mapnik.HS where {\
 };
 
 SYM_VAL_PTR(Colorizer,raster_colorizer_ptr)
-SYM_VAL_PTR(GroupProperties,group_symbolizer_properties_ptr)
+SYM_VAL_PTR(GroupSymProperties,group_symbolizer_properties_ptr)
 
 
 #define SYM_VAL(HS,CPP,CONV,MSG) \

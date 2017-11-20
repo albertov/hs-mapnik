@@ -360,8 +360,26 @@ instance Arbitrary Stop where
     label <- maybeArb arbitrary
     pure Stop{..}
 
-instance Arbitrary GroupProperties where
-  arbitrary = pure GroupProperties --TODO
+instance Arbitrary GroupSymProperties where
+  arbitrary = do
+    layout <- arbitrary
+    rules <- resize 3 arbitrary
+    return GroupSymProperties{..}
+
+instance Arbitrary GroupLayout where
+  arbitrary = oneof [ SimpleRowLayout <$> arbitrary
+                    , PairLayout      <$> arbitrary <*> arbitrary
+                    ]
+
+instance Arbitrary GroupRule where
+  arbitrary = do
+    symbolizers <- resize 3 arbitrary
+    filter      <- arbitrary
+    repeatKey   <- arbitrary
+    return GroupRule{..}
+  shrink GroupRule{..} = GroupRule {symbolizers=[], ..}
+                       : [ GroupRule s f rk
+                         | (s,f,rk) <- shrink (symbolizers, filter, repeatKey)]
 
 instance Arbitrary TextPlacements where
   arbitrary = Dummy <$> arbitrary
@@ -467,7 +485,7 @@ arbitraryFormatLayout n = do
   horizontalAlignment <- arbitrary
   justifyAlignment    <- arbitrary
   verticalAlignment   <- arbitrary
-  next                <- resize n arbitrary
+  next                <- resize (n-1) arbitrary
   pure FormatLayout{..}
 
 arbitraryFormatList :: Gen Format

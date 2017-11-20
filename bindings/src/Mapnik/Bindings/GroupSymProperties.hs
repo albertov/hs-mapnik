@@ -4,7 +4,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Mapnik.Bindings.GroupProperties (
+module Mapnik.Bindings.GroupSymProperties (
   unsafeNew
 , unsafeNewMaybe
 , create
@@ -27,23 +27,26 @@ C.include "<mapnik/symbolizer_base.hpp>"
 
 C.using "namespace mapnik"
 
--- * GroupProperties
+-- * GroupSymProperties
 
 
-foreign import ccall "&hs_mapnik_destroy_GroupProperties" destroyGroupProperties :: FinalizerPtr GroupProperties
+foreign import ccall "&hs_mapnik_destroy_GroupSymProperties" destroyGroupSymProperties :: FinalizerPtr GroupSymProperties
 
-unsafeNew :: (Ptr (Ptr GroupProperties) -> IO ()) -> IO GroupProperties
-unsafeNew = mkUnsafeNew GroupProperties destroyGroupProperties
+unsafeNew :: (Ptr (Ptr GroupSymProperties) -> IO ()) -> IO GroupSymProperties
+unsafeNew = mkUnsafeNew GroupSymProperties destroyGroupSymProperties
 
-unsafeNewMaybe :: (Ptr (Ptr GroupProperties) -> IO ()) -> IO (Maybe GroupProperties)
-unsafeNewMaybe = mkUnsafeNewMaybe GroupProperties destroyGroupProperties
+unsafeNewMaybe :: (Ptr (Ptr GroupSymProperties) -> IO ()) -> IO (Maybe GroupSymProperties)
+unsafeNewMaybe = mkUnsafeNewMaybe GroupSymProperties destroyGroupSymProperties
 
-create :: Mapnik.GroupProperties -> IO GroupProperties
-create Mapnik.GroupProperties = unsafeNew $ \p ->
+create :: Mapnik.GroupSymProperties -> IO GroupSymProperties
+create Mapnik.GroupSymProperties{..} = unsafeNew $ \p ->
   [CU.block|void{
     auto ret = std::make_shared<group_symbolizer_properties>();
     *$(group_symbolizer_properties_ptr **p) = new group_symbolizer_properties_ptr(ret);
   }|]
 
-unCreate :: GroupProperties -> IO Mapnik.GroupProperties
-unCreate p = return Mapnik.GroupProperties
+unCreate :: GroupSymProperties -> IO Mapnik.GroupSymProperties
+unCreate p = do
+  let rules = []
+      layout = Mapnik.SimpleRowLayout Nothing --TODO
+  return Mapnik.GroupSymProperties{..}

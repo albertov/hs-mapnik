@@ -1,2 +1,5 @@
+:set -XTypeApplications
+:set -XOverloadedStrings
+:set -XOverloadedLists
 :set -fwarn-unused-binds -fwarn-unused-imports -isrc -ispec -fprint-potential-instances -Wall
 :load MapnikSpec
