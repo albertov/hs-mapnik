@@ -5,10 +5,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
 module Mapnik.Bindings.Colorizer (
-  unsafeNew
-, unsafeNewMaybe
-, create
-, unCreate
+  unsafeNewColorizer
+, createColorizer
+, unCreateColorizer
 ) where
 
 import qualified Mapnik
@@ -44,14 +43,11 @@ C.using "namespace mapnik"
 
 foreign import ccall "&hs_mapnik_destroy_Colorizer" destroyColorizer :: FinalizerPtr Colorizer
 
-unsafeNew :: (Ptr (Ptr Colorizer) -> IO ()) -> IO Colorizer
-unsafeNew = mkUnsafeNew Colorizer destroyColorizer
+unsafeNewColorizer :: (Ptr (Ptr Colorizer) -> IO ()) -> IO Colorizer
+unsafeNewColorizer = mkUnsafeNew Colorizer destroyColorizer
 
-unsafeNewMaybe :: (Ptr (Ptr Colorizer) -> IO ()) -> IO (Maybe Colorizer)
-unsafeNewMaybe = mkUnsafeNewMaybe Colorizer destroyColorizer
-
-create :: Mapnik.Colorizer -> IO Colorizer
-create Mapnik.Colorizer{..} = unsafeNew $ \p -> do
+createColorizer :: Mapnik.Colorizer -> IO Colorizer
+createColorizer Mapnik.Colorizer{..} = unsafeNewColorizer $ \p -> do
   ret <- C.withPtr_ $ \ret -> [CU.block|void {
     *$(raster_colorizer_ptr **p) = new raster_colorizer_ptr(
       std::make_shared<raster_colorizer>()
@@ -150,8 +146,8 @@ getStops p = do
   }|]
   reverse <$> readIORef ref
 
-unCreate :: Colorizer -> IO Mapnik.Colorizer
-unCreate (Colorizer colorizer) = withForeignPtr colorizer $ \p -> do
+unCreateColorizer :: Colorizer -> IO Mapnik.Colorizer
+unCreateColorizer (Colorizer colorizer) = withForeignPtr colorizer $ \p -> do
   (mMode, colorPtr) <- C.withPtrs_ $ \(mode,col) ->
     [CU.block|void {
     const raster_colorizer *colorizer =

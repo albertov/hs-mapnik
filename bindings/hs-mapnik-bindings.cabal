@@ -29,13 +29,9 @@ library
                      , Mapnik.Bindings.Geometry
                      , Mapnik.Bindings.Projection
                      , Mapnik.Bindings.Colorizer
-                     , Mapnik.Bindings.TextPlacements
-                     , Mapnik.Bindings.TextSymProperties
-                     , Mapnik.Bindings.GroupSymProperties
                      , Mapnik.Bindings.Registry
                      , Mapnik.Bindings.Rule
                      , Mapnik.Bindings.Symbolizer
-                     , Mapnik.Bindings.SymbolizerValue
                      , Mapnik.Bindings.Variant
                      , Mapnik.Bindings.Raster
                      , Mapnik.Bindings.Expression

@@ -18,7 +18,6 @@ import qualified Mapnik.Bindings.Transform as Transform
 import qualified Mapnik.Bindings.Expression as Expression
 import qualified Mapnik.Bindings.Datasource as Datasource
 import qualified Mapnik.Bindings.Symbolizer as Symbolizer
-import qualified Mapnik.Bindings.TextPlacements as TextPlacements
 import           Mapnik.QuickCheck
 
 import           Control.Lens hiding ((.=))
@@ -314,12 +313,6 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
                 . traverse
                 . value
         m^..lns `shouldBe` [0,100,200,400,800,1600,3200,6400,12800,25600]
-
-  describe "TextPlacements" $ do
-    it "can create" $ do
-      let ps = def
-      ps' <- TextPlacements.unCreate =<< TextPlacements.create ps
-      ps `shouldBe` ps'
 
   describe "HsVector" $ do
     it "can create and render" $ do

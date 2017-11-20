@@ -52,7 +52,7 @@ module Mapnik.Bindings.Types (
 , mapnikCtx
 ) where
 
-import           Mapnik (Color, Dash(..), Box, Value)
+import           Mapnik (Color, Dash(..), GroupRule, Box, Value)
 import           Mapnik.Lens (HasRed(..), HasBlue(..), HasGreen(..), HasAlpha(..))
 
 import           Control.Lens (lens)
@@ -157,6 +157,7 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "text_placements_ptr", [t| TextPlacements |])
       , (C.TypeName "dash_t", [t| Dash |])
       , (C.TypeName "group_symbolizer_properties_ptr", [t| GroupSymProperties |])
+      , (C.TypeName "group_rule_ptr", [t| Mapnik.GroupRule |])
       , (C.TypeName "raster_colorizer_ptr", [t| Colorizer |])
       , (C.TypeName "colorizer_stop", [t| Stop |])
       , (C.TypeName "text_symbolizer_properties", [t| TextSymProperties |])
