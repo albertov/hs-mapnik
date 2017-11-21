@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
@@ -29,13 +30,12 @@ import           Mapnik.Lens
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Orphans()
 import           Mapnik.Bindings.Variant
+import qualified Mapnik.Bindings.Cpp as C
 
-import           Control.Exception (bracket, throwIO)
+import           Control.Exception.Lifted (bracket, throwIO)
 import           Control.Lens
 import           Data.Typeable
 import qualified Data.Vector.Storable as V
-import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Unsafe as CU
 import           Foreign.Ptr
 import           Foreign.ForeignPtr
 import           Foreign.Storable
@@ -108,10 +108,12 @@ withMaybe :: V.Storable a => Maybe a -> (Ptr a -> IO b) -> IO b
 withMaybe Nothing  f = f nullPtr
 withMaybe (Just a) f = with a f
 
+type instance VariantM RasterPtr = IO
+
 instance VariantPtr RasterPtr where
   allocaV = bracket alloc dealloc where
-    alloc = [CU.exp|raster_ptr * { new raster_ptr }|]
-    dealloc p = [CU.exp|void { delete $(raster_ptr *p)}|]
+    alloc = [C.exp|raster_ptr * { new raster_ptr }|]
+    dealloc p = [C.exp|void { delete $(raster_ptr *p)}|]
 
 #define RASTER_VARIANT(HS,CPP,DTYPE) \
 instance Variant RasterPtr (Raster HS) where { \
@@ -124,7 +126,7 @@ instance Variant RasterPtr (Raster HS) where { \
                 } = with _rasterExtent $ \ext -> \
                     with _rasterQueryExtent $ \qext -> \
                     withMaybe (fmap realToFrac _rasterNodata) $ \nd -> \
-    [CU.block|void { \
+    [C.block|void { \
       image_any image($(int w), $(int h), DTYPE); \
       memcpy(image.bytes(), $vec-ptr:(CPP *_rasterPixels), sizeof(CPP)*$vec-len:_rasterPixels); \
       auto ptr = *$(raster_ptr *p) = std::make_shared<raster>(*$(bbox *ext), *$(bbox *qext), std::move(image), $(double ff)); \
@@ -179,7 +181,7 @@ instance Variant RasterPtr SomeRaster where
   pokeV p (SomeRaster r) = pokeV p r
   peekV p = do
     numBytes <- fromIntegral <$>
-      [CU.block|size_t {
+      [C.block|size_t {
       const raster_ptr &raster = *$(raster_ptr *p);
       const image_any& image = raster->data_;
       image.size();
@@ -193,7 +195,7 @@ instance Variant RasterPtr SomeRaster where
      , nodataPtr
      , realToFrac -> _rasterFilterFactor
      ) <- C.withPtrs_ $ \(dtype, w, h, ext, qext, nd, ff) ->
-      [CU.block|void {
+      [C.block|void {
       const raster_ptr &raster = *$(raster_ptr *p);
       const image_any& image = raster->data_;
       *$(unsigned char *dtype) = static_cast<unsigned char>(image.get_dtype());

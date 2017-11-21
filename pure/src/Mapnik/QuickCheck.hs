@@ -36,6 +36,7 @@ instance Arbitrary Map where
     maximumExtent          <- arbitrary
     fontDirectory          <- arbitrary
     styles                 <- arbitrary
+    fontSets               <- arbitrary
     layers                 <- listOf (arbitraryLayer (M.keys styles))
     pure Map{..}
 
@@ -436,8 +437,7 @@ instance Arbitrary TextLayoutProperties where
 
 instance Arbitrary TextFormatProperties where
   arbitrary = do
-    faceName         <- maybeArb arbitraryFaceName
-    fontSet          <- arbitrary
+    font             <- arbitrary
     textSize         <- arbitrary
     characterSpacing <- arbitrary
     lineSpacing      <- arbitrary
@@ -463,8 +463,7 @@ instance Arbitrary Format where
 arbitraryFormat :: Int -> Gen Format
 arbitraryFormat 0 = pure NullFormat
 arbitraryFormat n = do
-  faceName         <- maybeArb arbitraryFaceName
-  fontSet          <- arbitrary
+  font             <- arbitrary
   textSize         <- arbitrary
   characterSpacing <- arbitrary
   lineSpacing      <- arbitrary
@@ -506,8 +505,13 @@ arbitraryFormatList = FormatList <$> listOf (oneof
 arbitraryFormatExp :: Gen Format
 arbitraryFormatExp = FormatExp <$> arbitrary
 
-instance Arbitrary FontSet where
-  arbitrary = pure FontSet --TODO
+instance Arbitrary Font where
+  arbitrary = oneof [FaceName <$> arbitraryFaceName, FontSetName <$> arbitrary]
+    where
+      arbitraryFaceName = elements
+        [ "DejaVu Sans Book"
+        ]
+
 
 instance Arbitrary FontFeatureSettings where
   arbitrary = FontFeatureSettings <$> parts
@@ -522,11 +526,6 @@ instance Arbitrary FontFeatureSettings where
 -----------------------------------------------------------------------------
 arbitraryEnum :: (Enum a, Bounded a) => Gen a
 arbitraryEnum = elements [minBound..maxBound]
-
-arbitraryFaceName :: Gen FaceName
-arbitraryFaceName = elements
-  [ "DejaVu Sans Book"
-  ]
 
 arbitrarySrs :: Gen Proj4
 arbitrarySrs = elements allSrs

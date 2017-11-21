@@ -1,8 +1,13 @@
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Mapnik.Bindings.Util where
 
+import qualified Mapnik.Bindings.Cpp as C
+
 import           Control.Monad ((<=<))
-import           Control.Exception
+import           Control.Monad.Base (MonadBase(..))
+import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Control.Exception.Lifted
 import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
 import           Data.ByteString (ByteString)
 import           Data.Text (Text)
@@ -12,48 +17,52 @@ import           Foreign.C.String (CString)
 import           Foreign.ForeignPtr (ForeignPtr, FinalizerPtr, newForeignPtr)
 import           Foreign.Storable (Storable)
 
-import qualified Language.C.Inline.Cpp as C
 
-newText :: String -> ((Ptr CString, Ptr C.CInt) -> IO ()) -> IO Text
+newText :: MonadBaseControl IO m
+  => String -> ((Ptr CString, Ptr C.CInt) -> m ()) -> m Text
 newText ctx = decodeUtf8Ctx ctx <=< newByteString
 
-newTextMaybe :: String -> ((Ptr CString, Ptr C.CInt) -> IO ()) -> IO (Maybe Text)
+newTextMaybe :: MonadBaseControl IO m
+  => String -> ((Ptr CString, Ptr C.CInt) -> m ()) -> m (Maybe Text)
 newTextMaybe msg = mapM (decodeUtf8Ctx msg) <=< newByteStringMaybe
 
 
-newByteString :: ((Ptr CString, Ptr C.CInt) -> IO ()) -> IO ByteString
+newByteString :: MonadBaseControl IO m
+  => ((Ptr CString, Ptr C.CInt) -> m ()) -> m ByteString
 newByteString =
   maybe (throwIO (userError "nullPtr")) return <=< newByteStringMaybe
 
-newByteStringMaybe :: ((Ptr CString, Ptr C.CInt) -> IO ()) -> IO (Maybe ByteString)
-newByteStringMaybe block = do
-  (ptr,len) <- C.withPtrs_ block
+newByteStringMaybe :: MonadBaseControl IO m
+  => ((Ptr CString, Ptr C.CInt) -> m ()) -> m (Maybe ByteString)
+newByteStringMaybe fun = do
+  (ptr,len) <- C.withPtrs_ fun
   if ptr == nullPtr then return Nothing else
-    Just <$> unsafePackMallocCStringLen (ptr, fromIntegral len)
+    Just <$> liftBase (unsafePackMallocCStringLen (ptr, fromIntegral len))
 
 mkUnsafeNew
-  :: (ForeignPtr a -> c)
-  -> FinalizerPtr a -> (Ptr (Ptr a) -> IO ()) -> IO c
+  :: MonadBaseControl IO m
+  => (ForeignPtr a -> c) -> FinalizerPtr a -> (Ptr (Ptr a) -> m ()) -> m c
 mkUnsafeNew a b = maybe (throwIO (userError "nullPtr")) return <=< mkUnsafeNewMaybe a b
 
 mkUnsafeNewMaybe
-  :: (ForeignPtr a -> c)
-  -> FinalizerPtr a -> (Ptr (Ptr a) -> IO ()) -> IO (Maybe c)
+  :: MonadBaseControl IO m
+  => (ForeignPtr a -> c) -> FinalizerPtr a -> (Ptr (Ptr a) -> m ()) -> m (Maybe c)
 mkUnsafeNewMaybe ctor dtor fun = do
   ptr <- C.withPtr_ fun
   if ptr == nullPtr then return Nothing else 
-    Just . ctor <$> newForeignPtr dtor ptr
+    Just . ctor <$> liftBase (newForeignPtr dtor ptr)
 
-newMaybe :: Storable a => ((Ptr C.CInt, Ptr a) -> IO ()) -> IO (Maybe a)
+newMaybe :: (MonadBaseControl IO m, Storable a)
+  => ((Ptr C.CInt, Ptr a) -> m ()) -> m (Maybe a)
 newMaybe fun = do
   (has, p) <- C.withPtrs_ fun
   return $ if has == 1 then Just p else Nothing
 
-decodeUtf8Keys :: String -> [(ByteString, a)] -> IO [(Text, a)]
+decodeUtf8Keys :: MonadBase IO m => String -> [(ByteString, a)] -> m [(Text, a)]
 decodeUtf8Keys msg = mapM (\(k,v) -> (,v) <$> decodeUtf8Ctx msg k)
 
 
-decodeUtf8Ctx :: String -> ByteString -> IO Text
+decodeUtf8Ctx :: MonadBase IO m => String -> ByteString -> m Text
 decodeUtf8Ctx msg k' =
   case decodeUtf8' k' of
     Right  k -> return $! k

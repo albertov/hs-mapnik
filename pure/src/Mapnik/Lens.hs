@@ -51,6 +51,7 @@ makePrisms ''Symbolizer
 makePrisms ''Prop
 makePrisms ''Format
 makePrisms ''GroupLayout
+makePrisms ''Font
 
 
 --------------------------------------------------------------------------

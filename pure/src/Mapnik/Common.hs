@@ -13,6 +13,7 @@ import Data.Word
 import Data.String (IsString(..))
 import Data.Text (Text)
 import Data.Vector.Storable (Vector)
+import qualified Data.HashMap.Strict as M
 import Foreign.Storable
 import Foreign.Marshal.Array (advancePtr)
 import Foreign.Ptr
@@ -42,6 +43,11 @@ data Dash = Dash {-# UNPACK #-} !Double {-# UNPACK #-} !Double
   deriving (Eq, Show, Generic)
 deriveMapnikJSON ''Dash
 
+type FaceName = Text
+type FontSetName = Text
+type FontSetMap = M.HashMap FontSetName [FaceName]
+
+-- | See <https://github.com/mapnik/mapnik/wiki/RasterColorizer>
 
 instance Storable Dash where
   sizeOf   _ = 2 * sizeOf (undefined :: CDouble)

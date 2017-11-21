@@ -26,6 +26,7 @@ data Map = Map
   , bufferSize             :: !(Maybe Int)
   , maximumExtent          :: !(Maybe Box)
   , fontDirectory          :: !(Maybe FilePath)
+  , fontSets               :: !FontSetMap
   , styles                 :: !Styles
   , layers                 :: ![Layer]
   } deriving (Eq, Show, Generic)
@@ -41,6 +42,7 @@ instance Default Map where
     , bufferSize             = Nothing
     , maximumExtent          = Nothing
     , fontDirectory          = Nothing
+    , fontSets               = mempty
     , styles                 = mempty
     , layers                 = mempty
     }

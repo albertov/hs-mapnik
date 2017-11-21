@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans -fno-warn-name-shadowing #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RankNTypes #-}
@@ -18,6 +19,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 module Mapnik.Bindings.Symbolizer (
   create
 , unCreate
@@ -37,27 +39,28 @@ import           Mapnik.Bindings.Util
 import qualified Mapnik.Bindings.Transform as Transform
 import           Mapnik.Bindings.Orphans ()
 import           Mapnik.Bindings.Variant
+import qualified Mapnik.Bindings.Cpp as C
 
 import           Control.Applicative
-import           Control.Exception
+import           Control.Exception.Lifted
 import           Control.Lens hiding (has)
 import           Control.Monad
+import           Control.Monad.Base (MonadBase, liftBase)
+import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Control.Monad.Reader
 import           Data.Maybe
 import qualified Data.Text as T
 import           Data.Text (Text, pack, unpack)
-import           Data.IORef
+import           Data.IORef.Lifted
 import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Vector.Storable.Mutable as VM
 import qualified Data.Vector.Storable         as V
-import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr, withForeignPtr)
+import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Marshal.Alloc (finalizerFree)
-import           Foreign.Marshal.Utils (with)
+import           Foreign.Marshal.Utils.Lifted (with)
 import           Foreign.Ptr (Ptr, castPtr, nullPtr)
 import           Foreign.Storable (poke)
 
-import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Cpp.Exceptions as C
-import qualified Language.C.Inline.Unsafe as CU
 
 
 C.context mapnikCtx
@@ -100,73 +103,82 @@ C.using "dash_t = std::pair<double,double>"
 
 foreign import ccall "&hs_mapnik_destroy_Symbolizer" destroySymbolizer :: FinalizerPtr Symbolizer
 
-unsafeNew :: Ptr Symbolizer -> IO Symbolizer
-unsafeNew = fmap Symbolizer . newForeignPtr destroySymbolizer
+unsafeNew :: MonadBase IO m => Ptr Symbolizer -> m Symbolizer
+unsafeNew = fmap Symbolizer . liftBase . newForeignPtr destroySymbolizer
 
 create :: Mapnik.Symbolizer -> IO Symbolizer
-create sym = bracket alloc dealloc $ \p -> do
+create = flip runReaderT undefined . create'
+
+type instance VariantM SymbolizerValue = ReaderT Mapnik.FontSetMap IO
+type SvM = VariantM SymbolizerValue
+
+create' :: Mapnik.Symbolizer -> SvM Symbolizer
+create' sym = bracket alloc dealloc $ \p -> do
   mapM_ (`setProperty` p) (sym^.symbolizerProps)
   unsafeNew =<< toSym p
   where
-    dealloc p = [CU.block|void { delete $(symbolizer_base *p);}|]
+    dealloc p = [C.block|void { delete $(symbolizer_base *p);}|]
     alloc = case sym of
       Mapnik.PointSymbolizer{} ->
-        [CU.exp|symbolizer_base *{ new point_symbolizer}|]
+        [C.exp|symbolizer_base *{ new point_symbolizer}|]
       Mapnik.LineSymbolizer{} ->
-        [CU.exp|symbolizer_base *{ new line_symbolizer}|]
+        [C.exp|symbolizer_base *{ new line_symbolizer}|]
       Mapnik.LinePatternSymbolizer{} ->
-        [CU.exp|symbolizer_base *{ new line_pattern_symbolizer}|]
+        [C.exp|symbolizer_base *{ new line_pattern_symbolizer}|]
       Mapnik.PolygonSymbolizer{} ->
-        [CU.exp|symbolizer_base *{ new polygon_symbolizer}|]
+        [C.exp|symbolizer_base *{ new polygon_symbolizer}|]
       Mapnik.PolygonPatternSymbolizer{} ->
-        [CU.exp|symbolizer_base *{ new polygon_pattern_symbolizer}|]
+        [C.exp|symbolizer_base *{ new polygon_pattern_symbolizer}|]
       Mapnik.RasterSymbolizer{} ->
-        [CU.exp|symbolizer_base *{ new raster_symbolizer}|]
+        [C.exp|symbolizer_base *{ new raster_symbolizer}|]
       Mapnik.ShieldSymbolizer{} ->
-        [CU.exp|symbolizer_base *{ new shield_symbolizer}|]
+        [C.exp|symbolizer_base *{ new shield_symbolizer}|]
       Mapnik.TextSymbolizer{} ->
-        [CU.exp|symbolizer_base *{ new text_symbolizer}|]
+        [C.exp|symbolizer_base *{ new text_symbolizer}|]
       Mapnik.BuildingSymbolizer{} ->
-        [CU.exp|symbolizer_base *{ new building_symbolizer}|]
+        [C.exp|symbolizer_base *{ new building_symbolizer}|]
       Mapnik.MarkersSymbolizer{} ->
-        [CU.exp|symbolizer_base *{ new markers_symbolizer}|]
+        [C.exp|symbolizer_base *{ new markers_symbolizer}|]
       Mapnik.GroupSymbolizer{} ->
-        [CU.exp|symbolizer_base *{ new group_symbolizer}|]
+        [C.exp|symbolizer_base *{ new group_symbolizer}|]
       Mapnik.DebugSymbolizer{} ->
-        [CU.exp|symbolizer_base *{ new debug_symbolizer}|]
+        [C.exp|symbolizer_base *{ new debug_symbolizer}|]
       Mapnik.DotSymbolizer{} ->
-        [CU.exp|symbolizer_base *{ new dot_symbolizer}|]
+        [C.exp|symbolizer_base *{ new dot_symbolizer}|]
 
     toSym p = case sym of
       Mapnik.PointSymbolizer{} ->
-        [CU.exp|symbolizer *{ new symbolizer(*static_cast<point_symbolizer*>($(symbolizer_base *p)))}|]
+        [C.exp|symbolizer *{ new symbolizer(*static_cast<point_symbolizer*>($(symbolizer_base *p)))}|]
       Mapnik.LineSymbolizer{} ->
-        [CU.exp|symbolizer *{ new symbolizer(*static_cast<line_symbolizer*>($(symbolizer_base *p)))}|]
+        [C.exp|symbolizer *{ new symbolizer(*static_cast<line_symbolizer*>($(symbolizer_base *p)))}|]
       Mapnik.LinePatternSymbolizer{} ->
-        [CU.exp|symbolizer *{ new symbolizer(*static_cast<line_pattern_symbolizer*>($(symbolizer_base *p)))}|]
+        [C.exp|symbolizer *{ new symbolizer(*static_cast<line_pattern_symbolizer*>($(symbolizer_base *p)))}|]
       Mapnik.PolygonSymbolizer{} ->
-        [CU.exp|symbolizer *{ new symbolizer(*static_cast<polygon_symbolizer*>($(symbolizer_base *p)))}|]
+        [C.exp|symbolizer *{ new symbolizer(*static_cast<polygon_symbolizer*>($(symbolizer_base *p)))}|]
       Mapnik.PolygonPatternSymbolizer{} ->
-        [CU.exp|symbolizer *{ new symbolizer(*static_cast<polygon_pattern_symbolizer*>($(symbolizer_base *p)))}|]
+        [C.exp|symbolizer *{ new symbolizer(*static_cast<polygon_pattern_symbolizer*>($(symbolizer_base *p)))}|]
       Mapnik.RasterSymbolizer{} ->
-        [CU.exp|symbolizer *{ new symbolizer(*static_cast<raster_symbolizer*>($(symbolizer_base *p)))}|]
+        [C.exp|symbolizer *{ new symbolizer(*static_cast<raster_symbolizer*>($(symbolizer_base *p)))}|]
       Mapnik.ShieldSymbolizer{} ->
-        [CU.exp|symbolizer *{ new symbolizer(*static_cast<shield_symbolizer*>($(symbolizer_base *p)))}|]
+        [C.exp|symbolizer *{ new symbolizer(*static_cast<shield_symbolizer*>($(symbolizer_base *p)))}|]
       Mapnik.TextSymbolizer{} ->
-        [CU.exp|symbolizer *{ new symbolizer(*static_cast<text_symbolizer*>($(symbolizer_base *p)))}|]
+        [C.exp|symbolizer *{ new symbolizer(*static_cast<text_symbolizer*>($(symbolizer_base *p)))}|]
       Mapnik.BuildingSymbolizer{} ->
-        [CU.exp|symbolizer *{ new symbolizer(*static_cast<building_symbolizer*>($(symbolizer_base *p)))}|]
+        [C.exp|symbolizer *{ new symbolizer(*static_cast<building_symbolizer*>($(symbolizer_base *p)))}|]
       Mapnik.MarkersSymbolizer{} ->
-        [CU.exp|symbolizer *{ new symbolizer(*static_cast<markers_symbolizer*>($(symbolizer_base *p)))}|]
+        [C.exp|symbolizer *{ new symbolizer(*static_cast<markers_symbolizer*>($(symbolizer_base *p)))}|]
       Mapnik.GroupSymbolizer{} ->
-        [CU.exp|symbolizer *{ new symbolizer(*static_cast<group_symbolizer*>($(symbolizer_base *p)))}|]
+        [C.exp|symbolizer *{ new symbolizer(*static_cast<group_symbolizer*>($(symbolizer_base *p)))}|]
       Mapnik.DebugSymbolizer{} ->
-        [CU.exp|symbolizer *{ new symbolizer(*static_cast<debug_symbolizer*>($(symbolizer_base *p)))}|]
+        [C.exp|symbolizer *{ new symbolizer(*static_cast<debug_symbolizer*>($(symbolizer_base *p)))}|]
       Mapnik.DotSymbolizer{} ->
-        [CU.exp|symbolizer *{ new symbolizer(*static_cast<dot_symbolizer*>($(symbolizer_base *p)))}|]
+        [C.exp|symbolizer *{ new symbolizer(*static_cast<dot_symbolizer*>($(symbolizer_base *p)))}|]
 
 unCreate :: Symbolizer -> IO Mapnik.Symbolizer
-unCreate sym = do
+unCreate sym = runReaderT (unCreate' sym) mempty
+
+unCreate' :: Symbolizer -> SvM Mapnik.Symbolizer
+unCreate' sym = do
   symName <- getName sym
   case defFromName symName of
     Just s -> do
@@ -174,13 +186,14 @@ unCreate sym = do
       return (s & symbolizerProps .~ props)
     Nothing -> throwIO (userError ("Unexpected symbolizer name: " ++ unpack symName))
 
-getProperties :: Symbolizer -> IO [Property]
+getProperties :: Symbolizer -> SvM [Property]
 getProperties sym' = bracket alloc dealloc $ \sym -> do
   ret <- newIORef []
+  env <- ask
   let cb :: Ptr SymbolizerValue -> C.CUChar -> IO ()
-      cb p = withKey $ \(k :: Key a) -> do prop <- peekV p
+      cb p = withKey $ \(k :: Key a) -> do prop <- runReaderT (peekV p) env
                                            modifyIORef' ret ((k :=> prop):)
-  [C.block|void {
+  [C.safeBlock|void {
     symbolizer_base::cont_type const& props =
       $(symbolizer_base *sym)->properties;
     for (auto it=props.begin(); it!=props.end(); ++it) {
@@ -190,12 +203,12 @@ getProperties sym' = bracket alloc dealloc $ \sym -> do
     }|]
   readIORef ret
   where
-    alloc = [CU.exp|symbolizer_base * { get_symbolizer_base(*$fptr-ptr:(symbolizer *sym')) }|]
-    dealloc p = [CU.block|void { delete $(symbolizer_base *p);}|]
+    alloc = [C.exp|symbolizer_base * { get_symbolizer_base(*$fptr-ptr:(symbolizer *sym')) }|]
+    dealloc p = [C.exp|void { delete $(symbolizer_base *p)}|]
 
-getName :: Symbolizer -> IO Text
+getName :: MonadBaseControl IO m => Symbolizer -> m Text
 getName s = newText "Symbolizer.getName" $ \(p, len) ->
-  [CU.block|void {
+  [C.block|void {
   std::string s = symbolizer_name(*$fptr-ptr:(symbolizer *s));
   mallocedString(s, $(char **p), $(int *len));
   }|]
@@ -566,146 +579,149 @@ symbolizerProps = lens getProps setProps where
       , fmap (CompOp  :=>) (sym^?!compOp)
       ]
 
-setProperty :: Property -> Ptr SymbolizerBase -> IO ()
-setProperty ((keyIndex -> k) :=> (flip pokeV -> cb)) sym =
-  [C.block|void {
+setProperty :: Property -> Ptr SymbolizerBase -> SvM ()
+setProperty ((keyIndex -> k) :=> v) sym = do
+  env <- ask
+  let cb p = runReaderT (pokeV p v) env
+  [C.safeBlock|void {
     sym_value_type val;
     $fun:(void (*cb)(sym_value_type*))(&val);
     $(symbolizer_base *sym)->properties[$(keys k)] = val;
   }|]
 
 withKey
-  :: (forall a. Variant SymbolizerValue a => Key a -> IO b)
-  -> C.CUChar -> IO b
+  :: MonadBaseControl IO m
+  => (forall a. Variant SymbolizerValue a => Key a -> m b)
+  -> C.CUChar -> m b
 withKey f = \k -> if
-  | k == [CU.pure|keys{keys::gamma}|] -> f Gamma
-  | k == [CU.pure|keys{keys::gamma_method}|] -> f GammaMethod
-  | k == [CU.pure|keys{keys::opacity}|] -> f Opacity
-  | k == [CU.pure|keys{keys::alignment}|] -> f Alignment
-  | k == [CU.pure|keys{keys::offset}|] -> f Offset
-  | k == [CU.pure|keys{keys::comp_op}|] -> f CompOp
-  | k == [CU.pure|keys{keys::clip}|] -> f Clip
-  | k == [CU.pure|keys{keys::fill}|] -> f Fill
-  | k == [CU.pure|keys{keys::fill_opacity}|] -> f FillOpacity
-  | k == [CU.pure|keys{keys::stroke}|] -> f Stroke
-  | k == [CU.pure|keys{keys::stroke_width}|] -> f StrokeWidth
-  | k == [CU.pure|keys{keys::stroke_opacity}|] -> f StrokeOpacity
-  | k == [CU.pure|keys{keys::stroke_linejoin}|] -> f StrokeLinejoin
-  | k == [CU.pure|keys{keys::stroke_linecap}|] -> f StrokeLinecap
-  | k == [CU.pure|keys{keys::stroke_gamma}|] -> f StrokeGamma
-  | k == [CU.pure|keys{keys::stroke_gamma_method}|] -> f StrokeGammaMethod
-  | k == [CU.pure|keys{keys::stroke_dashoffset}|] -> f StrokeDashoffset
-  | k == [CU.pure|keys{keys::stroke_dasharray}|] -> f StrokeDasharray
-  | k == [CU.pure|keys{keys::stroke_miterlimit}|] -> f StrokeMiterlimit
-  | k == [CU.pure|keys{keys::geometry_transform}|] -> f GeometryTransform
-  | k == [CU.pure|keys{keys::line_rasterizer}|] -> f LineRasterizer
-  | k == [CU.pure|keys{keys::image_transform}|] -> f ImageTransform
-  | k == [CU.pure|keys{keys::spacing}|] -> f Spacing
-  | k == [CU.pure|keys{keys::max_error}|] -> f MaxError
-  | k == [CU.pure|keys{keys::allow_overlap}|] -> f AllowOverlap
-  | k == [CU.pure|keys{keys::ignore_placement}|] -> f IgnorePlacement
-  | k == [CU.pure|keys{keys::width}|] -> f Width
-  | k == [CU.pure|keys{keys::height}|] -> f Height
-  | k == [CU.pure|keys{keys::file}|] -> f File
-  | k == [CU.pure|keys{keys::shield_dx}|] -> f ShieldDx
-  | k == [CU.pure|keys{keys::shield_dy}|] -> f ShieldDy
-  | k == [CU.pure|keys{keys::unlock_image}|] -> f UnlockImage
-  | k == [CU.pure|keys{keys::mode}|] -> f Mode
-  | k == [CU.pure|keys{keys::scaling}|] -> f Scaling
-  | k == [CU.pure|keys{keys::filter_factor}|] -> f FilterFactor
-  | k == [CU.pure|keys{keys::mesh_size}|] -> f MeshSize
-  | k == [CU.pure|keys{keys::premultiplied}|] -> f Premultiplied
-  | k == [CU.pure|keys{keys::smooth}|] -> f Smooth
-  | k == [CU.pure|keys{keys::simplify_algorithm}|] -> f SimplifyAlgorithm
-  | k == [CU.pure|keys{keys::simplify_tolerance}|] -> f SimplifyTolerance
-  | k == [CU.pure|keys{keys::halo_rasterizer}|] -> f HaloRasterizer
-  | k == [CU.pure|keys{keys::text_placements_}|] -> f TextPlacementsKey
-  | k == [CU.pure|keys{keys::label_placement}|] -> f LabelPlacement
-  | k == [CU.pure|keys{keys::markers_placement_type}|] -> f MarkersPlacementKey
-  | k == [CU.pure|keys{keys::markers_multipolicy}|] -> f MarkersMultipolicy
-  | k == [CU.pure|keys{keys::point_placement_type}|] -> f PointPlacementKey
-  | k == [CU.pure|keys{keys::colorizer}|] -> f ColorizerKey
-  | k == [CU.pure|keys{keys::halo_transform}|] -> f HaloTransform
-  | k == [CU.pure|keys{keys::num_columns}|] -> f NumColumns
-  | k == [CU.pure|keys{keys::start_column}|] -> f StartColumn
-  | k == [CU.pure|keys{keys::repeat_key}|] -> f RepeatKey
-  | k == [CU.pure|keys{keys::group_properties}|] -> f GroupPropertiesKey
-  | k == [CU.pure|keys{keys::largest_box_only}|] -> f LargestBoxOnly
-  | k == [CU.pure|keys{keys::minimum_path_length}|] -> f MinimumPathLength
-  | k == [CU.pure|keys{keys::halo_comp_op}|] -> f HaloCompOp
-  | k == [CU.pure|keys{keys::text_transform}|] -> f TextTransform
-  | k == [CU.pure|keys{keys::horizontal_alignment}|] -> f HorizontalAlignment
-  | k == [CU.pure|keys{keys::justify_alignment}|] -> f JustifyAlignment
-  | k == [CU.pure|keys{keys::vertical_alignment}|] -> f VerticalAlignment
-  | k == [CU.pure|keys{keys::upright}|] -> f Upright
-  | k == [CU.pure|keys{keys::direction}|] -> f Direction
-  | k == [CU.pure|keys{keys::avoid_edges}|] -> f AvoidEdges
-  | k == [CU.pure|keys{keys::ff_settings}|] -> f FfSettings
+  | k == [C.pure|keys{keys::gamma}|] -> f Gamma
+  | k == [C.pure|keys{keys::gamma_method}|] -> f GammaMethod
+  | k == [C.pure|keys{keys::opacity}|] -> f Opacity
+  | k == [C.pure|keys{keys::alignment}|] -> f Alignment
+  | k == [C.pure|keys{keys::offset}|] -> f Offset
+  | k == [C.pure|keys{keys::comp_op}|] -> f CompOp
+  | k == [C.pure|keys{keys::clip}|] -> f Clip
+  | k == [C.pure|keys{keys::fill}|] -> f Fill
+  | k == [C.pure|keys{keys::fill_opacity}|] -> f FillOpacity
+  | k == [C.pure|keys{keys::stroke}|] -> f Stroke
+  | k == [C.pure|keys{keys::stroke_width}|] -> f StrokeWidth
+  | k == [C.pure|keys{keys::stroke_opacity}|] -> f StrokeOpacity
+  | k == [C.pure|keys{keys::stroke_linejoin}|] -> f StrokeLinejoin
+  | k == [C.pure|keys{keys::stroke_linecap}|] -> f StrokeLinecap
+  | k == [C.pure|keys{keys::stroke_gamma}|] -> f StrokeGamma
+  | k == [C.pure|keys{keys::stroke_gamma_method}|] -> f StrokeGammaMethod
+  | k == [C.pure|keys{keys::stroke_dashoffset}|] -> f StrokeDashoffset
+  | k == [C.pure|keys{keys::stroke_dasharray}|] -> f StrokeDasharray
+  | k == [C.pure|keys{keys::stroke_miterlimit}|] -> f StrokeMiterlimit
+  | k == [C.pure|keys{keys::geometry_transform}|] -> f GeometryTransform
+  | k == [C.pure|keys{keys::line_rasterizer}|] -> f LineRasterizer
+  | k == [C.pure|keys{keys::image_transform}|] -> f ImageTransform
+  | k == [C.pure|keys{keys::spacing}|] -> f Spacing
+  | k == [C.pure|keys{keys::max_error}|] -> f MaxError
+  | k == [C.pure|keys{keys::allow_overlap}|] -> f AllowOverlap
+  | k == [C.pure|keys{keys::ignore_placement}|] -> f IgnorePlacement
+  | k == [C.pure|keys{keys::width}|] -> f Width
+  | k == [C.pure|keys{keys::height}|] -> f Height
+  | k == [C.pure|keys{keys::file}|] -> f File
+  | k == [C.pure|keys{keys::shield_dx}|] -> f ShieldDx
+  | k == [C.pure|keys{keys::shield_dy}|] -> f ShieldDy
+  | k == [C.pure|keys{keys::unlock_image}|] -> f UnlockImage
+  | k == [C.pure|keys{keys::mode}|] -> f Mode
+  | k == [C.pure|keys{keys::scaling}|] -> f Scaling
+  | k == [C.pure|keys{keys::filter_factor}|] -> f FilterFactor
+  | k == [C.pure|keys{keys::mesh_size}|] -> f MeshSize
+  | k == [C.pure|keys{keys::premultiplied}|] -> f Premultiplied
+  | k == [C.pure|keys{keys::smooth}|] -> f Smooth
+  | k == [C.pure|keys{keys::simplify_algorithm}|] -> f SimplifyAlgorithm
+  | k == [C.pure|keys{keys::simplify_tolerance}|] -> f SimplifyTolerance
+  | k == [C.pure|keys{keys::halo_rasterizer}|] -> f HaloRasterizer
+  | k == [C.pure|keys{keys::text_placements_}|] -> f TextPlacementsKey
+  | k == [C.pure|keys{keys::label_placement}|] -> f LabelPlacement
+  | k == [C.pure|keys{keys::markers_placement_type}|] -> f MarkersPlacementKey
+  | k == [C.pure|keys{keys::markers_multipolicy}|] -> f MarkersMultipolicy
+  | k == [C.pure|keys{keys::point_placement_type}|] -> f PointPlacementKey
+  | k == [C.pure|keys{keys::colorizer}|] -> f ColorizerKey
+  | k == [C.pure|keys{keys::halo_transform}|] -> f HaloTransform
+  | k == [C.pure|keys{keys::num_columns}|] -> f NumColumns
+  | k == [C.pure|keys{keys::start_column}|] -> f StartColumn
+  | k == [C.pure|keys{keys::repeat_key}|] -> f RepeatKey
+  | k == [C.pure|keys{keys::group_properties}|] -> f GroupPropertiesKey
+  | k == [C.pure|keys{keys::largest_box_only}|] -> f LargestBoxOnly
+  | k == [C.pure|keys{keys::minimum_path_length}|] -> f MinimumPathLength
+  | k == [C.pure|keys{keys::halo_comp_op}|] -> f HaloCompOp
+  | k == [C.pure|keys{keys::text_transform}|] -> f TextTransform
+  | k == [C.pure|keys{keys::horizontal_alignment}|] -> f HorizontalAlignment
+  | k == [C.pure|keys{keys::justify_alignment}|] -> f JustifyAlignment
+  | k == [C.pure|keys{keys::vertical_alignment}|] -> f VerticalAlignment
+  | k == [C.pure|keys{keys::upright}|] -> f Upright
+  | k == [C.pure|keys{keys::direction}|] -> f Direction
+  | k == [C.pure|keys{keys::avoid_edges}|] -> f AvoidEdges
+  | k == [C.pure|keys{keys::ff_settings}|] -> f FfSettings
 
 keyIndex :: Key a -> C.CUChar
-keyIndex Gamma = [CU.pure|keys{keys::gamma}|]
-keyIndex GammaMethod = [CU.pure|keys{keys::gamma_method}|]
-keyIndex Opacity = [CU.pure|keys{keys::opacity}|]
-keyIndex Alignment = [CU.pure|keys{keys::alignment}|]
-keyIndex Offset = [CU.pure|keys{keys::offset}|]
-keyIndex CompOp = [CU.pure|keys{keys::comp_op}|]
-keyIndex Clip = [CU.pure|keys{keys::clip}|]
-keyIndex Fill = [CU.pure|keys{keys::fill}|]
-keyIndex FillOpacity = [CU.pure|keys{keys::fill_opacity}|]
-keyIndex Stroke = [CU.pure|keys{keys::stroke}|]
-keyIndex StrokeWidth = [CU.pure|keys{keys::stroke_width}|]
-keyIndex StrokeOpacity = [CU.pure|keys{keys::stroke_opacity}|]
-keyIndex StrokeLinejoin = [CU.pure|keys{keys::stroke_linejoin}|]
-keyIndex StrokeLinecap = [CU.pure|keys{keys::stroke_linecap}|]
-keyIndex StrokeGamma = [CU.pure|keys{keys::stroke_gamma}|]
-keyIndex StrokeGammaMethod = [CU.pure|keys{keys::stroke_gamma_method}|]
-keyIndex StrokeDashoffset = [CU.pure|keys{keys::stroke_dashoffset}|]
-keyIndex StrokeDasharray = [CU.pure|keys{keys::stroke_dasharray}|]
-keyIndex StrokeMiterlimit = [CU.pure|keys{keys::stroke_miterlimit}|]
-keyIndex GeometryTransform = [CU.pure|keys{keys::geometry_transform}|]
-keyIndex LineRasterizer = [CU.pure|keys{keys::line_rasterizer}|]
-keyIndex ImageTransform = [CU.pure|keys{keys::image_transform}|]
-keyIndex Spacing = [CU.pure|keys{keys::spacing}|]
-keyIndex MaxError = [CU.pure|keys{keys::max_error}|]
-keyIndex AllowOverlap = [CU.pure|keys{keys::allow_overlap}|]
-keyIndex IgnorePlacement = [CU.pure|keys{keys::ignore_placement}|]
-keyIndex Width = [CU.pure|keys{keys::width}|]
-keyIndex Height = [CU.pure|keys{keys::height}|]
-keyIndex File = [CU.pure|keys{keys::file}|]
-keyIndex ShieldDx = [CU.pure|keys{keys::shield_dx}|]
-keyIndex ShieldDy = [CU.pure|keys{keys::shield_dy}|]
-keyIndex UnlockImage = [CU.pure|keys{keys::unlock_image}|]
-keyIndex Mode = [CU.pure|keys{keys::mode}|]
-keyIndex Scaling = [CU.pure|keys{keys::scaling}|]
-keyIndex FilterFactor = [CU.pure|keys{keys::filter_factor}|]
-keyIndex MeshSize = [CU.pure|keys{keys::mesh_size}|]
-keyIndex Premultiplied = [CU.pure|keys{keys::premultiplied}|]
-keyIndex Smooth = [CU.pure|keys{keys::smooth}|]
-keyIndex SimplifyAlgorithm = [CU.pure|keys{keys::simplify_algorithm}|]
-keyIndex SimplifyTolerance = [CU.pure|keys{keys::simplify_tolerance}|]
-keyIndex HaloRasterizer = [CU.pure|keys{keys::halo_rasterizer}|]
-keyIndex TextPlacementsKey = [CU.pure|keys{keys::text_placements_}|]
-keyIndex LabelPlacement = [CU.pure|keys{keys::label_placement}|]
-keyIndex MarkersPlacementKey = [CU.pure|keys{keys::markers_placement_type}|]
-keyIndex MarkersMultipolicy = [CU.pure|keys{keys::markers_multipolicy}|]
-keyIndex PointPlacementKey = [CU.pure|keys{keys::point_placement_type}|]
-keyIndex ColorizerKey = [CU.pure|keys{keys::colorizer}|]
-keyIndex HaloTransform = [CU.pure|keys{keys::halo_transform}|]
-keyIndex NumColumns = [CU.pure|keys{keys::num_columns}|]
-keyIndex StartColumn = [CU.pure|keys{keys::start_column}|]
-keyIndex RepeatKey = [CU.pure|keys{keys::repeat_key}|]
-keyIndex GroupPropertiesKey = [CU.pure|keys{keys::group_properties}|]
-keyIndex LargestBoxOnly = [CU.pure|keys{keys::largest_box_only}|]
-keyIndex MinimumPathLength = [CU.pure|keys{keys::minimum_path_length}|]
-keyIndex HaloCompOp = [CU.pure|keys{keys::halo_comp_op}|]
-keyIndex TextTransform = [CU.pure|keys{keys::text_transform}|]
-keyIndex HorizontalAlignment = [CU.pure|keys{keys::horizontal_alignment}|]
-keyIndex JustifyAlignment = [CU.pure|keys{keys::justify_alignment}|]
-keyIndex VerticalAlignment = [CU.pure|keys{keys::vertical_alignment}|]
-keyIndex Upright = [CU.pure|keys{keys::upright}|]
-keyIndex Direction = [CU.pure|keys{keys::direction}|]
-keyIndex AvoidEdges = [CU.pure|keys{keys::avoid_edges}|]
-keyIndex FfSettings = [CU.pure|keys{keys::ff_settings}|]
+keyIndex Gamma = [C.pure|keys{keys::gamma}|]
+keyIndex GammaMethod = [C.pure|keys{keys::gamma_method}|]
+keyIndex Opacity = [C.pure|keys{keys::opacity}|]
+keyIndex Alignment = [C.pure|keys{keys::alignment}|]
+keyIndex Offset = [C.pure|keys{keys::offset}|]
+keyIndex CompOp = [C.pure|keys{keys::comp_op}|]
+keyIndex Clip = [C.pure|keys{keys::clip}|]
+keyIndex Fill = [C.pure|keys{keys::fill}|]
+keyIndex FillOpacity = [C.pure|keys{keys::fill_opacity}|]
+keyIndex Stroke = [C.pure|keys{keys::stroke}|]
+keyIndex StrokeWidth = [C.pure|keys{keys::stroke_width}|]
+keyIndex StrokeOpacity = [C.pure|keys{keys::stroke_opacity}|]
+keyIndex StrokeLinejoin = [C.pure|keys{keys::stroke_linejoin}|]
+keyIndex StrokeLinecap = [C.pure|keys{keys::stroke_linecap}|]
+keyIndex StrokeGamma = [C.pure|keys{keys::stroke_gamma}|]
+keyIndex StrokeGammaMethod = [C.pure|keys{keys::stroke_gamma_method}|]
+keyIndex StrokeDashoffset = [C.pure|keys{keys::stroke_dashoffset}|]
+keyIndex StrokeDasharray = [C.pure|keys{keys::stroke_dasharray}|]
+keyIndex StrokeMiterlimit = [C.pure|keys{keys::stroke_miterlimit}|]
+keyIndex GeometryTransform = [C.pure|keys{keys::geometry_transform}|]
+keyIndex LineRasterizer = [C.pure|keys{keys::line_rasterizer}|]
+keyIndex ImageTransform = [C.pure|keys{keys::image_transform}|]
+keyIndex Spacing = [C.pure|keys{keys::spacing}|]
+keyIndex MaxError = [C.pure|keys{keys::max_error}|]
+keyIndex AllowOverlap = [C.pure|keys{keys::allow_overlap}|]
+keyIndex IgnorePlacement = [C.pure|keys{keys::ignore_placement}|]
+keyIndex Width = [C.pure|keys{keys::width}|]
+keyIndex Height = [C.pure|keys{keys::height}|]
+keyIndex File = [C.pure|keys{keys::file}|]
+keyIndex ShieldDx = [C.pure|keys{keys::shield_dx}|]
+keyIndex ShieldDy = [C.pure|keys{keys::shield_dy}|]
+keyIndex UnlockImage = [C.pure|keys{keys::unlock_image}|]
+keyIndex Mode = [C.pure|keys{keys::mode}|]
+keyIndex Scaling = [C.pure|keys{keys::scaling}|]
+keyIndex FilterFactor = [C.pure|keys{keys::filter_factor}|]
+keyIndex MeshSize = [C.pure|keys{keys::mesh_size}|]
+keyIndex Premultiplied = [C.pure|keys{keys::premultiplied}|]
+keyIndex Smooth = [C.pure|keys{keys::smooth}|]
+keyIndex SimplifyAlgorithm = [C.pure|keys{keys::simplify_algorithm}|]
+keyIndex SimplifyTolerance = [C.pure|keys{keys::simplify_tolerance}|]
+keyIndex HaloRasterizer = [C.pure|keys{keys::halo_rasterizer}|]
+keyIndex TextPlacementsKey = [C.pure|keys{keys::text_placements_}|]
+keyIndex LabelPlacement = [C.pure|keys{keys::label_placement}|]
+keyIndex MarkersPlacementKey = [C.pure|keys{keys::markers_placement_type}|]
+keyIndex MarkersMultipolicy = [C.pure|keys{keys::markers_multipolicy}|]
+keyIndex PointPlacementKey = [C.pure|keys{keys::point_placement_type}|]
+keyIndex ColorizerKey = [C.pure|keys{keys::colorizer}|]
+keyIndex HaloTransform = [C.pure|keys{keys::halo_transform}|]
+keyIndex NumColumns = [C.pure|keys{keys::num_columns}|]
+keyIndex StartColumn = [C.pure|keys{keys::start_column}|]
+keyIndex RepeatKey = [C.pure|keys{keys::repeat_key}|]
+keyIndex GroupPropertiesKey = [C.pure|keys{keys::group_properties}|]
+keyIndex LargestBoxOnly = [C.pure|keys{keys::largest_box_only}|]
+keyIndex MinimumPathLength = [C.pure|keys{keys::minimum_path_length}|]
+keyIndex HaloCompOp = [C.pure|keys{keys::halo_comp_op}|]
+keyIndex TextTransform = [C.pure|keys{keys::text_transform}|]
+keyIndex HorizontalAlignment = [C.pure|keys{keys::horizontal_alignment}|]
+keyIndex JustifyAlignment = [C.pure|keys{keys::justify_alignment}|]
+keyIndex VerticalAlignment = [C.pure|keys{keys::vertical_alignment}|]
+keyIndex Upright = [C.pure|keys{keys::upright}|]
+keyIndex Direction = [C.pure|keys{keys::direction}|]
+keyIndex AvoidEdges = [C.pure|keys{keys::avoid_edges}|]
+keyIndex FfSettings = [C.pure|keys{keys::ff_settings}|]
 
 
 
@@ -717,10 +733,10 @@ keyIndex FfSettings = [CU.pure|keys{keys::ff_settings}|]
 
 foreign import ccall "&hs_mapnik_destroy_TextPlacements" destroyTextPlacements :: FinalizerPtr TextPlacements
 
-createTextPlacements :: Mapnik.TextPlacements -> IO TextPlacements
+createTextPlacements :: Mapnik.TextPlacements -> SvM TextPlacements
 createTextPlacements (Mapnik.Dummy defs) = unsafeNew $ \p -> do
   defaults <- createTextSymProps defs
-  [CU.block|void {
+  [C.block|void {
     auto placements = std::make_shared<text_placements_dummy>();
     *$(text_placements_ptr **p) = new text_placements_ptr(placements);
     placements->defaults = *$fptr-ptr:(text_symbolizer_properties *defaults);
@@ -730,11 +746,11 @@ createTextPlacements (Mapnik.Dummy defs) = unsafeNew $ \p -> do
 
 
 
-unCreateTextPlacements :: TextPlacements -> IO Mapnik.TextPlacements
-unCreateTextPlacements (TextPlacements fp) = withForeignPtr fp $ \p ->
+unCreateTextPlacements :: TextPlacements -> SvM Mapnik.TextPlacements
+unCreateTextPlacements p =
   fmap Mapnik.Dummy . unCreateTextSymProps =<< C.withPtr_ (\ret ->
-    [CU.block|void {
-    auto ptr = dynamic_cast<text_placements_dummy *>($(text_placements_ptr *p)->get());
+    [C.block|void {
+    auto ptr = dynamic_cast<text_placements_dummy *>($fptr-ptr:(text_placements_ptr *p)->get());
     assert(ptr);
     *$(text_symbolizer_properties **ret) = &ptr->defaults;
     }|])
@@ -743,7 +759,7 @@ unCreateTextPlacements (TextPlacements fp) = withForeignPtr fp $ \p ->
 instance Variant SymbolizerValue Mapnik.TextPlacements where
   peekV p = unCreateTextPlacements =<<
     justOrTypeError "TextPlacements" (unsafeNewMaybe $ \ret ->
-      [CU.block|void {
+      [C.block|void {
       try {
         *$(text_placements_ptr **ret) =
           new text_placements_ptr(util::get<text_placements_ptr>(*$(sym_value_type *p)));
@@ -755,7 +771,7 @@ instance Variant SymbolizerValue Mapnik.TextPlacements where
       unsafeNewMaybe = mkUnsafeNewMaybe TextPlacements destroyTextPlacements
   pokeV p v' = do
     v <- createTextPlacements v'
-    [CU.block|void { *$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(text_placements_ptr *v)); }|]
+    [C.block|void { *$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(text_placements_ptr *v)); }|]
 
 
 --------------------------------------------------------------------------------
@@ -765,41 +781,42 @@ instance Variant SymbolizerValue Mapnik.TextPlacements where
 foreign import ccall "&hs_mapnik_destroy_TextSymProperties" destroyTextSymProperties :: FinalizerPtr TextSymProperties
 foreign import ccall "&hs_mapnik_destroy_Format" destroyFormat :: FinalizerPtr Format
 
-unsafeNewFormat :: (Ptr (Ptr Format) -> IO ()) -> IO Format
+unsafeNewFormat :: MonadBaseControl IO m => (Ptr (Ptr Format) -> m ()) -> m Format
 unsafeNewFormat = mkUnsafeNew Format destroyFormat
 
 #define SET_NODE_PROP(TY,HS,CPP) \
-    forM_ HS $ \v -> withV v $ \v' -> [CU.block|void { \
+    forM_ HS $ \v -> withV v $ \v' -> [C.block|void { \
       auto node = dynamic_cast<TY*>((*$(node_ptr **p))->get()); \
       node->CPP = *$(sym_value_type *v'); \
       }|]
 
-createFormat :: Mapnik.Format -> IO Format
+createFormat :: Mapnik.Format -> SvM Format
 createFormat f = unsafeNewFormat $ \p -> case f of
   Mapnik.FormatExp (Mapnik.Expression e') ->
     case Expression.parse e' of
       Right e ->
-        [CU.block|void {
+        [C.block|void {
         auto node = std::make_shared<text_node>(*$fptr-ptr:(expression_ptr *e));
         *$(node_ptr **p) = new node_ptr(node);
         }|]
       Left e -> throwIO (userError ("Could not parse format expression" ++ e))
   Mapnik.NullFormat ->
-    [CU.block|void { *$(node_ptr **p) = new node_ptr(nullptr); }|]
+    [C.block|void { *$(node_ptr **p) = new node_ptr(nullptr); }|]
   Mapnik.FormatList fs -> do
-    [CU.block|void {
+    [C.block|void {
     auto node = std::make_shared<list_node>();
     *$(node_ptr **p) = new node_ptr(node);
     }|]
     forM_ fs $ \f' -> do
       f'' <- createFormat f'
-      [CU.block|void {
+      [C.block|void {
         auto parent = static_cast<list_node*>((*$(node_ptr **p))->get());
         parent->push_back(*$fptr-ptr:(node_ptr *f''));
         }|]
   Mapnik.Format {..} -> do
     next' <- createFormat next
-    [CU.block|void {
+    --TODO Handle font
+    [C.block|void {
     auto node = std::make_shared<format_node>();
     node->set_child(*$fptr-ptr:(node_ptr *next'));
     *$(node_ptr **p) = new node_ptr(node);
@@ -817,7 +834,7 @@ createFormat f = unsafeNewFormat $ \p -> case f of
 
   Mapnik.FormatLayout {..} -> do
     next' <- createFormat next
-    [CU.block|void {
+    [C.block|void {
     auto node = std::make_shared<layout_node>();
     node->set_child(*$fptr-ptr:(node_ptr *next'));
     *$(node_ptr **p) = new node_ptr(node);
@@ -836,15 +853,16 @@ createFormat f = unsafeNewFormat $ \p -> case f of
     SET_NODE_PROP(layout_node, verticalAlignment, valign)
 
 
-#define SET_PROP_T(HS,CPP) forM_ HS (\v -> (`pokeV` v) =<< [CU.exp|sym_value_type *{ &$(text_properties_expressions *p)->CPP}|])
-#define SET_PROP_F(HS,CPP) forM_ HS (\v -> (`pokeV` v) =<< [CU.exp|sym_value_type *{ &$(format_properties *p)->CPP}|])
-#define SET_PROP_L(HS,CPP) forM_ HS (\v -> (`pokeV` v) =<< [CU.exp|sym_value_type *{ &$(text_layout_properties *p)->CPP}|])
+#define SET_PROP_T(HS,CPP) forM_ HS (\v -> (`pokeV` v) =<< [C.exp|sym_value_type *{ &$(text_properties_expressions *p)->CPP}|])
+#define SET_PROP_F(HS,CPP) forM_ HS (\v -> (`pokeV` v) =<< [C.exp|sym_value_type *{ &$(format_properties *p)->CPP}|])
+#define SET_PROP_L(HS,CPP) forM_ HS (\v -> (`pokeV` v) =<< [C.exp|sym_value_type *{ &$(text_layout_properties *p)->CPP}|])
 
-withTextProperties :: Mapnik.TextProperties -> (Ptr TextProperties -> IO a) -> IO a
+withTextProperties
+  :: Mapnik.TextProperties -> (Ptr TextProperties -> SvM a) -> SvM a
 withTextProperties Mapnik.TextProperties{..} = bracket alloc dealloc . enter
   where
-    alloc = [CU.exp|text_properties_expressions * { new text_properties_expressions() }|]
-    dealloc p = [CU.exp|void{delete $(text_properties_expressions *p)}|]
+    alloc = [C.exp|text_properties_expressions * { new text_properties_expressions() }|]
+    dealloc p = [C.exp|void{delete $(text_properties_expressions *p)}|]
     enter f p = do
       SET_PROP_T(labelPlacement,label_placement)
       SET_PROP_T(labelSpacing,label_spacing)
@@ -860,17 +878,19 @@ withTextProperties Mapnik.TextProperties{..} = bracket alloc dealloc . enter
       SET_PROP_T(upright,upright)
       f p
 
-withFormatProperties :: Mapnik.TextFormatProperties -> (Ptr TextFormatProperties -> IO a) -> IO a
+withFormatProperties
+  :: Mapnik.TextFormatProperties -> (Ptr TextFormatProperties -> SvM a) -> SvM a
 withFormatProperties Mapnik.TextFormatProperties{..} = bracket alloc dealloc . enter
   where
-    alloc = [CU.exp|format_properties * { new format_properties() }|]
-    dealloc p = [CU.exp|void{delete $(format_properties *p)}|]
+    alloc = [C.exp|format_properties * { new format_properties() }|]
+    dealloc p = [C.exp|void{delete $(format_properties *p)}|]
     enter f p = do
-      forM_ faceName $ \(encodeUtf8 -> v) ->
-        [CU.block|void {
-        $(format_properties *p)->face_name = std::string($bs-ptr:v, $bs-len:v);
-        }|]
-      --TODO fontSet
+      forM_ font $ \case
+        Mapnik.FaceName (encodeUtf8 -> v) ->
+          [C.block|void {
+          $(format_properties *p)->face_name = std::string($bs-ptr:v, $bs-len:v);
+          }|]
+        --TODO fontSet
       SET_PROP_F(textSize,text_size)
       SET_PROP_F(characterSpacing,character_spacing)
       SET_PROP_F(lineSpacing,line_spacing)
@@ -883,11 +903,12 @@ withFormatProperties Mapnik.TextFormatProperties{..} = bracket alloc dealloc . e
       SET_PROP_F(ffSettings,ff_settings)
       f p
 
-withLayoutProperties :: Mapnik.TextLayoutProperties -> (Ptr TextLayoutProperties -> IO a) -> IO a
+withLayoutProperties
+  :: Mapnik.TextLayoutProperties -> (Ptr TextLayoutProperties -> SvM a) -> SvM a
 withLayoutProperties Mapnik.TextLayoutProperties{..} = bracket alloc dealloc . enter
   where
-    alloc = [CU.exp|text_layout_properties * { new text_layout_properties() }|]
-    dealloc p = [CU.exp|void{delete $(text_layout_properties *p)}|]
+    alloc = [C.exp|text_layout_properties * { new text_layout_properties() }|]
+    dealloc p = [C.exp|void{delete $(text_layout_properties *p)}|]
     enter f p = do
       SET_PROP_L(dx,dx)
       SET_PROP_L(dy,dy)
@@ -902,48 +923,48 @@ withLayoutProperties Mapnik.TextLayoutProperties{..} = bracket alloc dealloc . e
       SET_PROP_L(justifyAlignment,jalign)
       SET_PROP_L(verticalAlignment,valign)
       forM_ direction $ \(fromIntegral . fromEnum -> v) ->
-        [CU.block|void { $(text_layout_properties *p)->dir = static_cast<directions_e>($(int v)); }|]
+        [C.block|void { $(text_layout_properties *p)->dir = static_cast<directions_e>($(int v)); }|]
       f p
 
-createTextSymProps :: Mapnik.TextSymProperties -> IO TextSymProperties
+createTextSymProps :: Mapnik.TextSymProperties -> SvM TextSymProperties
 createTextSymProps Mapnik.TextSymProperties{..} = unsafeNewTextSymProps $ \p ->
-  createFormat format >>= \(Format fp) -> withForeignPtr fp (\fmt ->
+  createFormat format >>= \fmt ->
   withTextProperties properties $ \props ->
   withFormatProperties formatProperties $ \formatProps ->
   withLayoutProperties layoutProperties $ \layoutProps ->
-    [CU.block|void {
+    [C.block|void {
       text_symbolizer_properties *props =
         *$(text_symbolizer_properties **p) = new text_symbolizer_properties();
       props->expressions     = *$(text_properties_expressions *props);
       props->layout_defaults = *$(text_layout_properties *layoutProps);
       props->format_defaults = *$(format_properties *formatProps);
-      props->set_format_tree(*$(node_ptr *fmt));
-    }|])
+      props->set_format_tree(*$fptr-ptr:(node_ptr *fmt));
+    }|]
   where
     unsafeNewTextSymProps = mkUnsafeNew TextSymProperties destroyTextSymProperties
 
 
-unCreateTextSymProps :: Ptr TextSymProperties -> IO Mapnik.TextSymProperties
+unCreateTextSymProps :: Ptr TextSymProperties -> SvM Mapnik.TextSymProperties
 unCreateTextSymProps ps = do
   format <- unFormat =<< unsafeNewFormat (\p ->
-    [CU.block|void {
+    [C.block|void {
       *$(node_ptr **p) = new node_ptr($(text_symbolizer_properties *ps)->format_tree());
     }|])
-  properties <- unProperties =<< [CU.exp|text_properties_expressions * {
+  properties <- unProperties =<< [C.exp|text_properties_expressions * {
     &$(text_symbolizer_properties *ps)->expressions
     }|]
-  formatProperties <- unFormatProperties =<< [CU.exp|format_properties * {
+  formatProperties <- unFormatProperties =<< [C.exp|format_properties * {
     &$(text_symbolizer_properties *ps)->format_defaults
     }|]
-  layoutProperties <- unLayoutProperties =<< [CU.exp|text_layout_properties * {
+  layoutProperties <- unLayoutProperties =<< [C.exp|text_layout_properties * {
     &$(text_symbolizer_properties *ps)->layout_defaults
     }|]
   return Mapnik.TextSymProperties{..}
 
 #define GET_OPT_PROP(TY,HS,CPP) \
   HS <- readPropWith $ \(has, ret) -> \
-    [CU.block|void{\
-      auto node = dynamic_cast<TY*>($(node_ptr *p)->get()); \
+    [C.block|void{\
+      auto node = dynamic_cast<TY*>($fptr-ptr:(node_ptr *p)->get()); \
       if (node->CPP) {\
         *$(int *has) = 1;\
         *$(sym_value_type** ret) = &(*node->CPP);\
@@ -952,12 +973,12 @@ unCreateTextSymProps ps = do
       }\
       }|]
 
-unFormat :: Format -> IO Mapnik.Format
-unFormat (Format fp) = withForeignPtr fp $ \p -> do
+unFormat :: Format -> SvM Mapnik.Format
+unFormat p = do
   ty <- C.withPtr_ $ \ty ->
-    [CU.block|void { do {
+    [C.block|void { do {
       *$(int *ty) = -1;
-      node_ptr node = *$(node_ptr *p);
+      node_ptr node = *$fptr-ptr:(node_ptr *p);
       if (!node) {
         break;
       }
@@ -990,8 +1011,8 @@ unFormat (Format fp) = withForeignPtr fp $ \p -> do
   case ty of
     (-1) -> return Mapnik.NullFormat
     0 -> fmap (Mapnik.FormatExp . Mapnik.Expression) $ newText "unFormat(FormatExp)" $ \(ret,len) ->
-        [CU.block|void {
-          text_node *text = dynamic_cast<text_node*>($(node_ptr *p)->get());
+        [C.block|void {
+          text_node *text = dynamic_cast<text_node*>($fptr-ptr:(node_ptr *p)->get());
           auto exp = text->get_text();
           std::string s = to_expression_string(*exp);
           mallocedString(s, $(char **ret), $(int *len));
@@ -999,8 +1020,8 @@ unFormat (Format fp) = withForeignPtr fp $ \p -> do
 
     1 -> do {
       faceName <- newTextMaybe "unFormat(Format.faceName)" $ \(ret,len) ->
-        [CU.block|void {
-        auto const node = dynamic_cast<format_node*>($(node_ptr *p)->get());
+        [C.block|void {
+        auto const node = dynamic_cast<format_node*>($fptr-ptr:(node_ptr *p)->get());
         auto v = node->face_name;
         if (v) {
           mallocedString(*v, $(char **ret), $(int *len));
@@ -1008,7 +1029,7 @@ unFormat (Format fp) = withForeignPtr fp $ \p -> do
           *$(char **ret) = nullptr;
         }
         }|];
-      fontSet <- return Nothing; --TODO
+      font <- return Nothing; --TODO
       GET_OPT_PROP(format_node, textSize, text_size);
       GET_OPT_PROP(format_node, characterSpacing, character_spacing);
       GET_OPT_PROP(format_node, lineSpacing, line_spacing);
@@ -1020,8 +1041,8 @@ unFormat (Format fp) = withForeignPtr fp $ \p -> do
       GET_OPT_PROP(format_node, haloRadius, halo_radius);
       GET_OPT_PROP(format_node, ffSettings, ff_settings);
 
-      next <- unFormat =<< unsafeNewFormat (\pf -> [CU.block|void{
-        auto const node = dynamic_cast<format_node*>($(node_ptr *p)->get());
+      next <- unFormat =<< unsafeNewFormat (\pf -> [C.block|void{
+        auto const node = dynamic_cast<format_node*>($fptr-ptr:(node_ptr *p)->get());
         *$(node_ptr **pf) =
           new node_ptr(node->get_child());
         }|]);
@@ -1042,8 +1063,8 @@ unFormat (Format fp) = withForeignPtr fp $ \p -> do
       GET_OPT_PROP(layout_node, justifyAlignment, jalign);
       GET_OPT_PROP(layout_node, verticalAlignment, valign);
 
-      next <- unFormat =<< unsafeNewFormat (\pf -> [CU.block|void{
-        auto const node = dynamic_cast<layout_node*>($(node_ptr *p)->get());
+      next <- unFormat =<< unsafeNewFormat (\pf -> [C.block|void{
+        auto const node = dynamic_cast<layout_node*>($fptr-ptr:(node_ptr *p)->get());
         *$(node_ptr **pf) =
           new node_ptr(node->get_child());
         }|]);
@@ -1056,8 +1077,8 @@ unFormat (Format fp) = withForeignPtr fp $ \p -> do
           callback cp = do
             child <- unsafeNewFormat (`poke` cp)
             modifyIORef' childRef (child:)
-      [C.block|void {
-        auto const node = dynamic_cast<list_node*>($(node_ptr *p)->get());
+      [C.safeBlock|void {
+        auto const node = dynamic_cast<list_node*>($fptr-ptr:(node_ptr *p)->get());
         auto children = node->get_children();
         for (auto it=children.begin(); it!=children.end(); ++it) {
           $fun:(void (*callback)(node_ptr *))(new node_ptr(*it));
@@ -1069,17 +1090,16 @@ unFormat (Format fp) = withForeignPtr fp $ \p -> do
 
     _ -> throwIO (userError "Unsupported node_ptr type")
 
-
 readPropWith
   :: Variant SymbolizerValue a
-  => ((Ptr C.CInt, Ptr (Ptr SymbolizerValue)) -> IO ()) -> IO (Maybe a)
+  => ((Ptr C.CInt, Ptr (Ptr SymbolizerValue)) -> SvM ()) -> SvM (Maybe a)
 readPropWith f = do
   (has,ret) <- C.withPtrs_ f
   if has==1 then Just <$> peekV ret else return Nothing
 
 #define GET_PROP(PS, HS, CPP) \
   HS <- readPropWith $ \(has,ret) -> \
-    [CU.block|void { \
+    [C.block|void { \
     const PS def;\
     auto v = *$(sym_value_type **ret) = &$(PS *p)->CPP;\
     *$(int *has) = *v != def.CPP;\
@@ -1088,10 +1108,10 @@ readPropWith f = do
 #define GET_PROP_L(HS,CPP) GET_PROP(text_layout_properties,HS,CPP)
 #define GET_PROP_T(HS,CPP) GET_PROP(text_properties_expressions,HS,CPP)
 
-unFormatProperties :: Ptr TextFormatProperties -> IO Mapnik.TextFormatProperties
+unFormatProperties :: Ptr TextFormatProperties -> SvM Mapnik.TextFormatProperties
 unFormatProperties p = do
   faceName <- newTextMaybe "unFormatProperties(faceName)" $ \(ret,len) ->
-    [CU.block|void {
+    [C.block|void {
     const format_properties def;
     auto v = $(format_properties *p)->face_name;
     if (v != def.face_name) {
@@ -1100,7 +1120,7 @@ unFormatProperties p = do
       *$(char **ret) = nullptr;
     }
     }|]
-  fontSet <- return Nothing --TODO
+  font <- return Nothing --TODO
   GET_PROP_F(textSize, text_size)
   GET_PROP_F(characterSpacing, character_spacing)
   GET_PROP_F(lineSpacing, line_spacing)
@@ -1113,7 +1133,7 @@ unFormatProperties p = do
   GET_PROP_F(ffSettings, ff_settings)
   return Mapnik.TextFormatProperties{..}
 
-unLayoutProperties :: Ptr TextLayoutProperties -> IO Mapnik.TextLayoutProperties
+unLayoutProperties :: Ptr TextLayoutProperties -> SvM Mapnik.TextLayoutProperties
 unLayoutProperties p = do
   GET_PROP_L(dx,dx)
   GET_PROP_L(dy,dy)
@@ -1128,7 +1148,7 @@ unLayoutProperties p = do
   GET_PROP_L(justifyAlignment,jalign)
   GET_PROP_L(verticalAlignment,valign)
   direction <- fmap (fmap (toEnum . fromIntegral)) $ newMaybe $ \(has,ret) ->
-    [CU.block|void {
+    [C.block|void {
     const text_layout_properties def;
     auto v = $(text_layout_properties *p)->dir;
     if (*$(int *has) = v != def.dir) {
@@ -1137,7 +1157,7 @@ unLayoutProperties p = do
     }|]
   return Mapnik.TextLayoutProperties{..}
 
-unProperties :: Ptr TextProperties -> IO Mapnik.TextProperties
+unProperties :: Ptr TextProperties -> SvM Mapnik.TextProperties
 unProperties p = do
   GET_PROP_T(labelPlacement,label_placement)
   GET_PROP_T(labelSpacing,label_spacing)
@@ -1158,34 +1178,33 @@ unProperties p = do
 --
 -- SymbolizerValue Variant instances
 
-
 instance VariantPtr SymbolizerValue where
   allocaV = bracket alloc dealloc where
-    alloc = [CU.exp|sym_value_type * { new sym_value_type }|]
-    dealloc p = [CU.exp|void { delete $(sym_value_type *p)}|]
+    alloc = [C.exp|sym_value_type * { new sym_value_type }|]
+    dealloc p = [C.exp|void { delete $(sym_value_type *p)}|]
 
 
 instance Variant SymbolizerValue Mapnik.Colorizer where
-  peekV p = unCreateColorizer =<<
+  peekV p = liftBase (unCreateColorizer =<<
     unsafeNewColorizer (\ret ->
-      [CU.block|void {
+      [C.block|void {
       try {
         *$(raster_colorizer_ptr **ret) =
           new raster_colorizer_ptr(util::get<raster_colorizer_ptr>(*$(sym_value_type *p)));
       } catch (mapbox::util::bad_variant_access) {
         *$(raster_colorizer_ptr **ret) = nullptr;
       }
-      }|])
+      }|]))
   pokeV p v' = do
-    v <-createColorizer v';
-    [CU.block|void {
+    v <- liftBase (createColorizer v');
+    [C.block|void {
       *$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(raster_colorizer_ptr *v));
     }|]
 
 instance Variant SymbolizerValue Mapnik.GroupSymProperties where
   peekV p = unCreateGroupSymProperties =<<
     unsafeNewGroupSymProperties (\ret ->
-      [CU.block|void {
+      [C.block|void {
       try {
         *$(group_symbolizer_properties_ptr **ret) =
           new group_symbolizer_properties_ptr(util::get<group_symbolizer_properties_ptr>(*$(sym_value_type *p)));
@@ -1194,8 +1213,8 @@ instance Variant SymbolizerValue Mapnik.GroupSymProperties where
       }
       }|])
   pokeV p v' = do
-    v <-createGroupSymProperties v';
-    [CU.block|void {
+    v <- createGroupSymProperties v';
+    [C.block|void {
       *$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(group_symbolizer_properties_ptr *v));
     }|]
 
@@ -1203,9 +1222,9 @@ instance Variant SymbolizerValue Mapnik.GroupSymProperties where
 #define SYM_VAL(HS,CPP,CONV,MSG) \
 instance Variant SymbolizerValue HS where {\
   pokeV p (CONV -> v) = \
-    [CU.block|void { *$(sym_value_type *p) = sym_value_type($(CPP v)); }|]; \
+    [C.block|void { *$(sym_value_type *p) = sym_value_type($(CPP v)); }|]; \
   peekV p = fmap CONV $ justOrTypeError MSG $ newMaybe (\(has,ret) -> \
-    [CU.block|void { \
+    [C.block|void { \
     try { \
       *$(CPP *ret) = util::get<CPP>(*$(sym_value_type *p)); \
       *$(int *has) = 1; \
@@ -1218,9 +1237,9 @@ instance Variant SymbolizerValue HS where {\
 #define SYM_VAL_ENUM(HS,CPP) \
 instance Variant SymbolizerValue HS where {\
   pokeV p (fromIntegral . fromEnum -> v) = \
-    [CU.block|void { *$(sym_value_type *p) = enumeration_wrapper(static_cast<CPP>($(int v)));}|]; \
+    [C.block|void { *$(sym_value_type *p) = enumeration_wrapper(static_cast<CPP>($(int v)));}|]; \
   peekV p = fmap (toEnum . fromIntegral) $ justOrTypeError "sYM_VAL_ENUM" $ newMaybe $ \(has,ret) -> \
-    [CU.block|void { \
+    [C.block|void { \
     try { \
       *$(int *ret) = static_cast<int>(util::get<enumeration_wrapper>(*$(sym_value_type *p))); \
       *$(int *has) = 1; \
@@ -1255,9 +1274,9 @@ SYM_VAL_ENUM(SimplifyAlgorithm,simplify_algorithm_e)
 
 instance Variant SymbolizerValue Bool where
   pokeV p (fromIntegral . fromEnum -> v) =
-    [CU.block|void { *$(sym_value_type *p) = sym_value_type($(int v)?true:false); }|];
+    [C.block|void { *$(sym_value_type *p) = sym_value_type($(int v)?true:false); }|];
   peekV p = fmap (toEnum . fromIntegral) $ justOrTypeError "Bool" $ newMaybe (\(has,ret) ->
-    [CU.block|void {
+    [C.block|void {
     try {
       *$(int *ret) = static_cast<int>(util::get<bool>(*$(sym_value_type *p)));
       *$(int *has) = 1;
@@ -1278,7 +1297,7 @@ instance Variant SymbolizerValue a => Variant SymbolizerValue (Mapnik.Prop a) wh
 instance Variant SymbolizerValue Text where
   peekV p = justOrTypeError "Text" $
     newTextMaybe "peekV(Text)" $ \(ptr, len) ->
-      [CU.block|void {
+      [C.block|void {
       try {
         auto const v = util::get<std::string>(*$(sym_value_type *p));
         mallocedString(v, $(char **ptr), $(int *len));
@@ -1287,7 +1306,7 @@ instance Variant SymbolizerValue Text where
       }
       }|]
   pokeV p (encodeUtf8 -> v) =
-    [CU.block|void {
+    [C.block|void {
       *$(sym_value_type *p) = sym_value_type(std::string($bs-ptr:v, $bs-len:v));
     }|]
 
@@ -1306,7 +1325,7 @@ instance Variant SymbolizerValue String where
 instance Variant SymbolizerValue Mapnik.Expression where
   peekV p = 
     fmap Mapnik.Expression $ justOrTypeError "Expression" $ newTextMaybe "peekV(Expression)" $ \(ret, len) ->
-      [CU.block|void {
+      [C.block|void {
       try {
         auto expr = util::get<expression_ptr>(*$(sym_value_type *p));
         if (expr) {
@@ -1322,13 +1341,13 @@ instance Variant SymbolizerValue Mapnik.Expression where
   pokeV p (Mapnik.Expression expr) =
     case Expression.parse expr of
       Right v ->
-        [CU.block|void{ *$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(expression_ptr *v)); }|]
+        [C.block|void{ *$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(expression_ptr *v)); }|]
       Left e -> throwIO (userError e)
 
 instance Variant SymbolizerValue Mapnik.FontFeatureSettings where
   peekV p =
     fmap Mapnik.FontFeatureSettings $ justOrTypeError "FFs" $ newTextMaybe "peekV(FontFeatureSettings)" $ \(ptr, len) ->
-      [CU.block|void {
+      [C.block|void {
       try {
         auto v = util::get<font_feature_settings>(*$(sym_value_type *p));
         std::string s = v.to_string();
@@ -1344,7 +1363,7 @@ instance Variant SymbolizerValue Mapnik.FontFeatureSettings where
 
 instance Variant SymbolizerValue Mapnik.DashArray where
   pokeV p dashes =
-    [CU.block|void {
+    [C.block|void {
       std::vector<dash_t> dashes($vec-len:dashes);
       for (int i=0; i<$vec-len:dashes; i++) {
         dashes[i] = $vec-ptr:(dash_t *dashes)[i];
@@ -1352,9 +1371,9 @@ instance Variant SymbolizerValue Mapnik.DashArray where
       *$(sym_value_type *p) = sym_value_type(dashes);
     }|]
 
-  peekV p = do
+  peekV p = liftBase $ do
     (fromIntegral -> len, castPtr -> ptr) <- C.withPtrs_ $ \(len,ptr) ->
-      [CU.block|void{
+      [C.block|void{
       try {
         auto arr = util::get<dash_array>(*$(sym_value_type *p));
         *$(size_t *len) = arr.size();
@@ -1374,28 +1393,29 @@ instance Variant SymbolizerValue Mapnik.DashArray where
     else throwIO (VariantTypeError "DashArray")
 
 instance Variant SymbolizerValue Mapnik.Color where
-  peekV p = justOrTypeError "Color" $ newMaybe $ \(has,ret) ->
-    [CU.block|void {
-    try {
-      *$(color *ret) = util::get<color>(*$(sym_value_type *p));
-      *$(int *has) = 1;
-    } catch (mapbox::util::bad_variant_access) {
-      *$(int *has) = 0;
-    }
-    }|]
+  peekV p =
+    justOrTypeError "Color" $ newMaybe $ \(has,ret) ->
+      [C.block|void {
+      try {
+        *$(color *ret) = util::get<color>(*$(sym_value_type *p));
+        *$(int *has) = 1;
+      } catch (mapbox::util::bad_variant_access) {
+        *$(int *has) = 0;
+      }
+      }|]
   pokeV p c = with c $ \cPtr ->
-    [CU.block|void {*$(sym_value_type *p) = *$(color *cPtr);}|]
+    [C.block|void {*$(sym_value_type *p) = *$(color *cPtr);}|]
 
 instance Variant SymbolizerValue Mapnik.Transform where
-  pokeV p (Mapnik.Transform expr) =
+  pokeV p (Mapnik.Transform expr) = liftBase $
     case Transform.parse expr of
       Right v ->
-        [CU.block|void {*$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(transform_type *v));}|]
+        [C.block|void {*$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(transform_type *v));}|]
       Left e -> throwIO (userError e)
 
-  peekV p =
+  peekV p = liftBase $
     fmap Mapnik.Transform $ justOrTypeError "Transform" $ newTextMaybe "peekV(Transform)" $ \(ptr, len) ->
-      [CU.block|void {
+      [C.block|void {
       try {
         auto t = util::get<transform_type>(*$(sym_value_type *p));
         if (t) {
@@ -1409,65 +1429,67 @@ instance Variant SymbolizerValue Mapnik.Transform where
       }
       }|]
 
+----------------------------------------------------------------------------------------
 -- * GroupSymProperties
 
 
 foreign import ccall "&hs_mapnik_destroy_GroupSymProperties" destroyGroupSymProperties :: FinalizerPtr GroupSymProperties
 
-unsafeNewGroupSymProperties :: (Ptr (Ptr GroupSymProperties) -> IO ()) -> IO GroupSymProperties
+unsafeNewGroupSymProperties :: MonadBaseControl IO m
+  => (Ptr (Ptr GroupSymProperties) -> m ()) -> m GroupSymProperties
 unsafeNewGroupSymProperties = mkUnsafeNew GroupSymProperties destroyGroupSymProperties
 
-createGroupSymProperties :: Mapnik.GroupSymProperties -> IO GroupSymProperties
+createGroupSymProperties :: Mapnik.GroupSymProperties -> SvM GroupSymProperties
 createGroupSymProperties Mapnik.GroupSymProperties{..} = unsafeNewGroupSymProperties $ \p -> do
-  [CU.block|void{
+  [C.block|void{
     auto ret = std::make_shared<group_symbolizer_properties>();
     *$(group_symbolizer_properties_ptr **p) = new group_symbolizer_properties_ptr(ret);
     }|]
   case layout of
     Mapnik.SimpleRowLayout (realToFrac . fromMaybe defaultSimpleMargin -> margin) ->
-      [CU.block|void {
+      [C.block|void {
       auto sym = (*$(group_symbolizer_properties_ptr **p))->get();
       sym->set_layout(std::move(simple_row_layout($(double margin))));
       }|]
     Mapnik.PairLayout (realToFrac . fromMaybe defaultRowMargin -> margin)
                       (realToFrac . fromMaybe defaultRowMaxDiff -> maxDiff) ->
-      [CU.block|void {
+      [C.block|void {
       auto sym = (*$(group_symbolizer_properties_ptr **p))->get();
       sym->set_layout(std::move(pair_layout($(double margin), $(double maxDiff))));
       }|]
   forM_ rules $ flip withGroupRule $ \r ->
-    [CU.block|void{
+    [C.block|void{
     auto sym = (*$(group_symbolizer_properties_ptr **p))->get();
     sym->add_rule(*$(group_rule_ptr *r));
     }|]
 
-withGroupRule :: Mapnik.GroupRule -> (Ptr Mapnik.GroupRule -> IO a) -> IO a
+withGroupRule :: Mapnik.GroupRule -> (Ptr Mapnik.GroupRule -> SvM a) -> SvM a
 withGroupRule Mapnik.GroupRule{..} f = bracket alloc dealloc enter where
-  alloc = [CU.exp|group_rule_ptr * { new group_rule_ptr(std::make_shared<group_rule>()) }|]
-  dealloc p = [CU.exp|void { delete $(group_rule_ptr *p) }|]
+  alloc = [C.exp|group_rule_ptr * { new group_rule_ptr(std::make_shared<group_rule>()) }|]
+  dealloc p = [C.exp|void { delete $(group_rule_ptr *p) }|]
   enter p = do
     forM_ filter $ \(Mapnik.Expression e) ->  case Expression.parse e of
       Right e ->
-        [CU.block|void {
+        [C.block|void {
         $(group_rule_ptr *p)->get()->set_filter(*$fptr-ptr:(expression_ptr *e));
         }|]
       Left e -> throwIO (userError ("Could not parse format expression" ++ e))
     forM_ repeatKey $ \(Mapnik.Expression e) ->  case Expression.parse e of
       Right e ->
-        [CU.block|void {
+        [C.block|void {
         $(group_rule_ptr *p)->get()->set_repeat_key(*$fptr-ptr:(expression_ptr *e));
         }|]
       Left e -> throwIO (userError ("Could not parse format expression" ++ e))
-    forM_ symbolizers $ create >=> \sym ->
-      [CU.block|void {
+    forM_ symbolizers $ create' >=> \sym ->
+      [C.block|void {
       $(group_rule_ptr *p)->get()->append(*$fptr-ptr:(symbolizer *sym));
       }|]
     f p
 
-peekGroupRule :: Ptr Mapnik.GroupRule -> IO Mapnik.GroupRule
+peekGroupRule :: Ptr Mapnik.GroupRule -> SvM Mapnik.GroupRule
 peekGroupRule p = do
   filter <- fmap (fmap Mapnik.Expression) $ newTextMaybe "peekGroupRule.filter" $ \(ret,len) ->
-    [CU.block|void {
+    [C.block|void {
     auto r = *$(group_rule_ptr *p);
     auto f = *r->get_filter();
     std::string s = to_expression_string(f);
@@ -1480,7 +1502,7 @@ peekGroupRule p = do
     }
     }|]
   repeatKey <- fmap (fmap Mapnik.Expression) $ newTextMaybe "peekGroupRule.repeatKey" $ \(ret,len) ->
-    [CU.block|void {
+    [C.block|void {
     auto r = *$(group_rule_ptr *p);
     auto f = r->get_repeat_key();
     if (f) {
@@ -1494,25 +1516,26 @@ peekGroupRule p = do
   let cb :: Ptr Symbolizer -> IO ()
       cb p = do s <- unsafeNew p
                 modifyIORef' symsRef (s:)
-  [C.block|void {
+  [C.safeBlock|void {
     auto const r = *$(group_rule_ptr *p);
     for (auto it=r->begin(); it!=r->end(); ++it) {
       $fun:(void(*cb)(symbolizer *))(new symbolizer(*it));
     }
   }|]
-  symbolizers <- mapM unCreate =<< (reverse <$> readIORef symsRef)
+  symbolizers <- mapM unCreate' =<< (reverse <$> readIORef symsRef)
   return Mapnik.GroupRule {..}
 
-unCreateGroupSymProperties :: GroupSymProperties -> IO Mapnik.GroupSymProperties
-unCreateGroupSymProperties (GroupSymProperties fp) = withForeignPtr fp $ \p -> do
+unCreateGroupSymProperties :: GroupSymProperties -> SvM Mapnik.GroupSymProperties
+unCreateGroupSymProperties p = do
   layout <- maybe (throwIO (VariantTypeError "GroupLayout")) return
         =<< ((<|>) <$> getRowLayout p <*> getPairLayout p )
   rulesRef <- newIORef []
+  env <- ask
   let cb :: Ptr Mapnik.GroupRule -> IO ()
-      cb p = do r <- peekGroupRule p
+      cb p = do r <- runReaderT (peekGroupRule p) env
                 modifyIORef' rulesRef (r:)
-  [C.block|void {
-    auto const sym = $(group_symbolizer_properties_ptr *p)->get();
+  [C.safeBlock|void {
+    auto const sym = $fptr-ptr:(group_symbolizer_properties_ptr *p)->get();
     auto rules = sym->get_rules();
     for (auto it=rules.begin(); it!=rules.end(); ++it) {
       $fun:(void (*cb)(group_rule_ptr *))(&*it);
@@ -1523,9 +1546,9 @@ unCreateGroupSymProperties (GroupSymProperties fp) = withForeignPtr fp $ \p -> d
   where
     getPairLayout p = do
       (is, realToFrac -> margin, realToFrac -> maxDiff) <- C.withPtrs_ $ \(is,margin,maxDiff) ->
-        [CU.block|void {
+        [C.block|void {
           try {
-            auto const sym = $(group_symbolizer_properties_ptr *p)->get();
+            auto const sym = $fptr-ptr:(group_symbolizer_properties_ptr *p)->get();
             auto v = util::get<pair_layout>(sym->get_layout());
             *$(int *is) = 1;
             *$(double *margin) = v.get_item_margin();
@@ -1540,9 +1563,9 @@ unCreateGroupSymProperties (GroupSymProperties fp) = withForeignPtr fp $ \p -> d
 
     getRowLayout p = do
       (is, realToFrac -> margin) <- C.withPtrs_ $ \(is,margin) ->
-        [CU.block|void {
+        [C.block|void {
           try {
-            auto const sym = $(group_symbolizer_properties_ptr *p)->get();
+            auto const sym = $fptr-ptr:(group_symbolizer_properties_ptr *p)->get();
             auto v = util::get<simple_row_layout>(sym->get_layout());
             *$(int *is) = 1;
             *$(double *margin) = v.get_item_margin();

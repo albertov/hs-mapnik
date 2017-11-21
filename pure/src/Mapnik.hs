@@ -60,6 +60,12 @@ module Mapnik (
 -- ** Expression
 , Expression
 
+-- ** Fonts
+, Font
+, FontSetMap
+, FontSetName
+, FaceName
+
 -- ** FontFeatureSettings
 , FontFeatureSettings
 
@@ -103,7 +109,6 @@ module Mapnik (
 , TextProperties
 , TextFormatProperties
 , TextLayoutProperties
-, FaceName
 -- **** Format
 , Format
 , formatExp

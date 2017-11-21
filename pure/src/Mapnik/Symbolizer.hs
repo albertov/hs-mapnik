@@ -36,9 +36,6 @@ instance ToJSON a => ToJSON (Prop a) where
 -- | Nullable properties. When 'Nothing', mapnik will use a default value
 type PropValue a = Maybe (Prop a)
 
-type FaceName = Text
-
--- | See <https://github.com/mapnik/mapnik/wiki/RasterColorizer>
 data Stop = Stop
   { value :: !Double
   , color :: !Color
@@ -87,12 +84,13 @@ data GroupRule = GroupRule
 data GroupSymProperties = GroupSymProperties
   { layout :: !GroupLayout
   , rules  :: ![GroupRule]
-  }
-  deriving (Eq, Show, Generic, Default)
+  } deriving (Eq, Show, Generic, Default)
 
-data FontSet = FontSet
+
+data Font
+  = FontSetName !FontSetName
+  | FaceName    !FaceName
   deriving (Eq, Show, Generic)
-
 
 -- | See <https://github.com/mapnik/mapnik/wiki/TextSymbolizer>
 data TextProperties = TextProperties
@@ -113,8 +111,7 @@ data TextProperties = TextProperties
 
 -- | <See https://github.com/mapnik/mapnik/wiki/TextSymbolizer#character-formatting-options>
 data TextFormatProperties = TextFormatProperties
-  { faceName         :: !(Maybe FaceName)
-  , fontSet          :: !(Maybe FontSet)
+  { font         :: !(Maybe Font)
   , textSize         :: !(PropValue Double)
   , characterSpacing :: !(PropValue Double)
   , lineSpacing      :: !(PropValue Double)
@@ -149,8 +146,7 @@ data Format
   | FormatList   ![Format]
   -- | See <https://github.com/mapnik/mapnik/wiki/TextSymbolizer#formats>
   | Format
-    { faceName         :: !(Maybe FaceName)
-    , fontSet          :: !(Maybe FontSet)
+    { font             :: !(Maybe Font)
     , textSize         :: !(PropValue Double)
     , characterSpacing :: !(PropValue Double)
     , lineSpacing      :: !(PropValue Double)
@@ -193,8 +189,7 @@ formatList = FormatList
 -- See 'Format'
 format_ :: Format
 format_ = Format
-  { faceName         = Nothing
-  , fontSet          = Nothing
+  { font             = Nothing
   , textSize         = Nothing
   , characterSpacing = Nothing
   , lineSpacing      = Nothing
@@ -560,7 +555,7 @@ deriveMapnikJSON ''Format
 deriveMapnikJSON ''TextLayoutProperties
 deriveMapnikJSON ''TextFormatProperties
 deriveMapnikJSON ''TextProperties
-deriveMapnikJSON ''FontSet
+deriveMapnikJSON ''Font
 deriveMapnikJSON ''Stop
 deriveMapnikJSON ''Colorizer
 deriveMapnikJSON ''GroupLayout
