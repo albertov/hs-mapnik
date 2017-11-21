@@ -37,7 +37,6 @@ module Mapnik.Bindings.Types (
 , Datasource (..)
 , Parameters (..)
 , ProjTransform (..)
-, C.CppException (..)
 , Dash(..)
 , FeatureList
 , QueryPtr
@@ -62,8 +61,7 @@ import           Control.Lens (lens)
 import           Control.Exception
 import           Data.Typeable
 import           Data.Bits
-import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Cpp.Exceptions as C
+import qualified Language.C.Inline as C
 import           Data.Monoid (mempty, (<>))
 import           Language.C.Inline.Context
 import qualified Language.C.Types as C
@@ -74,6 +72,7 @@ import qualified Data.HashMap.Strict as M
 import           Foreign.Storable (Storable)
 import           Foreign.ForeignPtr (ForeignPtr)
 import           Foreign.Ptr (Ptr, FunPtr)
+import qualified Language.C.Inline.Cpp as C
 
 #define fptr(X) newtype X = X (ForeignPtr X) deriving (Eq, Ord, Show)
 
@@ -120,7 +119,8 @@ type MapnikInt = C.CInt
 
 data MapnikError = ConfigError String
                  | FromMapnikError String
-  deriving (Eq, Show, Typeable, Exception)
+                 | CppStdException String
+  deriving (Eq, Ord, Show, Typeable, Exception)
 
 data Pair = Pair { x, y :: !Double }
   deriving (Eq, Show)

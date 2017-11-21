@@ -19,13 +19,12 @@ module Mapnik.Bindings.Geometry (
 
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
+import qualified Mapnik.Bindings.Cpp as C
 
 import           Data.ByteString (ByteString, unpack)
 import           Data.Char (chr)
 import           Data.String
 import           Data.Maybe (fromMaybe)
-import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Unsafe as CU
 import           Foreign.Ptr (Ptr)
 import           Foreign.ForeignPtr (FinalizerPtr)
 import           System.IO.Unsafe (unsafePerformIO)
@@ -57,7 +56,7 @@ unsafeNewMaybe = mkUnsafeNewMaybe Geometry destroyGeometry
 
 fromWkb :: ByteString -> Maybe Geometry
 fromWkb wkb = unsafePerformIO $ unsafeNewMaybe $ \p ->
-  [CU.block|void{
+  [C.block|void{
   geometry_t geom = geometry_utils::from_wkb($bs-ptr:wkb, $bs-len:wkb, mapnik::wkbAuto);
   if (! geometry::is_empty(geom) ) {
     *$(geometry_t **p) = new geometry_t(geom);
@@ -68,7 +67,7 @@ fromWkb wkb = unsafePerformIO $ unsafeNewMaybe $ \p ->
 
 fromWkt :: ByteString -> Maybe Geometry
 fromWkt wkt = unsafePerformIO $ unsafeNewMaybe $ \p ->
-  [CU.block|void{
+  [C.block|void{
   geometry_t geom;
   if (from_wkt(std::string($bs-ptr:wkt, $bs-len:wkt), geom)) {
     *$(geometry_t **p) = new geometry_t(geom);
@@ -88,7 +87,7 @@ toWkb _TODO = undefined
 
 toWkt :: Geometry -> ByteString
 toWkt g = unsafePerformIO $ newByteString $ \(p, len) ->
-  [CU.block|void{
+  [C.block|void{
   std::string result;
   if (util::to_wkt(result, *$fptr-ptr:(geometry_t *g))) {
     mallocedString(result, $(char **p), $(int *len));

@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -14,6 +15,7 @@ import qualified Mapnik
 import qualified Mapnik.Symbolizer as Mapnik
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
+import qualified Mapnik.Bindings.Cpp as C
 import           Mapnik.Bindings.Orphans ()
 import           Foreign.ForeignPtr (FinalizerPtr, withForeignPtr)
 import           Foreign.Marshal.Utils (with)
@@ -25,8 +27,6 @@ import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
 import           Data.Text.Encoding (encodeUtf8)
 import           Data.IORef
 import           Foreign.Storable (peek)
-import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Unsafe as CU
 
 
 
@@ -48,26 +48,26 @@ unsafeNewColorizer = mkUnsafeNew Colorizer destroyColorizer
 
 createColorizer :: Mapnik.Colorizer -> IO Colorizer
 createColorizer Mapnik.Colorizer{..} = unsafeNewColorizer $ \p -> do
-  ret <- C.withPtr_ $ \ret -> [CU.block|void {
+  ret <- C.withPtr_ $ \ret -> [C.block|void {
     *$(raster_colorizer_ptr **p) = new raster_colorizer_ptr(
       std::make_shared<raster_colorizer>()
       );
     *$(void **ret) = (*$(raster_colorizer_ptr **p))->get();
   }|]
   forM_ mode $ \(fromIntegral . fromEnum -> m) ->
-    [CU.block|void {
+    [C.block|void {
     raster_colorizer *colorizer =
       static_cast<raster_colorizer*>($(void *ret));
     colorizer->set_default_mode(static_cast<colorizer_mode_enum>($(int m)));
     }|]
   forM_ color $ \c -> with c $ \cPtr ->
-    [CU.block|void {
+    [C.block|void {
     raster_colorizer *colorizer =
       static_cast<raster_colorizer*>($(void *ret));
     colorizer->set_default_color(*$(color *cPtr));
     }|]
   forM_ stops $ \stop -> withStop stop $ \s ->
-    [CU.block|void {
+    [C.block|void {
     raster_colorizer *colorizer =
       static_cast<raster_colorizer*>($(void *ret));
     colorizer->add_stop(*$(colorizer_stop *s));
@@ -80,19 +80,19 @@ withStop Mapnik.Stop
   } fun = with color $ \c -> bracket (alloc c) dealloc enter
   where
     alloc c = C.withPtr_ $ \ret ->
-      [CU.block|void {
+      [C.block|void {
       auto ret = new colorizer_stop($(float val));
       ret->set_color(*$(color *c));
       *$(colorizer_stop **ret) = ret;
       }|]
-    dealloc p = [CU.exp|void { delete $(colorizer_stop *p) }|]
+    dealloc p = [C.exp|void { delete $(colorizer_stop *p) }|]
     enter p = do
       forM_ label $ \(encodeUtf8 -> lbl) ->
-        [CU.block|void {
+        [C.block|void {
         $(colorizer_stop *p)->set_label(std::string($bs-ptr:lbl, $bs-len:lbl));
         }|]
       forM_ mode $ \(fromIntegral . fromEnum -> mode') ->
-        [CU.block|void {
+        [C.block|void {
         $(colorizer_stop *p)->set_mode(static_cast<colorizer_mode_enum>($(int mode')));
         }|]
       fun p
@@ -105,7 +105,7 @@ unCreateStop p = do
    , labelPtr
    , fromIntegral -> labelLen
    ) <- C.withPtrs_ $ \(val,col,mode,ptr,len) ->
-    [CU.block|void {
+    [C.block|void {
       const colorizer_stop &stop = *$(colorizer_stop *p);
       static const colorizer_stop def;
       *$(float *val) = stop.get_value();
@@ -138,7 +138,7 @@ getStops p = do
   let cb :: Ptr Stop -> IO ()
       cb stopPtr = do stop <- unCreateStop stopPtr
                       modifyIORef' ref (stop:)
-  [C.block|void {
+  [C.safeBlock|void {
     auto stops = (*$(raster_colorizer_ptr *p))->get_stops();
     for (auto it=stops.begin(); it!=stops.end(); it++) {
       $fun:(void (*cb)(colorizer_stop*))(const_cast<colorizer_stop*>(&*it));
@@ -149,7 +149,7 @@ getStops p = do
 unCreateColorizer :: Colorizer -> IO Mapnik.Colorizer
 unCreateColorizer (Colorizer colorizer) = withForeignPtr colorizer $ \p -> do
   (mMode, colorPtr) <- C.withPtrs_ $ \(mode,col) ->
-    [CU.block|void {
+    [C.block|void {
     const raster_colorizer *colorizer =
       (*$(raster_colorizer_ptr *p)).get();
     static const raster_colorizer def;

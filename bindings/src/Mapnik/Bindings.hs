@@ -84,8 +84,10 @@ module Mapnik.Bindings (
 , HasUnBufferedBox(..)
 , HasResolution(..)
 
+-- * Exceptions
+, MapnikError (..)
+
 -- * Re-exports
-, CppException (..)
 , module Mapnik
 ) where
 

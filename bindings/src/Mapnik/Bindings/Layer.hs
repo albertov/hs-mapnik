@@ -48,8 +48,7 @@ import           Foreign.Marshal.Utils (with)
 import           Foreign.C.String (CString)
 import           Foreign.Ptr (Ptr)
 
-import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Unsafe as CU
+import qualified Mapnik.Bindings.Cpp as C
 
 
 C.context mapnikCtx
@@ -73,10 +72,10 @@ unsafeNew = mkUnsafeNew Layer destroyLayer
 
 create :: Text -> IO Layer
 create (encodeUtf8 -> name) =
-  unsafeNew $ \p -> [CU.block|void {*$(layer** p) = new layer(std::string($bs-ptr:name, $bs-len:name));}|]
+  unsafeNew $ \p -> [C.block|void {*$(layer** p) = new layer(std::string($bs-ptr:name, $bs-len:name));}|]
 
 addStyle :: Layer -> Text -> IO ()
-addStyle l (encodeUtf8 -> s) = [CU.block| void {
+addStyle l (encodeUtf8 -> s) = [C.block| void {
   $fptr-ptr:(layer *l)->add_style(std::string($bs-ptr:s, $bs-len:s));
   }|]
 
@@ -87,7 +86,7 @@ getStyles l = do
       callback ptr (fromIntegral -> len) = do
         styleName <- unsafePackMallocCStringLen (ptr, len)
         modifyIORef' stylesRef (styleName:)
-  [C.block|void {
+  [C.safeBlock|void {
   typedef std::vector<std::string> style_list;
   style_list const& styles = $fptr-ptr:(layer *l)->styles();
   for (style_list::const_iterator it=styles.begin(); it!=styles.end(); ++it) {
@@ -100,39 +99,39 @@ getStyles l = do
   reverse <$> (mapM (decodeUtf8Ctx "Layer.getStyles") =<< readIORef stylesRef)
 
 getGroupBy :: Layer -> IO Text
-getGroupBy l = newText "Layer.getGroupBy" $ \(p,len) -> [CU.block|void {
+getGroupBy l = newText "Layer.getGroupBy" $ \(p,len) -> [C.block|void {
   std::string const &srs = $fptr-ptr:(layer *l)->group_by();
   mallocedString(srs, $(char **p), $(int *len));
   }|]
 
 setGroupBy :: Layer -> Text -> IO ()
 setGroupBy l (encodeUtf8 -> srs) =
-  [CU.block|void { $fptr-ptr:(layer *l)->set_group_by(std::string($bs-ptr:srs, $bs-len:srs)); }|]
+  [C.block|void { $fptr-ptr:(layer *l)->set_group_by(std::string($bs-ptr:srs, $bs-len:srs)); }|]
 
 getName :: Layer -> IO Text
-getName l = newText "Layer.getName" $ \(p,len) -> [CU.block|void {
+getName l = newText "Layer.getName" $ \(p,len) -> [C.block|void {
   std::string const &name = $fptr-ptr:(layer *l)->name();
   mallocedString(name, $(char **p), $(int *len));
   }|]
 
 setName :: Layer -> Text -> IO ()
 setName l (encodeUtf8 -> v) =
-  [CU.block|void { $fptr-ptr:(layer *l)->set_name(std::string($bs-ptr:v, $bs-len:v)); }|]
+  [C.block|void { $fptr-ptr:(layer *l)->set_name(std::string($bs-ptr:v, $bs-len:v)); }|]
 
 getSrs :: Layer -> IO Text
-getSrs l = newText "Layer.getSrs" $ \(p,len) -> [CU.block|void {
+getSrs l = newText "Layer.getSrs" $ \(p,len) -> [C.block|void {
   std::string const &srs = $fptr-ptr:(layer *l)->srs();
   mallocedString(srs, $(char **p), $(int *len));
   }|]
 
 setSrs :: Layer -> Text -> IO ()
 setSrs l (encodeUtf8 -> srs) =
-  [CU.block|void { $fptr-ptr:(layer *l)->set_srs(std::string($bs-ptr:srs, $bs-len:srs)); }|]
+  [C.block|void { $fptr-ptr:(layer *l)->set_srs(std::string($bs-ptr:srs, $bs-len:srs)); }|]
 
 getBufferSize :: Layer -> IO (Maybe Int)
 getBufferSize l = do
   (has, fromIntegral -> ret) <- C.withPtrs_ $ \(has,ret) ->
-    [CU.block|void {
+    [C.block|void {
       boost::optional<int> ret = $fptr-ptr:(layer *l)->buffer_size();
       if (ret) {
         *$(int *has) = 1;
@@ -145,57 +144,57 @@ getBufferSize l = do
 
 setBufferSize :: Layer -> Int -> IO ()
 setBufferSize l (fromIntegral -> s) =
-  [CU.block|void { $fptr-ptr:(layer *l)->set_buffer_size($(int s)); }|]
+  [C.block|void { $fptr-ptr:(layer *l)->set_buffer_size($(int s)); }|]
 
 getMaxScaleDenominator :: Layer -> IO Double
-getMaxScaleDenominator l = realToFrac <$> [CU.exp|double {$fptr-ptr:(layer *l)->maximum_scale_denominator()}|]
+getMaxScaleDenominator l = realToFrac <$> [C.exp|double {$fptr-ptr:(layer *l)->maximum_scale_denominator()}|]
 
 setMaxScaleDenominator :: Layer -> Double -> IO ()
 setMaxScaleDenominator l (realToFrac -> s) =
-  [CU.block|void { $fptr-ptr:(layer *l)->set_maximum_scale_denominator($(double s)); }|]
+  [C.block|void { $fptr-ptr:(layer *l)->set_maximum_scale_denominator($(double s)); }|]
 
 getMinScaleDenominator :: Layer -> IO Double
-getMinScaleDenominator l = realToFrac <$> [CU.exp|double {$fptr-ptr:(layer *l)->minimum_scale_denominator()}|]
+getMinScaleDenominator l = realToFrac <$> [C.exp|double {$fptr-ptr:(layer *l)->minimum_scale_denominator()}|]
 
 setMinScaleDenominator :: Layer -> Double -> IO ()
 setMinScaleDenominator l (realToFrac -> s) =
-  [CU.block|void { $fptr-ptr:(layer *l)->set_minimum_scale_denominator($(double s)); }|]
+  [C.block|void { $fptr-ptr:(layer *l)->set_minimum_scale_denominator($(double s)); }|]
 
 getQueryable :: Layer -> IO Bool
-getQueryable l = toEnum . fromIntegral <$> [CU.exp|int { $fptr-ptr:(layer *l)->queryable() }|]
+getQueryable l = toEnum . fromIntegral <$> [C.exp|int { $fptr-ptr:(layer *l)->queryable() }|]
 
 setQueryable :: Layer -> Bool -> IO ()
 setQueryable l (fromIntegral . fromEnum -> q) =
-  [CU.block|void { $fptr-ptr:(layer *l)->set_queryable($(int q)); }|]
+  [C.block|void { $fptr-ptr:(layer *l)->set_queryable($(int q)); }|]
 
 getClearLabelCache :: Layer -> IO Bool
-getClearLabelCache l = toEnum . fromIntegral <$> [CU.exp|int { $fptr-ptr:(layer *l)->clear_label_cache() }|]
+getClearLabelCache l = toEnum . fromIntegral <$> [C.exp|int { $fptr-ptr:(layer *l)->clear_label_cache() }|]
 
 setClearLabelCache :: Layer -> Bool -> IO ()
 setClearLabelCache l (fromIntegral . fromEnum -> q) =
-  [CU.block|void { $fptr-ptr:(layer *l)->set_clear_label_cache($(int q)); }|]
+  [C.block|void { $fptr-ptr:(layer *l)->set_clear_label_cache($(int q)); }|]
 
 setCacheFeatures :: Layer -> Bool -> IO ()
 setCacheFeatures l (fromIntegral . fromEnum -> q) =
-  [CU.block|void { $fptr-ptr:(layer *l)->set_cache_features($(int q)); }|]
+  [C.block|void { $fptr-ptr:(layer *l)->set_cache_features($(int q)); }|]
 
 getCacheFeatures :: Layer -> IO Bool
-getCacheFeatures l = toEnum . fromIntegral <$> [CU.exp|int { $fptr-ptr:(layer *l)->cache_features() }|]
+getCacheFeatures l = toEnum . fromIntegral <$> [C.exp|int { $fptr-ptr:(layer *l)->cache_features() }|]
 
 getDatasource :: Layer -> IO (Maybe Datasource)
 getDatasource l = Datasource.unsafeNewMaybe $ \p ->
-  [CU.block|void {
+  [C.block|void {
     auto p = $fptr-ptr:(layer *l)->datasource();
     *$(datasource_ptr **p) = p ? new datasource_ptr(p) : NULL;
     }|]
 
 setDatasource :: Layer -> Datasource -> IO ()
 setDatasource l ds =
-  [CU.block|void { $fptr-ptr:(layer *l)->set_datasource(*$fptr-ptr:(datasource_ptr *ds)); }|]
+  [C.block|void { $fptr-ptr:(layer *l)->set_datasource(*$fptr-ptr:(datasource_ptr *ds)); }|]
 
 getMaxExtent :: Layer -> IO (Maybe Box)
 getMaxExtent l =  newMaybe $ \(has,p) ->
-    [CU.block|void {
+    [C.block|void {
       auto res = $fptr-ptr:(layer *l)->maximum_extent();
       if (res) {
         *$(bbox *p) = *res;
@@ -207,4 +206,4 @@ getMaxExtent l =  newMaybe $ \(has,p) ->
 
 setMaxExtent :: Layer -> Box -> IO ()
 setMaxExtent l box = with box $ \boxPtr ->
-  [CU.block|void { $fptr-ptr:(layer *l)->set_maximum_extent(*$(bbox *boxPtr)); }|]
+  [C.block|void { $fptr-ptr:(layer *l)->set_maximum_extent(*$(bbox *boxPtr)); }|]

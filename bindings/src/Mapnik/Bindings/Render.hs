@@ -7,6 +7,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Mapnik.Bindings.Render where
 
 import           Mapnik (Proj4, AspectFixMode(..))
@@ -16,6 +17,7 @@ import           Mapnik.Bindings.Variant
 import           Mapnik.Bindings.Datasource -- For field class defs
 import           Mapnik.Bindings.Raster -- For field class defs
 import           Mapnik.Bindings.Orphans()
+import qualified Mapnik.Bindings.Cpp as C
 import qualified Mapnik.Bindings.Image as Image
 import qualified Mapnik.Bindings.Map as Map
 
@@ -29,9 +31,6 @@ import qualified Data.HashMap.Strict as M
 import           Foreign.Marshal.Utils (with)
 import           Foreign.Ptr
 
-import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Unsafe as CU
-import qualified Language.C.Inline.Cpp.Exceptions as C
 
 
 C.context mapnikCtx
@@ -69,7 +68,7 @@ render m cfg = Image.unsafeNew $ \ptr ->
                withMaybeSrs (cfg^.srs) $ \(srsPtr, fromIntegral -> srsLen) -> do
   Map.setAspectFixMode m (cfg^.aspectFixMode)
   forM_ (cfg^.variables.to M.toList) $ \(encodeUtf8 -> k, val) -> withV val $ \v ->
-    [CU.block|void {
+    [C.block|void {
       std::string k($bs-ptr:k, $bs-len:k);
       attributes &m = *$(attributes *vars);
       m[k] = *$(value *v);
@@ -105,8 +104,8 @@ render m cfg = Image.unsafeNew $ \ptr ->
     h = cfg^?!height.to fromIntegral
     scale = cfg^.scaleFactor.to realToFrac
     withAttributes = bracket alloc dealloc where
-      alloc = [CU.exp|attributes * { new attributes }|]
-      dealloc p = [CU.exp|void { delete $(attributes *p) }|]
+      alloc = [C.exp|attributes * { new attributes }|]
+      dealloc p = [C.exp|void { delete $(attributes *p) }|]
 
     withMaybeSrs Nothing f = f (nullPtr,0)
     withMaybeSrs (Just (encodeUtf8 -> s)) f = useAsCStringLen s f

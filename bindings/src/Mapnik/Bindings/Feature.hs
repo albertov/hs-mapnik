@@ -17,6 +17,7 @@ module Mapnik.Bindings.Feature (
 
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
+import qualified Mapnik.Bindings.Cpp as C
 import           Mapnik.Bindings.Raster
 import           Mapnik.Bindings.Variant
 import qualified Mapnik.Bindings.Geometry as Geometry
@@ -28,8 +29,6 @@ import           Data.Vector (Vector)
 import qualified Data.Vector as V
 import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
-import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Unsafe as CU
 
 C.context mapnikCtx
 
@@ -63,28 +62,28 @@ unsafeNew = mkUnsafeNew FeaturePtr destroyFeature
 
 create :: Ptr FeatureCtx -> Feature -> IO FeaturePtr
 create ctx f = unsafeNew $ \ret -> do
-  [CU.block|void {
+  [C.block|void {
   auto feat = *$(feature_ptr **ret) = new feature_ptr(
     feature_factory::create(*$(context_ptr *ctx), $(value_integer fid'))
     );
   }|]
   forM_ geometry $ \g ->
-    [CU.block|void{
+    [C.block|void{
       auto feat = **$(feature_ptr **ret);
       feat->set_geometry_copy(*$fptr-ptr:(geometry_t *g));
     }|]
   forM_ raster $ \(SomeRaster r) -> withV r $ \r'->
-    [CU.block|void{
+    [C.block|void{
       auto feat = **$(feature_ptr **ret);
       feat->set_raster(*$(raster_ptr *r'));
     }|]
   withVec $ \fs -> do
     forM_ fields $ flip withV $ \fld ->
-      [CU.block|void{
+      [C.block|void{
         auto fs = static_cast<feature_impl::cont_type*>($(void *fs));
         fs->push_back(*$(value *fld));
       }|]
-    [CU.block|void{
+    [C.block|void{
       auto feat = **$(feature_ptr **ret);
       auto fs = static_cast<feature_impl::cont_type*>($(void *fs));
       feat->set_data(*fs);
@@ -93,14 +92,14 @@ create ctx f = unsafeNew $ \ret -> do
     Feature {fid=(fromIntegral -> fid'),..}  = f
 
     withVec = bracket alloc dealloc where
-      alloc = [CU.exp|void * { new feature_impl::cont_type() }|]
-      dealloc p = [CU.exp| void { delete static_cast<feature_impl::cont_type*>($(void *p)) } |]
+      alloc = [C.exp|void * { new feature_impl::cont_type() }|]
+      dealloc p = [C.exp| void { delete static_cast<feature_impl::cont_type*>($(void *p)) } |]
 
 unCreate :: Ptr FeaturePtr -> IO Feature
 unCreate p = do
-  fid <- fromIntegral <$> [CU.exp|int { (*$(feature_ptr* p))->id() }|]
+  fid <- fromIntegral <$> [C.exp|int { (*$(feature_ptr* p))->id() }|]
   geometry <- Geometry.unsafeNewMaybe $ \g ->
-    [CU.block|void {
+    [C.block|void {
     auto feat = *$(feature_ptr *p);
     if (! geometry::is_empty(feat->get_geometry()) ) {
       *$(geometry_t **g) = new geometry_t(feat->get_geometry());
@@ -111,7 +110,7 @@ unCreate p = do
   fieldsRef <- newIORef []
   let cb :: Ptr Value -> IO ()
       cb v = peekV v >>= \f -> modifyIORef' fieldsRef (f:)
-  [C.block|void {
+  [C.safeBlock|void {
       auto fs = (*$(feature_ptr *p))->get_data();
       for (auto it=fs.begin(); it!=fs.end(); ++it) {
         $fun:(void (*cb)(value *))(&*it);
@@ -120,7 +119,7 @@ unCreate p = do
   fields <- V.reverse . V.fromList <$> readIORef fieldsRef
   raster <- allocaV $ \ret -> do
     has <- C.withPtr_ $ \has ->
-      [CU.block|void {
+      [C.block|void {
       auto feat = *$(feature_ptr *p);
       *$(raster_ptr *ret) = feat->get_raster();
       *$(int *has) = *$(raster_ptr *ret)? 1 : 0;

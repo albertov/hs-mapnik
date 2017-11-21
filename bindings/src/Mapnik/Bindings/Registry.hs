@@ -13,10 +13,9 @@ module Mapnik.Bindings.Registry (
 ) where
 
 import           Mapnik.Bindings.Types
+import qualified Mapnik.Bindings.Cpp as C
 import           Data.String (fromString)
 
-import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Cpp.Exceptions as C
 
 C.context mapnikCtx
 

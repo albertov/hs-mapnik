@@ -69,9 +69,7 @@ import           System.IO.Unsafe (unsafePerformIO)
 import qualified Data.HashMap.Strict as M
 import qualified GHC.Exts as Exts
 
-import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Cpp.Exceptions as C
-import qualified Language.C.Inline.Unsafe as CU
+import qualified Mapnik.Bindings.Cpp as C
 
 
 C.context mapnikCtx
@@ -112,7 +110,7 @@ unsafeNewValues = mkUnsafeNew Parameters destroyParameters
 
 getParameters :: Datasource -> IO Parameters
 getParameters ds = unsafeNewValues $ \ ptr ->
-  [CU.block|void{
+  [C.block|void{
   *$(parameters** ptr) = new parameters((*$fptr-ptr:(datasource_ptr *ds))->params());
   }|]
 
@@ -125,14 +123,14 @@ paramsFromList :: [(Text,Value)] -> Parameters
 paramsFromList ps = unsafePerformIO $ do
   p <- emptyValues
   forM_ ps $ \(encodeUtf8 -> k, val) -> withV val $ \v ->
-    [CU.block|void {
+    [C.block|void {
       std::string k($bs-ptr:k, $bs-len:k);
       (*$fptr-ptr:(parameters *p))[k] = *$(value_holder *v);
     }|]
   return p
 
 emptyValues :: IO Parameters
-emptyValues = fmap Parameters . newForeignPtr destroyParameters =<< [CU.exp|parameters *{ new parameters }|]
+emptyValues = fmap Parameters . newForeignPtr destroyParameters =<< [C.exp|parameters *{ new parameters }|]
 
 paramsToList :: Parameters -> [(Text,Value)]
 paramsToList p = unsafePerformIO $ do
@@ -142,7 +140,7 @@ paramsToList p = unsafePerformIO $ do
         key <- packCStringLen (k, fromIntegral l)
         val <- peekV v
         modifyIORef' ref ((key,val):)
-  [C.block|void {
+  [C.safeBlock|void {
      for (parameters::const_iterator it = $fptr-ptr:(parameters *p)->begin();
           it != $fptr-ptr:(parameters *p)->end();
           ++it)
@@ -171,7 +169,7 @@ features ds query = withQuery query $ \q -> do
       cbField p len i = do
         f <- packCStringLen (p, fromIntegral len)
         modifyIORef' fields ((f,i):)
-  [C.block|void { do {
+  [C.safeBlock|void { do {
     auto ds = $fptr-ptr:(datasource_ptr *ds)->get();
     if (!ds) break;
     auto fs = ds->features(*$(query *q));
@@ -244,7 +242,7 @@ createHsDatasource :: HsDatasource -> IO Datasource
 createHsDatasource HsVector{..} = with _extent $ \e -> unsafeNew $ \ ptr -> do
   fs <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> Ptr QueryPtr -> IO ()|]) getFeatures'
   fsp <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ()|]) getFeaturesAtPoint'
-  [CU.block|void {
+  [C.block|void {
   datasource_ptr p = std::make_shared<hs_datasource>(
     "hs_vector_layer",                 //TODO
     datasource::Vector,                //TODO
@@ -256,7 +254,7 @@ createHsDatasource HsVector{..} = with _extent $ \e -> unsafeNew $ \ ptr -> do
   *$(datasource_ptr** ptr) = new datasource_ptr(p);
   }|]
   forM_ fieldNames $ \(encodeUtf8 -> v) ->
-    [CU.block|void {
+    [C.block|void {
       auto ds = dynamic_cast<hs_datasource*>((*$(datasource_ptr **ptr))->get());
       ds->push_key(std::string($bs-ptr:v, $bs-len:v));
     }|]
@@ -272,7 +270,7 @@ createHsDatasource HsVector{..} = with _extent $ \e -> unsafeNew $ \ ptr -> do
 createHsDatasource HsRaster{..} = with _extent $ \e -> unsafeNew $ \ ptr -> do
   fs <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> Ptr QueryPtr -> IO ()|]) getFeatures'
   fsp <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ()|]) getFeaturesAtPoint'
-  [CU.block|void {
+  [C.block|void {
   datasource_ptr p = std::make_shared<hs_datasource>(
     "hs_raster_layer",                 //TODO
     datasource::Raster,                //TODO
@@ -284,7 +282,7 @@ createHsDatasource HsRaster{..} = with _extent $ \e -> unsafeNew $ \ ptr -> do
   *$(datasource_ptr** ptr) = new datasource_ptr(p);
   }|]
   forM_ fieldNames $ \(encodeUtf8 -> v) ->
-    [CU.block|void {
+    [C.block|void {
       auto ds = dynamic_cast<hs_datasource*>((*$(datasource_ptr **ptr))->get());
       ds->push_key(std::string($bs-ptr:v, $bs-len:v));
     }|]
@@ -294,7 +292,7 @@ createHsDatasource HsRaster{..} = with _extent $ \e -> unsafeNew $ \ ptr -> do
       rs <- getRasters =<< unCreateQuery q
       forM_ rs $ \r -> do
         f <- Feature.create ctx $ feature {raster=Just (SomeRaster r)}
-        [CU.block|void {
+        [C.block|void {
           $(feature_list *fs)->push_back(*$fptr-ptr:(feature_ptr *f)); }
         |]
 
@@ -305,7 +303,7 @@ createHsDatasource HsRaster{..} = with _extent $ \e -> unsafeNew $ \ ptr -> do
 pushBack :: Ptr FeatureCtx -> Ptr FeatureList -> Feature -> IO ()
 pushBack ctx fs = \f -> do
   f' <- Feature.create ctx f
-  [CU.block|void {
+  [C.block|void {
     $(feature_list *fs)->push_back(*$fptr-ptr:(feature_ptr *f')); }
   |]
 
@@ -319,7 +317,7 @@ withQuery query f =
   with _queryBox $ \pBox ->
   with _queryUnBufferedBox $ \uBox ->
   withAttributes _queryVariables $ \attrs ->
-    let alloc = C.withPtr_ $ \p -> [CU.block|void {
+    let alloc = C.withPtr_ $ \p -> [C.block|void {
       auto q = new query( *$(bbox *pBox)
                         , std::tuple<double,double>( $(double resx)
                                                    , $(double resy))
@@ -333,10 +331,10 @@ withQuery query f =
     in bracket alloc dealloc enter
 
   where
-    dealloc p = [CU.exp|void { delete $(query *p) }|]
+    dealloc p = [C.exp|void { delete $(query *p) }|]
     enter p = do
       forM_ _queryPropertyNames $ \(encodeUtf8 -> pname) ->
-        [CU.block|void {
+        [C.block|void {
           $(query *p)->add_property_name(std::string($bs-ptr:pname, $bs-len:pname));
         }|]
       f p
@@ -357,7 +355,7 @@ unCreateQuery q = do
     , _queryUnBufferedBox
     , varPtr
     ) <- C.withPtrs_ $ \(x,y,s,f,b,ub,vs) ->
-    [CU.block|void{
+    [C.block|void{
     const query& q     = *$(query *q);
     auto res           = q.resolution();
     *$(double *x)      = std::get<0>(res);
@@ -371,7 +369,7 @@ unCreateQuery q = do
   ref <- newIORef  []
   let cb :: CString -> C.CInt -> IO ()
       cb s l = packCStringLen (s,fromIntegral l) >>= \s' -> modifyIORef' ref (s':)
-  [C.block|void {
+  [C.safeBlock|void {
     auto const names = $(query *q)->property_names();
     for (auto it=names.begin(); it!=names.end(); ++it) {
       $fun:(void (*cb)(char *, int))(const_cast<char *>(it->c_str()), it->size());
@@ -383,14 +381,14 @@ unCreateQuery q = do
 
 withAttributes :: Attributes -> (Ptr Attributes -> IO a) -> IO a
 withAttributes attrs f = bracket alloc dealloc enter where
-  alloc = [CU.exp|attributes * { new attributes } |]
+  alloc = [C.exp|attributes * { new attributes } |]
   enter p = do
     forM_ (M.toList attrs) $ \(encodeUtf8 -> k, val) -> withV val $ \v ->
-      [CU.block|void {
+      [C.block|void {
         (*$(attributes *p))[std::string($bs-ptr:k, $bs-ptr:k)] = *$(value *v);
       }|]
     f p
-  dealloc p = [CU.exp|void { delete $(attributes *p) }|]
+  dealloc p = [C.exp|void { delete $(attributes *p) }|]
 
 
 extractAttributes :: Ptr Attributes -> IO Attributes
@@ -401,7 +399,7 @@ extractAttributes p = do
         key <- packCStringLen (k, fromIntegral l)
         val <- peekV v
         modifyIORef' ref ((key,val):)
-  [C.block|void {
+  [C.safeBlock|void {
      for (attributes::const_iterator it = $(attributes *p)->begin();
           it != $(attributes *p)->end();
           ++it)

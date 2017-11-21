@@ -14,6 +14,7 @@ module Mapnik.Bindings.Projection (
 
 import           Mapnik (Proj4)
 import           Mapnik.Bindings.Types
+import qualified Mapnik.Bindings.Cpp as C
 import           Mapnik.Bindings.Orphans()
 
 import           Control.Exception (try)
@@ -21,9 +22,6 @@ import           Data.Text.Encoding (encodeUtf8)
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
 import           Foreign.Marshal.Utils (with)
 
-import qualified Language.C.Inline.Unsafe as CU
-import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Cpp.Exceptions as C
 
 import           System.IO.Unsafe (unsafePerformIO)
 
@@ -51,7 +49,7 @@ projTransform (encodeUtf8->src) (encodeUtf8->dst) = unsafePerformIO $ fmap showE
     |]
   ProjTransform <$> newForeignPtr destroyProjTransform ptr
   where
-    showExc = either (Left . show @C.CppException) Right
+    showExc = either (Left . show @MapnikError) Right
 
 class CanTransform p where
   forward :: ProjTransform -> p -> p
@@ -60,13 +58,13 @@ class CanTransform p where
 instance CanTransform Box where
   forward p box =
     unsafePerformIO $ with box $ \boxPtr -> C.withPtr_ $ \ret ->
-      [CU.block|void {
+      [C.block|void {
       *$(bbox *ret) = *$(bbox *boxPtr);
       $fptr-ptr:(hs_proj_transform *p)->trans().forward(*$(bbox *ret));
     }|]
   backward p box =
     unsafePerformIO $ with box $ \boxPtr -> C.withPtr_ $ \ret ->
-      [CU.block|void {
+      [C.block|void {
       *$(bbox *ret) = *$(bbox *boxPtr);
       $fptr-ptr:(hs_proj_transform *p)->trans().backward(*$(bbox *ret));
     }|]
@@ -75,13 +73,13 @@ type NumPoints = Int
 instance CanTransform (Box,NumPoints) where
   forward p (box, n'@(fromIntegral -> n)) =
     (,n') $ unsafePerformIO $ with box $ \boxPtr -> C.withPtr_ $ \ret ->
-      [CU.block|void {
+      [C.block|void {
       *$(bbox *ret) = *$(bbox *boxPtr);
       $fptr-ptr:(hs_proj_transform *p)->trans().forward(*$(bbox *ret), $(int n));
     }|]
   backward p (box, n'@(fromIntegral -> n)) =
     (,n') $ unsafePerformIO $ with box $ \boxPtr -> C.withPtr_ $ \ret ->
-      [CU.block|void {
+      [C.block|void {
       *$(bbox *ret) = *$(bbox *boxPtr);
       $fptr-ptr:(hs_proj_transform *p)->trans().backward(*$(bbox *ret), $(int n));
     }|]

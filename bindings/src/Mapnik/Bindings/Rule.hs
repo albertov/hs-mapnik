@@ -28,15 +28,12 @@ import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import qualified Mapnik.Bindings.Expression as Expression
 import qualified Mapnik.Bindings.Symbolizer as Symbolizer
+import qualified Mapnik.Bindings.Cpp as C
 import           Data.IORef
 import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
 import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
-
-import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Unsafe as CU
-
 
 C.context mapnikCtx
 
@@ -58,36 +55,36 @@ unsafeNew :: (Ptr (Ptr Rule) -> IO ()) -> IO Rule
 unsafeNew = mkUnsafeNew Rule destroyRule
 
 create :: IO Rule
-create  = unsafeNew $ \p -> [CU.block|void {*$(rule** p) = new rule();}|]
+create  = unsafeNew $ \p -> [C.block|void {*$(rule** p) = new rule();}|]
 
 setName :: Rule -> Text -> IO ()
 setName l (encodeUtf8 -> s) =
-  [CU.block|void { $fptr-ptr:(rule *l)->set_name(std::string($bs-ptr:s, $bs-len:s)); }|]
+  [C.block|void { $fptr-ptr:(rule *l)->set_name(std::string($bs-ptr:s, $bs-len:s)); }|]
 
 getName :: Rule -> IO Text
 getName r = newText "Rule.getName" $ \(p,len) ->
-  [CU.block|void {
+  [C.block|void {
   std::string const &s = $fptr-ptr:(rule *r)->get_name();
   mallocedString(s, $(char **p), $(int *len));
   }|]
 
 getMinScale :: Rule -> IO Double
-getMinScale r = realToFrac <$> [CU.exp|double { $fptr-ptr:(rule *r)->get_min_scale()}|]
+getMinScale r = realToFrac <$> [C.exp|double { $fptr-ptr:(rule *r)->get_min_scale()}|]
 
 setMinScale :: Rule -> Double -> IO ()
 setMinScale r (realToFrac -> s) =
-  [CU.block|void { $fptr-ptr:(rule *r)->set_min_scale($(double s)); }|]
+  [C.block|void { $fptr-ptr:(rule *r)->set_min_scale($(double s)); }|]
 
 setMaxScale :: Rule -> Double -> IO ()
 setMaxScale r (realToFrac -> s) =
-  [CU.block|void { $fptr-ptr:(rule *r)->set_max_scale($(double s)); }|]
+  [C.block|void { $fptr-ptr:(rule *r)->set_max_scale($(double s)); }|]
 
 getMaxScale :: Rule -> IO Double
-getMaxScale r = realToFrac <$> [CU.exp|double { $fptr-ptr:(rule *r)->get_max_scale()}|]
+getMaxScale r = realToFrac <$> [C.exp|double { $fptr-ptr:(rule *r)->get_max_scale()}|]
 
 
 appendSymbolizer :: Rule -> Symbolizer -> IO ()
-appendSymbolizer r s = [CU.block| void {
+appendSymbolizer r s = [C.block| void {
   symbolizer sym(*$fptr-ptr:(symbolizer *s));
   $fptr-ptr:(rule *r)->append(std::move(sym));
   }|]
@@ -99,7 +96,7 @@ getSymbolizers r = do
       callback ptr = do
         sym <- Symbolizer.unsafeNew ptr
         modifyIORef' symsRef (sym:)
-  [C.block|void {
+  [C.safeBlock|void {
   for (rule::symbolizers::const_iterator it=$fptr-ptr:(rule *r)->begin(); it!=$fptr-ptr:(rule *r)->end(); ++it) {
     $fun:(void (*callback)(symbolizer *))(new symbolizer(*it));
   }
@@ -107,13 +104,13 @@ getSymbolizers r = do
   reverse <$> readIORef symsRef
 
 setFilter :: Rule -> Expression -> IO ()
-setFilter r s = [CU.block| void {
+setFilter r s = [C.block| void {
   expression_ptr const& filter(*$fptr-ptr:(expression_ptr *s));
   $fptr-ptr:(rule *r)->set_filter(filter);
   }|]
 
 getFilter :: Rule -> IO (Maybe Expression)
-getFilter r = Expression.unsafeNewMaybe $ \p -> [CU.block| void {
+getFilter r = Expression.unsafeNewMaybe $ \p -> [C.block| void {
   rule dfl;
   expression_ptr const& expr = $fptr-ptr:(rule *r)->get_filter();
   std::string filter = mapnik::to_expression_string(*expr);
@@ -126,15 +123,15 @@ getFilter r = Expression.unsafeNewMaybe $ \p -> [CU.block| void {
   }|]
 
 hasElseFilter :: Rule -> IO Bool
-hasElseFilter r = toEnum . fromIntegral <$> [CU.exp|int { $fptr-ptr:(rule *r)->has_else_filter()}|]
+hasElseFilter r = toEnum . fromIntegral <$> [C.exp|int { $fptr-ptr:(rule *r)->has_else_filter()}|]
 
 setElse :: Rule -> Bool -> IO ()
 setElse r (fromIntegral . fromEnum -> q) =
-  [CU.block|void { $fptr-ptr:(rule *r)->set_else($(int q)); }|]
+  [C.block|void { $fptr-ptr:(rule *r)->set_else($(int q)); }|]
 
 hasAlsoFilter :: Rule -> IO Bool
-hasAlsoFilter r = toEnum . fromIntegral <$> [CU.exp|int { $fptr-ptr:(rule *r)->has_also_filter()}|]
+hasAlsoFilter r = toEnum . fromIntegral <$> [C.exp|int { $fptr-ptr:(rule *r)->has_also_filter()}|]
 
 setAlso :: Rule -> Bool -> IO ()
 setAlso r (fromIntegral . fromEnum -> q) =
-  [CU.block|void { $fptr-ptr:(rule *r)->set_also($(int q)); }|]
+  [C.block|void { $fptr-ptr:(rule *r)->set_also($(int q)); }|]

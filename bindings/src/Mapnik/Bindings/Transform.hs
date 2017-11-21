@@ -13,15 +13,13 @@ module Mapnik.Bindings.Transform (
 
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
+import qualified Mapnik.Bindings.Cpp as C
 import           Control.Exception (try)
 import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
 import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
 
-import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Cpp.Exceptions as C
-import qualified Language.C.Inline.Unsafe as CU
 
 import           System.IO.Unsafe (unsafePerformIO)
 
@@ -52,12 +50,12 @@ parse (encodeUtf8 -> s) =
   unsafePerformIO $ fmap showExc $ try $ unsafeNew $ \p ->
     [C.catchBlock|*$(transform_type **p) = new transform_type(parse_transform(std::string($bs-ptr:s, $bs-len:s)));|]
   where
-    showExc = either (Left . show @C.CppException) Right
+    showExc = either (Left . show @MapnikError) Right
 
 
 toText :: Transform -> Text
 toText trans = unsafePerformIO $ newText "Transform.toText" $ \(ptr,len) ->
-  [CU.block|void {
+  [C.block|void {
   std::string s = transform_processor_type::to_string(**$fptr-ptr:(transform_type *trans));
   mallocedString(s, $(char **ptr), $(int *len));
   }|]

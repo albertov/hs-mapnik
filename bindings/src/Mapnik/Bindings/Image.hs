@@ -15,6 +15,7 @@ module Mapnik.Bindings.Image (
 
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
+import qualified Mapnik.Bindings.Cpp as C
 import           Control.Monad ((<=<))
 import           Data.ByteString (ByteString)
 import           Data.String (fromString)
@@ -23,8 +24,6 @@ import           Foreign.Ptr (Ptr)
 import qualified Data.Vector.Storable as V
 import qualified Data.Vector.Storable.Mutable as MV
 
-import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Unsafe as CU
 
 import           System.IO.Unsafe (unsafePerformIO)
 
@@ -52,7 +51,7 @@ unsafeNew = fmap Image . newForeignPtr destroyImage <=< C.withPtr_
 --      serialize :: Format -> Image -> ByteString
 serialize :: String -> Image -> Maybe ByteString
 serialize (fromString -> fmt) im = unsafePerformIO $ newByteStringMaybe $ \(ptr, len) ->
-  [CU.block|void {
+  [C.block|void {
   std::string const fmt = std::string($bs-ptr:fmt, $bs-len:fmt);
   try {
     std::string s = save_to_string(*$fptr-ptr:(image_rgba8 *im), fmt);
@@ -68,13 +67,13 @@ type Size = (Int,Int)
 toRgba8 :: Image -> (Size, V.Vector PixelRgba8)
 toRgba8 im = unsafePerformIO $ do
   (fromIntegral -> w, fromIntegral -> h) <- C.withPtrs_ $ \(w,h) ->
-    [CU.block|void {
+    [C.block|void {
     mapnik::image_rgba8 *im = $fptr-ptr:(image_rgba8 *im);
     *$(size_t *w) = im->width();
     *$(size_t *h) = im->height();
     }|]
   vec <- MV.unsafeNew (w*h)
-  [CU.block|void {
+  [C.block|void {
   mapnik::image_rgba8 *im = $fptr-ptr:(image_rgba8 *im);
   std::memcpy($vec-ptr:(pixel_rgba8 *vec), im->data(), im->size());
   }|]
@@ -87,7 +86,7 @@ fromRgba8 ((width, height), rgba8)
   | height < 0 || width < 0 = Nothing
   | width*height /= V.length rgba8 = Nothing
 fromRgba8 ((fromIntegral -> width, fromIntegral -> height), rgba8) = unsafePerformIO $ fmap Just $ unsafeNew $ \ptr ->
-  [CU.block|void {
+  [C.block|void {
   *$(image_rgba8 **ptr) =
     new mapnik::image_rgba8(
       $(int width), $(int height),

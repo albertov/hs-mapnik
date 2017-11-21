@@ -18,9 +18,7 @@ import           Data.Text.Encoding (encodeUtf8)
 import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
 
-import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Cpp.Exceptions as C
-import qualified Language.C.Inline.Unsafe as CU
+import qualified Mapnik.Bindings.Cpp as C
 
 import           System.IO.Unsafe (unsafePerformIO)
 
@@ -51,11 +49,11 @@ parse (encodeUtf8 -> s) =
   unsafePerformIO $ fmap showExc $ try $ unsafeNew $ \p ->
     [C.catchBlock|*$(expression_ptr **p) = new expression_ptr(parse_expression(std::string($bs-ptr:s, $bs-len:s)));|]
   where
-    showExc = either (Left . show @C.CppException) Right
+    showExc = either (Left . show @MapnikError) Right
 
 toText :: Expression -> Text
 toText expr = unsafePerformIO $ newText "Expression.toText" $ \(p,len) ->
-  [CU.block|void {
+  [C.block|void {
   std::string s = to_expression_string(**$fptr-ptr:(expression_ptr *expr));
   mallocedString(s, $(char **p), $(int *len));
   }|]
