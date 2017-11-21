@@ -5,7 +5,6 @@
 module Mapnik.Bindings.Variant (
   Variant(..)
 , VariantPtr (..)
-, VariantM
 , VariantTypeError(..)
 , justOrTypeError
 , withV
@@ -16,9 +15,10 @@ import           Control.Monad.Base (MonadBase)
 import           Data.Typeable
 import           Foreign.Ptr (Ptr)
 
-type family VariantM v :: * -> *
 
 class VariantPtr v where
+  type VariantM v :: * -> *
+  type VariantM v = IO
   allocaV :: (Ptr v -> VariantM v a) -> VariantM v a
 
 class Variant v a where

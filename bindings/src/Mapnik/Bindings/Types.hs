@@ -1,4 +1,6 @@
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -29,7 +31,7 @@ module Mapnik.Bindings.Types (
 , Stop
 , TextSymProperties (..)
 , GroupSymProperties (..)
-, FontSet(..)
+, FontSet
 , Colorizer(..)
 , Box
 , Datasource (..)
@@ -43,6 +45,7 @@ module Mapnik.Bindings.Types (
 , FeaturePtr (..)
 , PixelRgba8 (..)
 , Pair (..)
+, MapnikError (..)
 , RasterPtr
 , Value
 , Param
@@ -56,6 +59,8 @@ import           Mapnik (Color, Dash(..), GroupRule, Box, Value)
 import           Mapnik.Lens (HasRed(..), HasBlue(..), HasGreen(..), HasAlpha(..))
 
 import           Control.Lens (lens)
+import           Control.Exception
+import           Data.Typeable
 import           Data.Bits
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
@@ -106,18 +111,22 @@ fptr(RasterPtr)
 fptr(Param)
 newtype Geometry = Geometry (ForeignPtr Geometry) deriving (Eq, Ord)
 
+
 #ifdef BIGINT
 type MapnikInt = C.CLong
 #else
 type MapnikInt = C.CInt
 #endif
 
+data MapnikError = ConfigError String
+                 | FromMapnikError String
+  deriving (Eq, Show, Typeable, Exception)
 
 data Pair = Pair { x, y :: !Double }
   deriving (Eq, Show)
 
 newtype PixelRgba8 = PixelRgba8 { unRgba8 :: Word32 }
-  deriving (Eq, Show, Storable)
+  deriving newtype (Eq, Show, Storable)
 
 #define COLOR_LENS(cname, name, off) \
 instance cname PixelRgba8 Word8 where {\
@@ -178,6 +187,7 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "value", [t| Value |])
       , (C.TypeName "value_holder", [t| Param |])
       , (C.TypeName "bbox", [t| Box |])
+      , (C.TypeName "font_set", [t| FontSet |])
       , (C.TypeName "attributes", [t| Attributes |])
       , (C.TypeName "features_callback", [t|FunPtr (Ptr FeatureCtx -> Ptr FeatureList -> Ptr QueryPtr -> IO ())|])
       , (C.TypeName "features_at_point_callback", [t|FunPtr (Ptr FeatureCtx -> Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ())|])
@@ -192,5 +202,8 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "pixel_gray64", [t| Word64 |])
       , (C.TypeName "pixel_gray64s", [t| Int64 |])
       , (C.TypeName "pixel_gray64f", [t| Double |])
+      , (C.TypeName "string", [t| String |])
+      , (C.TypeName "opt_string", [t| Maybe String |])
+      , (C.TypeName "opt_fontset", [t| Maybe FontSet |])
       ]
     }

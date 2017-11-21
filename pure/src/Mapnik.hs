@@ -62,6 +62,7 @@ module Mapnik (
 
 -- ** Fonts
 , Font
+, FontSet
 , FontSetMap
 , FontSetName
 , FaceName

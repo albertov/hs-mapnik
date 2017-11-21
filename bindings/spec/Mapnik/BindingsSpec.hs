@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -21,6 +22,7 @@ import qualified Mapnik.Bindings.Symbolizer as Symbolizer
 import           Mapnik.QuickCheck
 
 import           Control.Lens hiding ((.=))
+import           Control.Exception
 import           Control.Monad
 import           Data.Text (Text)
 import           Data.Int
@@ -423,22 +425,38 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
 
 
   describe "property tests" $ do
-    prop "fromMapnik <=< toMapnik = return" $ \(setExistingDatasources -> a) -> do
-      -- We can't really compare equality here because we need to account for
-      -- the default values. Instead of re-implementing mapnik's logic we
-      -- check that the xml serialization done by mapnik (which normalizes
-      -- default values) of an arbitrary map `a` is the same as
-      -- `(fromMapnik <=< toMapnik) a`
-      a' <- (fromMapnik <=< toMapnik) a
-      mapXmlEq a a' `shouldReturn` True
-  
-    prop "render preserves Map observable configuration" $ \opts -> do
-      m <- fromFixture
-      xml1 <- Map.toXml m
-      _ <- render m opts
-      xml2 <- Map.toXml m
-      xml1 `shouldBe` xml2
+    describe "Map" $ parallel $ do
+      let cleanupMap
+            = setExistingDatasources
+            -- ^ we need to make sure the datasource exists or loadMap will barf
+            . setExistingFontDir
+            -- ^ we need to make sure the font dir exists or toMapnik(Map) will barf
+            --
+      prop "fromMapnik <=< toMapnik = return" $ \(cleanupMap -> a) -> do
+        -- We can't really compare equality here because we need to account for
+        -- the default values. Instead of re-implementing mapnik's logic we
+        -- check that the xml serialization done by mapnik (which normalizes
+        -- default values) of an arbitrary map `a` is the same as
+        -- `(fromMapnik <=< toMapnik) a`
+        a' <- (fromMapnik <=< toMapnik) a
+        mapXmlEq a a' `shouldReturn` True
+
+      prop "can render or not (but dont segfault)" $ \(cleanupMap -> a, opts) -> do
+        let dirtyMap = if True then id
+                        else fontSets .~ mempty
+        swallowExceptions $
+          flip render opts =<< toMapnik (dirtyMap a)
+    
+      prop "render preserves Map observable configuration" $ \opts -> do
+        m <- fromFixture
+        xml1 <- Map.toXml m
+        _ <- render m opts
+        xml2 <- Map.toXml m
+        xml1 `shouldBe` xml2
       
+
+swallowExceptions :: IO a -> IO ()
+swallowExceptions = void . try @SomeException
 
 mapXmlEq :: ( MapnikType a2 ~ Map.Map
             , MapnikType a1 ~ Map.Map
@@ -448,7 +466,6 @@ mapXmlEq a b =
   (==) <$> (Map.toXml =<< toMapnik a)
        <*> (Map.toXml =<< toMapnik b)
 
--- we need to make sure the datasource exists or loadMap will barf
 setExistingDatasources :: Map -> Map
 setExistingDatasources = layers . traverse . dataSource ?~ existingDatasource
   where
@@ -457,6 +474,9 @@ setExistingDatasources = layers . traverse . dataSource ?~ existingDatasource
       , "encoding" .= ("latin1" :: String)
       , "file"     .= ("spec/data/popplaces" :: String)
       ]
+
+setExistingFontDir :: Map -> Map
+setExistingFontDir = fontDirectory ?~ "spec/data/fonts"
 
 loadFixture :: Map.Map -> IO ()
 loadFixture = loadFixtureFrom "spec/map.xml"
@@ -482,9 +502,9 @@ cppStdException _ = False
 
 instance Arbitrary RenderSettings where
   arbitrary = do
-    _renderSettingsWidth <- getPositive <$> arbitrary
-    _renderSettingsHeight <- getPositive <$> arbitrary
-    _renderSettingsExtent <- arbitrary
+    _renderSettingsWidth <- choose (1, 100)
+    _renderSettingsHeight <- choose (1, 100)
+    _renderSettingsExtent <- oneof [arbitrary, pure aBox]
     _renderSettingsVariables <- arbitrary
     _renderSettingsScaleFactor <- getPositive <$> arbitrary
     _renderSettingsSrs <- maybeArb arbitrarySrs

@@ -39,15 +39,21 @@ module Mapnik.Bindings.Map (
 , resize
 , addLayer
 , insertStyle
+, insertFontSet
+, getFontSetMap
+, registerFonts
 , removeAllLayers
 ) where
 
-import           Mapnik (Color(..), StyleName, AspectFixMode(..), CompositeMode)
+import           Mapnik (Color(..), StyleName, AspectFixMode(..), CompositeMode
+                        , FontSetMap, FontSetName)
+import qualified Mapnik
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans()
 import qualified Mapnik.Bindings.Layer as Layer
 import qualified Mapnik.Bindings.Style as Style
+import           Mapnik.Bindings.Symbolizer (withFontSet)
 
 import           Data.IORef
 import           Data.String (fromString)
@@ -55,6 +61,7 @@ import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
 import           Data.Text (Text, unpack)
 import           Data.Text.Encoding (encodeUtf8)
 import           Data.ByteString (ByteString)
+import qualified Data.HashMap.Strict as M
 import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
 import           Foreign.C.String (CString)
@@ -311,3 +318,43 @@ getMaxExtent m =  newMaybe $ \(has, p) ->
 setMaxExtent :: Map -> Box -> IO ()
 setMaxExtent m box = with box $ \boxPtr ->
   [CU.block|void { $fptr-ptr:(Map *m)->set_maximum_extent(*$(bbox *boxPtr)); }|]
+
+insertFontSet :: Map -> FontSetName -> Mapnik.FontSet -> IO ()
+insertFontSet m name@(encodeUtf8->n) faceNames = withFontSet name faceNames $ \fs -> [CU.block|void {
+  $fptr-ptr:(Map *m)->insert_fontset(std::string($bs-ptr:n, $bs-len:n), *$(font_set *fs));
+  }|]
+  
+getFontSetMap :: Map -> IO FontSetMap
+getFontSetMap m = do
+  ref <- newIORef []
+  let cb p = do {v <- peekFontSet p; modifyIORef' ref (v:)}
+  [C.block|void {
+    auto const fs = $fptr-ptr:(Map *m)->fontsets();
+    for (auto it=fs.begin(); it!=fs.end(); ++it) {
+      $fun:(void (*cb)(font_set *))(const_cast<font_set*>(&it->second));
+    }
+  }|]
+  M.fromList <$> readIORef ref
+
+peekFontSet :: Ptr FontSet -> IO (FontSetName, Mapnik.FontSet)
+peekFontSet fs = do
+  name <- newText "peekFontSet.name" $ \(p,len) -> [CU.block|void {
+    auto const s = $(font_set *fs)->get_name();
+    mallocedString(s, $(char **p), $(int *len));
+    }|]
+  ref <- newIORef []
+  let cb p len = do s <- unsafePackMallocCStringLen (p,fromIntegral len)
+                    modifyIORef' ref (s:)
+  [C.block|void  {
+    auto const names = $(font_set *fs)->get_face_names();
+    for (auto it=names.begin(); it!=names.end(); ++it) {
+      char *p;
+      int len;
+      mallocedString(*it, &p, &len);
+      $fun:(void(*cb)(char *, int))(p, len);
+    }}|]
+  (,) <$> pure name <*> (mapM (decodeUtf8Ctx "peekFontSet") . reverse =<< readIORef ref)
+
+registerFonts :: Map -> FilePath -> IO Bool
+registerFonts m (encodeUtf8 . fromString -> d) =
+  (toEnum . fromIntegral) <$> [C.exp|int { static_cast<int>($fptr-ptr:(Map *m)->register_fonts(std::string($bs-ptr:d, $bs-len:d)))}|]

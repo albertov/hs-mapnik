@@ -334,7 +334,7 @@ data Symbolizer
     , BASE_PROPS
     }
   | ShieldSymbolizer
-    { placements      :: !(Maybe TextPlacements)
+    { placements      :: !TextPlacements
     , imageTransform  :: !(PropValue Transform)
     , dx              :: !(PropValue Double)
     , dy              :: !(PropValue Double)
@@ -345,7 +345,7 @@ data Symbolizer
     , BASE_PROPS
     }
   | TextSymbolizer
-    { placements     :: !(Maybe TextPlacements)
+    { placements     :: !TextPlacements
     , haloCompOp     :: !(PropValue CompositeMode)
     , haloRasterizer :: !(PropValue HaloRasterizer)
     , haloTransform  :: !(PropValue Transform)
@@ -377,11 +377,11 @@ data Symbolizer
     , STROKE_PROPS
     }
   | GroupSymbolizer
-    { groupProperties :: !(PropValue GroupSymProperties)
+    { groupProperties :: !GroupSymProperties
     , numColumns      :: !(PropValue Int)
     , startColumn     :: !(PropValue Int)
     , repeatKey       :: !(PropValue Expression)
-    , placements      :: !(Maybe TextPlacements)
+    , placements      :: !TextPlacements
     , BASE_PROPS
     }
   | DebugSymbolizer
@@ -468,7 +468,7 @@ rasterSym = RasterSymbolizer
 -- 'ShieldSymbolizer' constructor fields for the available properties
 -- and their meaning.
 shieldSym = ShieldSymbolizer
-  { placements      = Nothing
+  { placements      = def
   , imageTransform  = Nothing
   , dx              = Nothing
   , dy              = Nothing
@@ -482,7 +482,7 @@ shieldSym = ShieldSymbolizer
 -- 'TextSymbolizer' constructor fields for the available properties
 -- and their meaning.
 textSym = TextSymbolizer
-  { placements     = Nothing
+  { placements     = def
   , haloCompOp     = Nothing
   , haloRasterizer = Nothing
   , haloTransform  = Nothing
@@ -523,11 +523,11 @@ markersSym = MarkersSymbolizer
 -- 'GroupSymbolizer' constructor fields for the available properties
 -- and their meaning.
 groupSym = GroupSymbolizer
-  { groupProperties = Nothing
+  { groupProperties = def
   , numColumns      = Nothing
   , startColumn     = Nothing
   , repeatKey       = Nothing
-  , placements      = Nothing
+  , placements      = def
   , BASE_PROPS_DEFS
   }
 -- | See <https://github.com/mapnik/mapnik/wiki/DebugSymbolizer> and the

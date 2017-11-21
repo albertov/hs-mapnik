@@ -1,4 +1,5 @@
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 module Mapnik.Bindings.Util where
 
@@ -13,9 +14,9 @@ import           Data.ByteString (ByteString)
 import           Data.Text (Text)
 import           Data.Text.Encoding (decodeUtf8')
 import           Foreign.Ptr (Ptr, nullPtr)
-import           Foreign.C.String (CString)
 import           Foreign.ForeignPtr (ForeignPtr, FinalizerPtr, newForeignPtr)
 import           Foreign.Storable (Storable)
+import           Foreign.C.String (CString, newCString)
 
 
 newText :: MonadBaseControl IO m
@@ -67,3 +68,10 @@ decodeUtf8Ctx msg k' =
   case decodeUtf8' k' of
     Right  k -> return $! k
     Left   e -> throwIO (userError (msg ++ ": Error when decoding " ++ show k' ++ ": " ++ show e))
+
+catchToErrorMsg :: IO () -> IO CString
+catchToErrorMsg a = do
+  r <- try a
+  case r of
+    Right () -> return nullPtr
+    Left (e::SomeException) -> newCString (show e)

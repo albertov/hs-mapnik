@@ -108,8 +108,6 @@ withMaybe :: V.Storable a => Maybe a -> (Ptr a -> IO b) -> IO b
 withMaybe Nothing  f = f nullPtr
 withMaybe (Just a) f = with a f
 
-type instance VariantM RasterPtr = IO
-
 instance VariantPtr RasterPtr where
   allocaV = bracket alloc dealloc where
     alloc = [C.exp|raster_ptr * { new raster_ptr }|]

@@ -45,7 +45,8 @@ deriveMapnikJSON ''Dash
 
 type FaceName = Text
 type FontSetName = Text
-type FontSetMap = M.HashMap FontSetName [FaceName]
+type FontSetMap = M.HashMap FontSetName FontSet
+type FontSet = [FaceName]
 
 -- | See <https://github.com/mapnik/mapnik/wiki/RasterColorizer>
 

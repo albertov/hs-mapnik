@@ -45,7 +45,7 @@ instance FromMapnik Map where
     fontDirectory <- Map.getFontDirectory m
     layers <- mapM fromMapnik =<< Map.getLayers m
     styles <- M.fromList <$> (mapM (\(k,v) -> (k,) <$> fromMapnik v) =<< Map.getStyles m)
-    fontSets <- return M.empty --TODO
+    fontSets <- Map.getFontSetMap m
     return Mapnik.Map{..}
 
 instance FromMapnik Expression where

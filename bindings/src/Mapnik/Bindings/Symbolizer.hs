@@ -2,7 +2,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE PatternSynonyms #-}
@@ -24,6 +23,7 @@ module Mapnik.Bindings.Symbolizer (
   create
 , unCreate
 , unsafeNew
+, withFontSet
 ) where
 
 import qualified Mapnik
@@ -49,6 +49,7 @@ import           Control.Monad.Base (MonadBase, liftBase)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Control.Monad.Reader
 import           Data.Maybe
+import qualified Data.HashMap.Strict as M
 import qualified Data.Text as T
 import           Data.Text (Text, pack, unpack)
 import           Data.IORef.Lifted
@@ -95,6 +96,9 @@ C.using "namespace mapnik"
 C.using "namespace mapnik::formatting"
 C.using "sym_value_type = symbolizer_base::value_type"
 C.using "dash_t = std::pair<double,double>"
+C.using "opt_string = const boost::optional<std::string>"
+C.using "opt_fontset = const boost::optional<font_set>"
+C.using "string = const std::string"
 
 
 --
@@ -106,10 +110,9 @@ foreign import ccall "&hs_mapnik_destroy_Symbolizer" destroySymbolizer :: Finali
 unsafeNew :: MonadBase IO m => Ptr Symbolizer -> m Symbolizer
 unsafeNew = fmap Symbolizer . liftBase . newForeignPtr destroySymbolizer
 
-create :: Mapnik.Symbolizer -> IO Symbolizer
-create = flip runReaderT undefined . create'
+create :: Mapnik.FontSetMap -> Mapnik.Symbolizer -> IO Symbolizer
+create m = flip runReaderT m . create'
 
-type instance VariantM SymbolizerValue = ReaderT Mapnik.FontSetMap IO
 type SvM = VariantM SymbolizerValue
 
 create' :: Mapnik.Symbolizer -> SvM Symbolizer
@@ -184,7 +187,7 @@ unCreate' sym = do
     Just s -> do
       props <- getProperties sym
       return (s & symbolizerProps .~ props)
-    Nothing -> throwIO (userError ("Unexpected symbolizer name: " ++ unpack symName))
+    Nothing -> throwIO (FromMapnikError ("Unexpected symbolizer name: " ++ unpack symName))
 
 getProperties :: Symbolizer -> SvM [Property]
 getProperties sym' = bracket alloc dealloc $ \sym -> do
@@ -359,7 +362,7 @@ symbolizerProps = lens getProps setProps where
 
   setProps sym@Mapnik.ShieldSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
-    step (TextPlacementsKey :=> Val v) = placements ?~ v
+    step (TextPlacementsKey :=> Val v) = placements .~ v
     step (ImageTransform :=> v) = imageTransform ?~ v
     step (ShieldDx       :=> v) = dx ?~ v
     step (ShieldDy       :=> v) = dy ?~ v
@@ -371,7 +374,7 @@ symbolizerProps = lens getProps setProps where
 
   setProps sym@Mapnik.TextSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
-    step (TextPlacementsKey :=> Val v) = placements ?~ v
+    step (TextPlacementsKey :=> Val v) = placements .~ v
     step (HaloCompOp     :=> v) = haloCompOp ?~ v
     step (HaloRasterizer :=> v) = haloRasterizer ?~ v
     step (HaloTransform  :=> v) = haloTransform ?~ v
@@ -406,11 +409,11 @@ symbolizerProps = lens getProps setProps where
 
   setProps sym@Mapnik.GroupSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
-    step (GroupPropertiesKey :=> v) = groupProperties ?~ v
+    step (GroupPropertiesKey :=> Val v) = groupProperties .~ v
     step (NumColumns      :=> v) = numColumns ?~ v
     step (StartColumn     :=> v) = startColumn ?~ v
     step (RepeatKey       :=> v) = repeatKey ?~ v
-    step (TextPlacementsKey :=> Val v) = placements ?~ v
+    step (TextPlacementsKey :=> Val v) = placements .~ v
     step p                       = stepBase p
 
   setProps sym@Mapnik.DebugSymbolizer{} = foldr step sym  where
@@ -517,7 +520,7 @@ symbolizerProps = lens getProps setProps where
       , GET_BASE_PROPS
       ]
     Mapnik.ShieldSymbolizer{} ->
-      [ fmap ((TextPlacementsKey :=>) . Val) (sym^?!placements)
+      [ fmap ((TextPlacementsKey :=>) . Val) (sym^?!placements.to Just)
       , fmap (ImageTransform :=>) (sym^?!imageTransform)
       , fmap (ShieldDx          :=>) (sym^?!dx)
       , fmap (ShieldDy          :=>) (sym^?!dy)
@@ -528,7 +531,7 @@ symbolizerProps = lens getProps setProps where
       , GET_BASE_PROPS
       ]
     Mapnik.TextSymbolizer{} ->
-      [ fmap ((TextPlacementsKey :=>) . Val) (sym^?!placements)
+      [ fmap ((TextPlacementsKey :=>) . Val) (sym^?!placements.to Just)
       , fmap (HaloCompOp        :=>) (sym^?!haloCompOp)
       , fmap (HaloRasterizer    :=>) (sym^?!haloRasterizer)
       , fmap (HaloTransform :=>) (sym^?!haloTransform)
@@ -560,11 +563,11 @@ symbolizerProps = lens getProps setProps where
       , GET_STROKE_PROPS
       ]
     Mapnik.GroupSymbolizer{} ->
-      [ fmap (GroupPropertiesKey :=>) (sym^?!groupProperties)
+      [ fmap ((GroupPropertiesKey :=>) . Val) (sym^?!groupProperties.to Just)
       , fmap (NumColumns      :=>) (sym^?!numColumns)
       , fmap (StartColumn     :=>) (sym^?!startColumn)
       , fmap (RepeatKey       :=>) (sym^?!repeatKey)
-      , fmap ((TextPlacementsKey :=>) . Val) (sym^?!placements)
+      , fmap ((TextPlacementsKey :=>) . Val) (sym^?!placements.to Just)
       , GET_BASE_PROPS
       ]
     Mapnik.DebugSymbolizer{} ->
@@ -579,84 +582,91 @@ symbolizerProps = lens getProps setProps where
       , fmap (CompOp  :=>) (sym^?!compOp)
       ]
 
+
 setProperty :: Property -> Ptr SymbolizerBase -> SvM ()
 setProperty ((keyIndex -> k) :=> v) sym = do
   env <- ask
-  let cb p = runReaderT (pokeV p v) env
-  [C.safeBlock|void {
+  let cb p = catchToErrorMsg (runReaderT (pokeV p v) env)
+  [C.catchBlock|
     sym_value_type val;
-    $fun:(void (*cb)(sym_value_type*))(&val);
+    char *msg = $fun:(char * (*cb)(sym_value_type*))(&val);
+    if (msg) {
+      std::string smsg(msg);
+      free(msg);
+      throw std::runtime_error("Setting a property caused an exception in a haskell callback: " + smsg);
+    }
     $(symbolizer_base *sym)->properties[$(keys k)] = val;
-  }|]
+  |]
 
 withKey
   :: MonadBaseControl IO m
   => (forall a. Variant SymbolizerValue a => Key a -> m b)
   -> C.CUChar -> m b
-withKey f = \k -> if
-  | k == [C.pure|keys{keys::gamma}|] -> f Gamma
-  | k == [C.pure|keys{keys::gamma_method}|] -> f GammaMethod
-  | k == [C.pure|keys{keys::opacity}|] -> f Opacity
-  | k == [C.pure|keys{keys::alignment}|] -> f Alignment
-  | k == [C.pure|keys{keys::offset}|] -> f Offset
-  | k == [C.pure|keys{keys::comp_op}|] -> f CompOp
-  | k == [C.pure|keys{keys::clip}|] -> f Clip
-  | k == [C.pure|keys{keys::fill}|] -> f Fill
-  | k == [C.pure|keys{keys::fill_opacity}|] -> f FillOpacity
-  | k == [C.pure|keys{keys::stroke}|] -> f Stroke
-  | k == [C.pure|keys{keys::stroke_width}|] -> f StrokeWidth
-  | k == [C.pure|keys{keys::stroke_opacity}|] -> f StrokeOpacity
-  | k == [C.pure|keys{keys::stroke_linejoin}|] -> f StrokeLinejoin
-  | k == [C.pure|keys{keys::stroke_linecap}|] -> f StrokeLinecap
-  | k == [C.pure|keys{keys::stroke_gamma}|] -> f StrokeGamma
-  | k == [C.pure|keys{keys::stroke_gamma_method}|] -> f StrokeGammaMethod
-  | k == [C.pure|keys{keys::stroke_dashoffset}|] -> f StrokeDashoffset
-  | k == [C.pure|keys{keys::stroke_dasharray}|] -> f StrokeDasharray
-  | k == [C.pure|keys{keys::stroke_miterlimit}|] -> f StrokeMiterlimit
-  | k == [C.pure|keys{keys::geometry_transform}|] -> f GeometryTransform
-  | k == [C.pure|keys{keys::line_rasterizer}|] -> f LineRasterizer
-  | k == [C.pure|keys{keys::image_transform}|] -> f ImageTransform
-  | k == [C.pure|keys{keys::spacing}|] -> f Spacing
-  | k == [C.pure|keys{keys::max_error}|] -> f MaxError
-  | k == [C.pure|keys{keys::allow_overlap}|] -> f AllowOverlap
-  | k == [C.pure|keys{keys::ignore_placement}|] -> f IgnorePlacement
-  | k == [C.pure|keys{keys::width}|] -> f Width
-  | k == [C.pure|keys{keys::height}|] -> f Height
-  | k == [C.pure|keys{keys::file}|] -> f File
-  | k == [C.pure|keys{keys::shield_dx}|] -> f ShieldDx
-  | k == [C.pure|keys{keys::shield_dy}|] -> f ShieldDy
-  | k == [C.pure|keys{keys::unlock_image}|] -> f UnlockImage
-  | k == [C.pure|keys{keys::mode}|] -> f Mode
-  | k == [C.pure|keys{keys::scaling}|] -> f Scaling
-  | k == [C.pure|keys{keys::filter_factor}|] -> f FilterFactor
-  | k == [C.pure|keys{keys::mesh_size}|] -> f MeshSize
-  | k == [C.pure|keys{keys::premultiplied}|] -> f Premultiplied
-  | k == [C.pure|keys{keys::smooth}|] -> f Smooth
-  | k == [C.pure|keys{keys::simplify_algorithm}|] -> f SimplifyAlgorithm
-  | k == [C.pure|keys{keys::simplify_tolerance}|] -> f SimplifyTolerance
-  | k == [C.pure|keys{keys::halo_rasterizer}|] -> f HaloRasterizer
-  | k == [C.pure|keys{keys::text_placements_}|] -> f TextPlacementsKey
-  | k == [C.pure|keys{keys::label_placement}|] -> f LabelPlacement
-  | k == [C.pure|keys{keys::markers_placement_type}|] -> f MarkersPlacementKey
-  | k == [C.pure|keys{keys::markers_multipolicy}|] -> f MarkersMultipolicy
-  | k == [C.pure|keys{keys::point_placement_type}|] -> f PointPlacementKey
-  | k == [C.pure|keys{keys::colorizer}|] -> f ColorizerKey
-  | k == [C.pure|keys{keys::halo_transform}|] -> f HaloTransform
-  | k == [C.pure|keys{keys::num_columns}|] -> f NumColumns
-  | k == [C.pure|keys{keys::start_column}|] -> f StartColumn
-  | k == [C.pure|keys{keys::repeat_key}|] -> f RepeatKey
-  | k == [C.pure|keys{keys::group_properties}|] -> f GroupPropertiesKey
-  | k == [C.pure|keys{keys::largest_box_only}|] -> f LargestBoxOnly
-  | k == [C.pure|keys{keys::minimum_path_length}|] -> f MinimumPathLength
-  | k == [C.pure|keys{keys::halo_comp_op}|] -> f HaloCompOp
-  | k == [C.pure|keys{keys::text_transform}|] -> f TextTransform
-  | k == [C.pure|keys{keys::horizontal_alignment}|] -> f HorizontalAlignment
-  | k == [C.pure|keys{keys::justify_alignment}|] -> f JustifyAlignment
-  | k == [C.pure|keys{keys::vertical_alignment}|] -> f VerticalAlignment
-  | k == [C.pure|keys{keys::upright}|] -> f Upright
-  | k == [C.pure|keys{keys::direction}|] -> f Direction
-  | k == [C.pure|keys{keys::avoid_edges}|] -> f AvoidEdges
-  | k == [C.pure|keys{keys::ff_settings}|] -> f FfSettings
+withKey f k
+  | k == [C.pure|keys{keys::gamma}|] = f Gamma
+  | k == [C.pure|keys{keys::gamma_method}|] = f GammaMethod
+  | k == [C.pure|keys{keys::opacity}|] = f Opacity
+  | k == [C.pure|keys{keys::alignment}|] = f Alignment
+  | k == [C.pure|keys{keys::offset}|] = f Offset
+  | k == [C.pure|keys{keys::comp_op}|] = f CompOp
+  | k == [C.pure|keys{keys::clip}|] = f Clip
+  | k == [C.pure|keys{keys::fill}|] = f Fill
+  | k == [C.pure|keys{keys::fill_opacity}|] = f FillOpacity
+  | k == [C.pure|keys{keys::stroke}|] = f Stroke
+  | k == [C.pure|keys{keys::stroke_width}|] = f StrokeWidth
+  | k == [C.pure|keys{keys::stroke_opacity}|] = f StrokeOpacity
+  | k == [C.pure|keys{keys::stroke_linejoin}|] = f StrokeLinejoin
+  | k == [C.pure|keys{keys::stroke_linecap}|] = f StrokeLinecap
+  | k == [C.pure|keys{keys::stroke_gamma}|] = f StrokeGamma
+  | k == [C.pure|keys{keys::stroke_gamma_method}|] = f StrokeGammaMethod
+  | k == [C.pure|keys{keys::stroke_dashoffset}|] = f StrokeDashoffset
+  | k == [C.pure|keys{keys::stroke_dasharray}|] = f StrokeDasharray
+  | k == [C.pure|keys{keys::stroke_miterlimit}|] = f StrokeMiterlimit
+  | k == [C.pure|keys{keys::geometry_transform}|] = f GeometryTransform
+  | k == [C.pure|keys{keys::line_rasterizer}|] = f LineRasterizer
+  | k == [C.pure|keys{keys::image_transform}|] = f ImageTransform
+  | k == [C.pure|keys{keys::spacing}|] = f Spacing
+  | k == [C.pure|keys{keys::max_error}|] = f MaxError
+  | k == [C.pure|keys{keys::allow_overlap}|] = f AllowOverlap
+  | k == [C.pure|keys{keys::ignore_placement}|] = f IgnorePlacement
+  | k == [C.pure|keys{keys::width}|] = f Width
+  | k == [C.pure|keys{keys::height}|] = f Height
+  | k == [C.pure|keys{keys::file}|] = f File
+  | k == [C.pure|keys{keys::shield_dx}|] = f ShieldDx
+  | k == [C.pure|keys{keys::shield_dy}|] = f ShieldDy
+  | k == [C.pure|keys{keys::unlock_image}|] = f UnlockImage
+  | k == [C.pure|keys{keys::mode}|] = f Mode
+  | k == [C.pure|keys{keys::scaling}|] = f Scaling
+  | k == [C.pure|keys{keys::filter_factor}|] = f FilterFactor
+  | k == [C.pure|keys{keys::mesh_size}|] = f MeshSize
+  | k == [C.pure|keys{keys::premultiplied}|] = f Premultiplied
+  | k == [C.pure|keys{keys::smooth}|] = f Smooth
+  | k == [C.pure|keys{keys::simplify_algorithm}|] = f SimplifyAlgorithm
+  | k == [C.pure|keys{keys::simplify_tolerance}|] = f SimplifyTolerance
+  | k == [C.pure|keys{keys::halo_rasterizer}|] = f HaloRasterizer
+  | k == [C.pure|keys{keys::text_placements_}|] = f TextPlacementsKey
+  | k == [C.pure|keys{keys::label_placement}|] = f LabelPlacement
+  | k == [C.pure|keys{keys::markers_placement_type}|] = f MarkersPlacementKey
+  | k == [C.pure|keys{keys::markers_multipolicy}|] = f MarkersMultipolicy
+  | k == [C.pure|keys{keys::point_placement_type}|] = f PointPlacementKey
+  | k == [C.pure|keys{keys::colorizer}|] = f ColorizerKey
+  | k == [C.pure|keys{keys::halo_transform}|] = f HaloTransform
+  | k == [C.pure|keys{keys::num_columns}|] = f NumColumns
+  | k == [C.pure|keys{keys::start_column}|] = f StartColumn
+  | k == [C.pure|keys{keys::repeat_key}|] = f RepeatKey
+  | k == [C.pure|keys{keys::group_properties}|] = f GroupPropertiesKey
+  | k == [C.pure|keys{keys::largest_box_only}|] = f LargestBoxOnly
+  | k == [C.pure|keys{keys::minimum_path_length}|] = f MinimumPathLength
+  | k == [C.pure|keys{keys::halo_comp_op}|] = f HaloCompOp
+  | k == [C.pure|keys{keys::text_transform}|] = f TextTransform
+  | k == [C.pure|keys{keys::horizontal_alignment}|] = f HorizontalAlignment
+  | k == [C.pure|keys{keys::justify_alignment}|] = f JustifyAlignment
+  | k == [C.pure|keys{keys::vertical_alignment}|] = f VerticalAlignment
+  | k == [C.pure|keys{keys::upright}|] = f Upright
+  | k == [C.pure|keys{keys::direction}|] = f Direction
+  | k == [C.pure|keys{keys::avoid_edges}|] = f AvoidEdges
+  | k == [C.pure|keys{keys::ff_settings}|] = f FfSettings
+  | otherwise = error "unknown symbolizer::keys"
 
 keyIndex :: Key a -> C.CUChar
 keyIndex Gamma = [C.pure|keys{keys::gamma}|]
@@ -799,7 +809,7 @@ createFormat f = unsafeNewFormat $ \p -> case f of
         auto node = std::make_shared<text_node>(*$fptr-ptr:(expression_ptr *e));
         *$(node_ptr **p) = new node_ptr(node);
         }|]
-      Left e -> throwIO (userError ("Could not parse format expression" ++ e))
+      Left e -> throwIO (ConfigError ("Could not parse format expression" ++ e))
   Mapnik.NullFormat ->
     [C.block|void { *$(node_ptr **p) = new node_ptr(nullptr); }|]
   Mapnik.FormatList fs -> do
@@ -890,7 +900,15 @@ withFormatProperties Mapnik.TextFormatProperties{..} = bracket alloc dealloc . e
           [C.block|void {
           $(format_properties *p)->face_name = std::string($bs-ptr:v, $bs-len:v);
           }|]
-        --TODO fontSet
+        Mapnik.FontSetName name -> do
+          mFs <- asks (M.lookup name)
+          case mFs of
+            Just faceNames -> withFontSet name faceNames $ \fs ->
+              [C.block|void {
+              $(format_properties *p)->fontset = *$(font_set *fs);
+              }|]
+            Nothing -> throwIO (ConfigError ("No fontset named " ++ show name ++ " found in map"))
+          
       SET_PROP_F(textSize,text_size)
       SET_PROP_F(characterSpacing,character_spacing)
       SET_PROP_F(lineSpacing,line_spacing)
@@ -902,6 +920,17 @@ withFormatProperties Mapnik.TextFormatProperties{..} = bracket alloc dealloc . e
       SET_PROP_F(haloRadius,halo_radius)
       SET_PROP_F(ffSettings,ff_settings)
       f p
+
+withFontSet
+  :: MonadBaseControl IO m
+  => Mapnik.FontSetName -> Mapnik.FontSet -> (Ptr FontSet -> m a) -> m a
+withFontSet (encodeUtf8->name) faceNames = bracket alloc dealloc where
+  alloc = do
+    ret <- [C.exp|font_set * { new font_set(std::string($bs-ptr:name, $bs-len:name)) }|]
+    forM_ faceNames $ \(encodeUtf8 -> face) ->
+      [C.exp|void { $(font_set *ret)->add_face_name(std::string($bs-ptr:face, $bs-len:face)) }|]
+    return ret
+  dealloc p = [C.exp|void { delete $(font_set *p) }|]
 
 withLayoutProperties
   :: Mapnik.TextLayoutProperties -> (Ptr TextLayoutProperties -> SvM a) -> SvM a
@@ -1019,17 +1048,13 @@ unFormat p = do
         }|]
 
     1 -> do {
-      faceName <- newTextMaybe "unFormat(Format.faceName)" $ \(ret,len) ->
-        [C.block|void {
-        auto const node = dynamic_cast<format_node*>($fptr-ptr:(node_ptr *p)->get());
-        auto v = node->face_name;
-        if (v) {
-          mallocedString(*v, $(char **ret), $(int *len));
-        } else {
-          *$(char **ret) = nullptr;
-        }
+      font <- peekFont
+        (Left <$> [C.exp|opt_string * {
+        &dynamic_cast<format_node*>($fptr-ptr:(node_ptr *p)->get())->face_name
+        }|])
+        [C.exp|opt_fontset * {
+        &dynamic_cast<format_node*>($fptr-ptr:(node_ptr *p)->get())->fontset
         }|];
-      font <- return Nothing; --TODO
       GET_OPT_PROP(format_node, textSize, text_size);
       GET_OPT_PROP(format_node, characterSpacing, character_spacing);
       GET_OPT_PROP(format_node, lineSpacing, line_spacing);
@@ -1088,7 +1113,43 @@ unFormat p = do
         .  mapM unFormat
         =<< readIORef childRef
 
-    _ -> throwIO (userError "Unsupported node_ptr type")
+    _ -> throwIO (FromMapnikError "Unsupported node_ptr type")
+
+peekFont :: MonadBaseControl IO m
+  => m (Either (Ptr (Maybe String)) (Ptr String))
+  -> m (Ptr (Maybe FontSet))
+  -> m (Maybe Mapnik.Font)
+peekFont f1 f2 = ((<|>) <$> (getFaceName =<< f1) <*> (getFontSetName =<< f2)) where
+  getFaceName (Left p) = fmap (fmap Mapnik.FaceName) $
+    newTextMaybe "unFormat(peekFont.faceName)" $ \(ret,len) ->
+    [C.block|void {
+    auto v = *$(opt_string *p);
+    if (v) {
+      mallocedString(*v, $(char **ret), $(int *len));
+    } else {
+      *$(char **ret) = nullptr;
+    }
+    }|];
+  getFaceName (Right p) = fmap (fmap Mapnik.FaceName) $
+    newTextMaybe "unFormat(peekFont.faceName)" $ \(ret,len) ->
+    [C.block|void {
+    auto v = *$(string *p);
+    if (v != "") {
+      mallocedString(v, $(char **ret), $(int *len));
+    } else {
+      *$(char **ret) = nullptr;
+    }
+    }|];
+  getFontSetName p = fmap (fmap Mapnik.FontSetName) $
+    newTextMaybe "unFormat(peekFont.fontsetName)" $ \(ret,len) ->
+    [C.block|void {
+    auto v = *$(opt_fontset *p);
+    if (v) {
+      mallocedString(v->get_name(), $(char **ret), $(int *len));
+    } else {
+      *$(char **ret) = nullptr;
+    }
+    }|];
 
 readPropWith
   :: Variant SymbolizerValue a
@@ -1110,17 +1171,9 @@ readPropWith f = do
 
 unFormatProperties :: Ptr TextFormatProperties -> SvM Mapnik.TextFormatProperties
 unFormatProperties p = do
-  faceName <- newTextMaybe "unFormatProperties(faceName)" $ \(ret,len) ->
-    [C.block|void {
-    const format_properties def;
-    auto v = $(format_properties *p)->face_name;
-    if (v != def.face_name) {
-      mallocedString(v, $(char **ret), $(int *len));
-    } else {
-      *$(char **ret) = nullptr;
-    }
-    }|]
-  font <- return Nothing --TODO
+  font <- peekFont
+    (Right <$> [C.exp|string * { &$(format_properties *p)->face_name }|])
+    [C.exp|opt_fontset * { &$(format_properties *p)->fontset }|]
   GET_PROP_F(textSize, text_size)
   GET_PROP_F(characterSpacing, character_spacing)
   GET_PROP_F(lineSpacing, line_spacing)
@@ -1179,6 +1232,7 @@ unProperties p = do
 -- SymbolizerValue Variant instances
 
 instance VariantPtr SymbolizerValue where
+  type VariantM SymbolizerValue = ReaderT Mapnik.FontSetMap IO
   allocaV = bracket alloc dealloc where
     alloc = [C.exp|sym_value_type * { new sym_value_type }|]
     dealloc p = [C.exp|void { delete $(sym_value_type *p)}|]
@@ -1315,7 +1369,7 @@ instance Variant SymbolizerValue Char where
     s <- peekV p
     case T.uncons s of
       Just (c,_) -> return c
-      Nothing    -> throwIO (userError "Unexpected empty string")
+      Nothing    -> throwIO (FromMapnikError "Unexpected empty string")
   pokeV p (T.singleton -> c) = pokeV p c
 
 instance Variant SymbolizerValue String where
@@ -1342,7 +1396,7 @@ instance Variant SymbolizerValue Mapnik.Expression where
     case Expression.parse expr of
       Right v ->
         [C.block|void{ *$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(expression_ptr *v)); }|]
-      Left e -> throwIO (userError e)
+      Left e -> throwIO (ConfigError e)
 
 instance Variant SymbolizerValue Mapnik.FontFeatureSettings where
   peekV p =
@@ -1411,7 +1465,7 @@ instance Variant SymbolizerValue Mapnik.Transform where
     case Transform.parse expr of
       Right v ->
         [C.block|void {*$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(transform_type *v));}|]
-      Left e -> throwIO (userError e)
+      Left e -> throwIO (ConfigError e)
 
   peekV p = liftBase $
     fmap Mapnik.Transform $ justOrTypeError "Transform" $ newTextMaybe "peekV(Transform)" $ \(ptr, len) ->
@@ -1473,13 +1527,13 @@ withGroupRule Mapnik.GroupRule{..} f = bracket alloc dealloc enter where
         [C.block|void {
         $(group_rule_ptr *p)->get()->set_filter(*$fptr-ptr:(expression_ptr *e));
         }|]
-      Left e -> throwIO (userError ("Could not parse format expression" ++ e))
+      Left e -> throwIO (ConfigError ("Could not parse format expression" ++ e))
     forM_ repeatKey $ \(Mapnik.Expression e) ->  case Expression.parse e of
       Right e ->
         [C.block|void {
         $(group_rule_ptr *p)->get()->set_repeat_key(*$fptr-ptr:(expression_ptr *e));
         }|]
-      Left e -> throwIO (userError ("Could not parse format expression" ++ e))
+      Left e -> throwIO (ConfigError ("Could not parse format expression" ++ e))
     forM_ symbolizers $ create' >=> \sym ->
       [C.block|void {
       $(group_rule_ptr *p)->get()->append(*$fptr-ptr:(symbolizer *sym));

@@ -35,8 +35,8 @@ instance Arbitrary Map where
     bufferSize             <- arbitrary
     maximumExtent          <- arbitrary
     fontDirectory          <- arbitrary
-    styles                 <- arbitrary
     fontSets               <- arbitrary
+    styles                 <- M.fromList <$> listOf ((,) <$> arbitrary <*> arbitraryStyle fontSets)
     layers                 <- listOf (arbitraryLayer (M.keys styles))
     pure Map{..}
 
@@ -48,24 +48,24 @@ instance Arbitrary Datasource where
     [ "type" .= ("memory" :: T.Text)
     ]
 
-instance Arbitrary Style where
-  arbitrary = do
-    opacity             <- arbitrary
-    imageFiltersInflate <- arbitrary
-    rules               <- arbitrary
-    pure Style{..}
+arbitraryStyle :: FontSetMap -> Gen Style
+arbitraryStyle fontMap = do
+  opacity             <- arbitrary
+  imageFiltersInflate <- arbitrary
+  rules               <- listOf (arbitraryRule fontMap)
+  pure Style{..}
 
-instance Arbitrary Rule where
-  arbitrary = do
-    name                      <- maybeArb arbitrary
-    symbolizers               <- resize 5 arbitrary
-    filter                    <- arbitrary
-    ( minimumScaleDenominator
-     ,maximumScaleDenominator) <- arbitraryMinMaxScaleDenom
-    pure Rule{..}
+arbitraryRule :: FontSetMap -> Gen Rule
+arbitraryRule fontMap = do
+  name                      <- maybeArb arbitrary
+  symbolizers               <- resize 5 (listOf (arbitrarySymbolizer fontMap))
+  filter                    <- arbitrary
+  ( minimumScaleDenominator
+   ,maximumScaleDenominator) <- arbitraryMinMaxScaleDenom
+  pure Rule{..}
 
 instance Arbitrary Expression where
-  arbitrary = elements ["[some_field]"] --TODO
+  arbitrary = elements ["[GEONAME]", "[SCALE_CAT]"] --TODO
 
 instance Arbitrary Transform where
   arbitrary = Transform <$> (T.intercalate " " <$> listOf1 parts)
@@ -92,26 +92,28 @@ instance Arbitrary Box where
 
 --------------------------------------------------------------------------------
 
-instance Arbitrary Symbolizer where
-  arbitrary = oneof
+arbitrarySymbolizer :: FontSetMap -> Gen Symbolizer
+arbitrarySymbolizer fontMap = oneof
    [ arbitraryPointSym
    , arbitraryLineSym
    , arbitraryLinePatternSym
    , arbitraryPolygonSym
    , arbitraryPolygonPatternSym
    , arbitraryRasterSym
-   , arbitraryShieldSym
-   , arbitraryTextSym
+   , arbitraryShieldSym fontMap
+   , arbitraryTextSym fontMap
    , arbitraryBuildingSym
    , arbitraryMarkersSym
-   , arbitraryGroupSym
+   , arbitraryGroupSym fontMap
    , arbitraryDebugSym
    , arbitraryDotSym
    ]
 
 
 arbitraryPointSym, arbitraryLineSym, arbitraryLinePatternSym, arbitraryPolygonSym, arbitraryPolygonPatternSym, arbitraryRasterSym :: Gen Symbolizer
-arbitraryShieldSym, arbitraryTextSym, arbitraryBuildingSym, arbitraryMarkersSym, arbitraryGroupSym, arbitraryDebugSym, arbitraryDotSym :: Gen Symbolizer
+arbitraryBuildingSym, arbitraryMarkersSym, arbitraryDebugSym, arbitraryDotSym :: Gen Symbolizer
+arbitraryTextSym, arbitraryGroupSym, arbitraryShieldSym :: FontSetMap -> Gen Symbolizer
+
 arbitraryPointSym = do
   file            <- arbitrary
   opacity         <- arbitrary
@@ -204,8 +206,8 @@ arbitraryRasterSym = do
   simplifyAlgorithm <- arbitrary
   pure RasterSymbolizer{..}
 
-arbitraryShieldSym = do
-  placements      <- arbitrary
+arbitraryShieldSym fontMap = do
+  placements      <- arbitraryPlacements fontMap
   imageTransform  <- arbitrary
   dx              <- arbitrary
   dy              <- arbitrary
@@ -221,8 +223,8 @@ arbitraryShieldSym = do
   simplifyAlgorithm <- arbitrary
   pure ShieldSymbolizer{..}
  
-arbitraryTextSym = do
-  placements     <- arbitrary
+arbitraryTextSym fontMap = do
+  placements     <- arbitraryPlacements fontMap
   haloCompOp     <- arbitrary
   haloRasterizer <- arbitrary
   haloTransform  <- arbitrary
@@ -281,12 +283,12 @@ arbitraryMarkersSym = do
   simplifyAlgorithm <- arbitrary
   pure MarkersSymbolizer{..}
 
-arbitraryGroupSym = do
-  groupProperties <- arbitrary
+arbitraryGroupSym fontMap = do
+  groupProperties <- arbitraryGroupSymProperties fontMap
   numColumns      <- arbitrary
   startColumn     <- arbitrary
   repeatKey       <- arbitrary
-  placements      <- arbitrary
+  placements      <- arbitraryPlacements fontMap
   simplifyTolerance <- arbitrary
   smooth            <- arbitrary
   clip              <- arbitrary
@@ -369,37 +371,34 @@ instance Arbitrary Stop where
     label <- maybeArb arbitrary
     pure Stop{..}
 
-instance Arbitrary GroupSymProperties where
-  arbitrary = do
-    layout <- arbitrary
-    rules <- resize 3 arbitrary
-    return GroupSymProperties{..}
+arbitraryGroupSymProperties :: FontSetMap -> Gen GroupSymProperties
+arbitraryGroupSymProperties fontMap = do
+  layout <- arbitrary
+  rules <- resize 3 (listOf (arbitraryGroupRule fontMap))
+  return GroupSymProperties{..}
 
 instance Arbitrary GroupLayout where
   arbitrary = oneof [ SimpleRowLayout <$> arbitrary
                     , PairLayout      <$> arbitrary <*> arbitrary
                     ]
 
-instance Arbitrary GroupRule where
-  arbitrary = do
-    symbolizers <- resize 3 arbitrary
-    filter      <- arbitrary
-    repeatKey   <- arbitrary
-    return GroupRule{..}
-  shrink GroupRule{..} = GroupRule {symbolizers=[], ..}
-                       : [ GroupRule s f rk
-                         | (s,f,rk) <- shrink (symbolizers, filter, repeatKey)]
+arbitraryGroupRule :: FontSetMap -> Gen GroupRule
+arbitraryGroupRule fontMap = do
+  symbolizers <- resize 3 (listOf (arbitrarySymbolizer fontMap))
+  filter      <- arbitrary
+  repeatKey   <- arbitrary
+  return GroupRule{..}
 
-instance Arbitrary TextPlacements where
-  arbitrary = Dummy <$> arbitrary
+arbitraryPlacements :: FontSetMap -> Gen TextPlacements
+arbitraryPlacements fontMap = Dummy <$> arbitraryTextSymProperties fontMap
 
-instance Arbitrary TextSymProperties where
-  arbitrary = do
-    properties       <- arbitrary
-    layoutProperties <- arbitrary
-    formatProperties <- arbitrary
-    format           <- arbitrary
-    pure TextSymProperties{..}
+arbitraryTextSymProperties :: FontSetMap -> Gen TextSymProperties
+arbitraryTextSymProperties fontMap = do
+  properties       <- arbitrary
+  layoutProperties <- arbitrary
+  formatProperties <- arbitraryTextFormatProperties fontMap
+  format           <- arbitraryFormat fontMap
+  pure TextSymProperties{..}
 
 instance Arbitrary TextProperties where
   arbitrary = do
@@ -435,75 +434,81 @@ instance Arbitrary TextLayoutProperties where
     direction           <- arbitrary
     pure TextLayoutProperties{..}
 
-instance Arbitrary TextFormatProperties where
-  arbitrary = do
-    font             <- arbitrary
-    textSize         <- arbitrary
-    characterSpacing <- arbitrary
-    lineSpacing      <- arbitrary
-    textOpacity      <- arbitrary
-    haloOpacity      <- arbitrary
-    textTransform    <- arbitrary
-    fill             <- arbitrary
-    haloFill         <- arbitrary
-    haloRadius       <- arbitrary
-    ffSettings       <- arbitrary
-    pure TextFormatProperties{..}
-
-instance Arbitrary Format where
-  --TODO implement shrink
-  arbitrary = oneof
-    [ sized arbitraryFormat
-    , arbitraryFormatList
-    , arbitraryFormatExp
-    , sized arbitraryFormatLayout
-    , pure NullFormat
-    ]
-
-arbitraryFormat :: Int -> Gen Format
-arbitraryFormat 0 = pure NullFormat
-arbitraryFormat n = do
-  font             <- arbitrary
+arbitraryTextFormatProperties :: FontSetMap -> Gen TextFormatProperties
+arbitraryTextFormatProperties fontMap = do
+  font             <- maybeArb (arbitraryFont fontMap)
   textSize         <- arbitrary
   characterSpacing <- arbitrary
   lineSpacing      <- arbitrary
-  wrapBefore       <- arbitrary
-  repeatWrapChar   <- arbitrary
+  textOpacity      <- arbitrary
+  haloOpacity      <- arbitrary
   textTransform    <- arbitrary
   fill             <- arbitrary
   haloFill         <- arbitrary
   haloRadius       <- arbitrary
   ffSettings       <- arbitrary
-  next             <- resize (n-1) arbitrary
-  pure Format{..}
+  pure TextFormatProperties{..}
 
-arbitraryFormatLayout :: Int -> Gen Format
-arbitraryFormatLayout 0 = pure NullFormat
-arbitraryFormatLayout n = do
-  dx                  <- arbitrary
-  dy                  <- arbitrary
-  orientation         <- arbitrary
-  textRatio           <- arbitrary
-  wrapWidth           <- arbitrary
-  wrapChar            <- arbitrary
-  wrapBefore          <- arbitrary
-  repeatWrapChar      <- arbitrary
-  rotateDisplacement  <- arbitrary
-  horizontalAlignment <- arbitrary
-  justifyAlignment    <- arbitrary
-  verticalAlignment   <- arbitrary
-  next                <- resize (n-1) arbitrary
-  pure FormatLayout{..}
+arbitraryFont :: FontSetMap -> Gen Font
+arbitraryFont fontMap | M.null fontMap = FaceName <$> arbitrary
+arbitraryFont fontMap = oneof
+  [ FaceName <$> arbitrary
+  , FontSetName <$> elements  (M.keys fontMap)
+  ]
 
-arbitraryFormatList :: Gen Format
-arbitraryFormatList = FormatList <$> listOf (oneof
-    [ sized arbitraryFormat
-    , arbitraryFormatExp
-    , sized arbitraryFormatLayout
-    ])
+arbitraryFormat :: FontSetMap -> Gen Format
+arbitraryFormat fontMap = oneof
+  [ sized arbitraryF
+  , arbitraryFormatList
+  , arbitraryFormatExp
+  , sized arbitraryFormatLayout
+  , pure NullFormat
+  ]
+  where
+  arbitraryF :: Int -> Gen Format
+  arbitraryF 0 = pure NullFormat
+  arbitraryF n = do
+    font             <- maybeArb (arbitraryFont fontMap)
+    textSize         <- arbitrary
+    characterSpacing <- arbitrary
+    lineSpacing      <- arbitrary
+    wrapBefore       <- arbitrary
+    repeatWrapChar   <- arbitrary
+    textTransform    <- arbitrary
+    fill             <- arbitrary
+    haloFill         <- arbitrary
+    haloRadius       <- arbitrary
+    ffSettings       <- arbitrary
+    next             <- resize (n-1) (arbitraryFormat fontMap)
+    pure Format{..}
 
-arbitraryFormatExp :: Gen Format
-arbitraryFormatExp = FormatExp <$> arbitrary
+  arbitraryFormatLayout :: Int -> Gen Format
+  arbitraryFormatLayout 0 = pure NullFormat
+  arbitraryFormatLayout n = do
+    dx                  <- arbitrary
+    dy                  <- arbitrary
+    orientation         <- arbitrary
+    textRatio           <- arbitrary
+    wrapWidth           <- arbitrary
+    wrapChar            <- arbitrary
+    wrapBefore          <- arbitrary
+    repeatWrapChar      <- arbitrary
+    rotateDisplacement  <- arbitrary
+    horizontalAlignment <- arbitrary
+    justifyAlignment    <- arbitrary
+    verticalAlignment   <- arbitrary
+    next                <- resize (n-1) (arbitraryFormat fontMap)
+    pure FormatLayout{..}
+
+  arbitraryFormatList :: Gen Format
+  arbitraryFormatList = FormatList <$> listOf (oneof
+      [ sized arbitraryF
+      , arbitraryFormatExp
+      , sized arbitraryFormatLayout
+      ])
+
+  arbitraryFormatExp :: Gen Format
+  arbitraryFormatExp = FormatExp <$> arbitrary
 
 instance Arbitrary Font where
   arbitrary = oneof [FaceName <$> arbitraryFaceName, FontSetName <$> arbitrary]

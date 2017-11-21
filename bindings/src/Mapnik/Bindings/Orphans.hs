@@ -86,14 +86,11 @@ instance Storable Box where
       *$(bbox* p) = bbox($(double x0), $(double y0), $(double x1), $(double y1));
       }|]
 
-type instance VariantM Value = IO
 
 instance VariantPtr Value where
   allocaV = bracket alloc dealloc where
     alloc = [C.exp|value * { new value }|]
     dealloc p = [C.exp|void { delete $(value *p)}|]
-
-type instance VariantM Param = IO
 
 instance VariantPtr Param where
   allocaV = bracket alloc dealloc where

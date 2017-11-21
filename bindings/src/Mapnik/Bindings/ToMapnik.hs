@@ -41,34 +41,33 @@ instance ToMapnik Mapnik.Map where
     forM_ srs                    (Map.setSrs m')
     forM_ bufferSize             (Map.setBufferSize m')
     forM_ maximumExtent          (Map.setMaxExtent m')
-    forM_ fontDirectory          (Map.setFontDirectory m')
+    forM_ fontDirectory          (setAndRegisterFontDirectory m')
     forM_ layers                 (addLayer m' <=< toMapnik)
-    forM_ (toList styles)        (\(k,v) -> insertStyle m' k =<< toMapnik v)
+    forM_ (toList styles)        (\(k,v) -> insertStyle m' k =<< toMapnikStyle fontSets v)
+    forM_ (toList fontSets)      (uncurry (insertFontSet m'))
     return m'
 
-instance ToMapnik Mapnik.Style where
-  type MapnikType Mapnik.Style = Style
-  toMapnik Mapnik.Style {..} = do
-    s <- Style.create
-    forM_ opacity             (Style.setOpacity s)
-    forM_ imageFiltersInflate (Style.setImageFiltersInflate s)
-    forM_ rules               (addRule s <=< toMapnik)
-    return s
+    where
+    toMapnikStyle fontMap Mapnik.Style {..} = do
+      s <- Style.create
+      forM_ opacity             (Style.setOpacity s)
+      forM_ imageFiltersInflate (Style.setImageFiltersInflate s)
+      forM_ rules               (addRule s <=< toMapnikRule fontMap)
+      return s
 
-instance ToMapnik Mapnik.Rule where
-  type MapnikType Mapnik.Rule = Rule
-  toMapnik Mapnik.Rule {..} = do
-    r <- Rule.create
-    forM_ name                    (Rule.setName r)
-    forM_ filter                  (Rule.setFilter r <=< toMapnik)
-    forM_ minimumScaleDenominator (Rule.setMinScale r)
-    forM_ maximumScaleDenominator (Rule.setMaxScale r)
-    forM_ symbolizers             (appendSymbolizer r <=< toMapnik)
-    return r
+    toMapnikRule fontMap Mapnik.Rule {..} = do
+      r <- Rule.create
+      forM_ name                    (Rule.setName r)
+      forM_ filter                  (Rule.setFilter r <=< toMapnik)
+      forM_ minimumScaleDenominator (Rule.setMinScale r)
+      forM_ maximumScaleDenominator (Rule.setMaxScale r)
+      forM_ symbolizers             (appendSymbolizer r <=< Symbolizer.create fontMap)
+      return r
 
-instance ToMapnik Mapnik.Symbolizer where
-  type MapnikType Mapnik.Symbolizer = Symbolizer
-  toMapnik = Symbolizer.create
+    setAndRegisterFontDirectory m d = do
+      Map.setFontDirectory m d
+      ok <- Map.registerFonts m d
+      unless ok (throwIO (ConfigError ("Could not register fonts at " ++ show d)))
 
 instance ToMapnik Mapnik.Layer where
   type MapnikType Mapnik.Layer = Layer
