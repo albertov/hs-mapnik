@@ -50,7 +50,7 @@ import           Mapnik.Bindings.Variant
 import           Mapnik.Bindings.Raster
 
 import           Control.Lens
-import           Control.Exception (bracket, try, SomeException)
+import           Control.Exception (bracket)
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
 import           Control.Monad (forM_)
@@ -61,8 +61,7 @@ import           Data.Function (on)
 import           Data.Text.Encoding (encodeUtf8)
 import           Data.IORef
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
-import           Foreign.StablePtr
-import           Foreign.Ptr (Ptr, nullPtr)
+import           Foreign.Ptr (Ptr)
 import           Foreign.C.String (CString)
 import           Foreign.Marshal.Utils (with)
 import           System.IO.Unsafe (unsafePerformIO)
@@ -307,14 +306,6 @@ pushBack ctx fs = \f -> do
     $(feature_list *fs)->push_back(*$fptr-ptr:(feature_ptr *f')); }
   |]
 
-
-catchingExceptions :: IO () -> IO (Ptr ())
-catchingExceptions act = do
-  res <- try act
-  case res of
-    Right () -> return nullPtr
-    Left  (e::SomeException) ->
-      castStablePtrToPtr <$> newStablePtr e
 
 withQuery :: Query -> (Ptr QueryPtr -> IO a) -> IO a
 withQuery query f =

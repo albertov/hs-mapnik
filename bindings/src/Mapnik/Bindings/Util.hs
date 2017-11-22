@@ -16,7 +16,8 @@ import           Data.Text.Encoding (decodeUtf8')
 import           Foreign.Ptr (Ptr, nullPtr)
 import           Foreign.ForeignPtr (ForeignPtr, FinalizerPtr, newForeignPtr)
 import           Foreign.Storable (Storable)
-import           Foreign.C.String (CString, newCString)
+import           Foreign.StablePtr
+import           Foreign.C.String (CString)
 
 
 newText :: MonadBaseControl IO m
@@ -50,7 +51,7 @@ mkUnsafeNewMaybe
   => (ForeignPtr a -> c) -> FinalizerPtr a -> (Ptr (Ptr a) -> m ()) -> m (Maybe c)
 mkUnsafeNewMaybe ctor dtor fun = do
   ptr <- C.withPtr_ fun
-  if ptr == nullPtr then return Nothing else 
+  if ptr == nullPtr then return Nothing else
     Just . ctor <$> liftBase (newForeignPtr dtor ptr)
 
 newMaybe :: (MonadBaseControl IO m, Storable a)
@@ -69,9 +70,10 @@ decodeUtf8Ctx msg k' =
     Right  k -> return $! k
     Left   e -> throwIO (userError (msg ++ ": Error when decoding " ++ show k' ++ ": " ++ show e))
 
-catchToErrorMsg :: IO () -> IO CString
-catchToErrorMsg a = do
-  r <- try a
-  case r of
+catchingExceptions :: IO () -> IO (Ptr ())
+catchingExceptions act = do
+  res <- try act
+  case res of
     Right () -> return nullPtr
-    Left (e::SomeException) -> newCString (show e)
+    Left  (e::SomeException) ->
+      castStablePtrToPtr <$> newStablePtr e

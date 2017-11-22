@@ -8,6 +8,8 @@
 
 namespace mapnik {
 
+using HsException = HsStablePtr;
+
 class MAPNIK_DECL hs_exception : public std::exception
 {
 public:

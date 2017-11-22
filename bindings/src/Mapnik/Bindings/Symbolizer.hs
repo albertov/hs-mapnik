@@ -586,14 +586,12 @@ symbolizerProps = lens getProps setProps where
 setProperty :: Property -> Ptr SymbolizerBase -> SvM ()
 setProperty ((keyIndex -> k) :=> v) sym = do
   env <- ask
-  let cb p = catchToErrorMsg (runReaderT (pokeV p v) env)
+  let cb p = catchingExceptions (runReaderT (pokeV p v) env)
   [C.catchBlock|
     sym_value_type val;
-    char *msg = $fun:(char * (*cb)(sym_value_type*))(&val);
-    if (msg) {
-      std::string smsg(msg);
-      free(msg);
-      throw std::runtime_error("Setting a property caused an exception in a haskell callback: " + smsg);
+    HsException err = $fun:(void * (*cb)(sym_value_type*))(&val);
+    if (err) {
+      throw hs_exception(err);
     }
     $(symbolizer_base *sym)->properties[$(keys k)] = val;
   |]
@@ -908,7 +906,7 @@ withFormatProperties Mapnik.TextFormatProperties{..} = bracket alloc dealloc . e
               $(format_properties *p)->fontset = *$(font_set *fs);
               }|]
             Nothing -> throwIO (ConfigError ("No fontset named " ++ show name ++ " found in map"))
-          
+
       SET_PROP_F(textSize,text_size)
       SET_PROP_F(characterSpacing,character_spacing)
       SET_PROP_F(lineSpacing,line_spacing)
@@ -1377,7 +1375,7 @@ instance Variant SymbolizerValue String where
   pokeV p = pokeV p . pack
 
 instance Variant SymbolizerValue Mapnik.Expression where
-  peekV p = 
+  peekV p =
     fmap Mapnik.Expression $ justOrTypeError "Expression" $ newTextMaybe "peekV(Expression)" $ \(ret, len) ->
       [C.block|void {
       try {
@@ -1629,7 +1627,7 @@ unCreateGroupSymProperties p = do
         }|]
       let itemMargin = if margin==defaultSimpleMargin then Nothing else Just margin
       return $! if is==1 then Just Mapnik.SimpleRowLayout{..} else Nothing
-      
+
 defaultSimpleMargin :: Double
 defaultSimpleMargin = 0
 
