@@ -49,7 +49,7 @@ rSettings :: RenderSettings
 rSettings = renderSettings 256 256 aBox
 
 spec :: Spec
-spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
+spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
 
   describe "Map" $ do
     it "renders as PNG" $ do
@@ -446,14 +446,14 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 100 $ do
                         else fontSets .~ mempty
         swallowExceptions $
           flip render opts =<< toMapnik (dirtyMap a)
-    
+
       prop "render preserves Map observable configuration" $ \opts -> do
         m <- fromFixture
         xml1 <- Map.toXml m
         _ <- render m opts
         xml2 <- Map.toXml m
         xml1 `shouldBe` xml2
-      
+
 
 swallowExceptions :: IO a -> IO ()
 swallowExceptions = void . try @SomeException

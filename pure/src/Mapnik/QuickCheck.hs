@@ -23,6 +23,7 @@ import           System.IO.Unsafe (unsafePerformIO)
 import           Test.QuickCheck hiding (label)
 import           Test.QuickCheck.Instances ()
 import           Prelude hiding (filter)
+import qualified Prelude as P
 import           Paths_hs_mapnik (getDataFileName)
 
 instance Arbitrary Map where
@@ -536,7 +537,9 @@ arbitrarySrs :: Gen Proj4
 arbitrarySrs = elements allSrs
 
 allSrs :: [Proj4]
-allSrs = unsafePerformIO (T.lines <$> (T.readFile =<< getDataFileName "spec/proj4s.txt"))
+allSrs = unsafePerformIO $
+      P.filter (not . T.all (==' ')) . T.lines
+  <$> (T.readFile =<< getDataFileName "spec/proj4s.txt")
 {-# NOINLINE allSrs #-}
 
 arbitraryMinMaxScaleDenom :: Gen (Maybe Double, Maybe Double)

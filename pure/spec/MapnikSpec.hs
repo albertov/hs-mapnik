@@ -18,8 +18,6 @@ spec :: Spec
 spec = parallel $ do
   describe "JSON" $ do
     describe "Map"   $ jsonProp (Proxy @Map)
-    describe "Layer" $ jsonProp (Proxy @Layer)
-    describe "Style" $ jsonProp (Proxy @Style)
 
 
 jsonProp

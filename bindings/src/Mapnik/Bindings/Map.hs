@@ -54,6 +54,7 @@ import           Mapnik.Bindings.Orphans()
 import qualified Mapnik.Bindings.Layer as Layer
 import qualified Mapnik.Bindings.Style as Style
 import           Mapnik.Bindings.Symbolizer (withFontSet)
+import qualified Mapnik.Bindings.Cpp as C
 
 import           Data.IORef
 import           Data.String (fromString)
@@ -67,9 +68,6 @@ import           Foreign.Ptr (Ptr)
 import           Foreign.C.String (CString)
 import           Foreign.Storable (poke)
 import           Foreign.Marshal.Utils (with)
-
-import qualified Language.C.Inline.Unsafe as CU
-import qualified Mapnik.Bindings.Cpp as C
 
 
 C.context mapnikCtx
