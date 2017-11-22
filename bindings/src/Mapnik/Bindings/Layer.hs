@@ -87,7 +87,7 @@ getStyles l = do
         styleName <- unsafePackMallocCStringLen (ptr, len)
         modifyIORef' stylesRef (styleName:)
   [C.safeBlock|void {
-  typedef std::vector<std::string> style_list;
+  using style_list = std::vector<std::string>;
   style_list const& styles = $fptr-ptr:(layer *l)->styles();
   for (style_list::const_iterator it=styles.begin(); it!=styles.end(); ++it) {
     char *key;

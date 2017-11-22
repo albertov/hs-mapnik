@@ -41,7 +41,7 @@ C.include "<mapnik/agg_renderer.hpp>"
 C.include "<mapnik/map.hpp>"
 
 C.using "namespace mapnik"
-C.verbatim "typedef box2d<double> bbox;"
+C.using "bbox = box2d<double>"
 
 
 data RenderSettings = RenderSettings

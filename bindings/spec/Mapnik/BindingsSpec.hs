@@ -318,8 +318,8 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
                 . value
         m^..lns `shouldBe` [0,100,200,400,800,1600,3200,6400,12800,25600]
 
-  describe "HsVector" $ do
-    it "can create and render" $ do
+  describe "HsDataSource" $ do
+    it "can create and render HsVector" $ do
       m <- Map.create
       loadFixture m
       Map.removeAllLayers m
@@ -358,8 +358,7 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
       q^.unBufferedBox `shouldBe` theExtent
       q^.resolution `shouldBe` Pair 5.12 5.12
 
-  describe "HsRaster" $ do
-    it "can create and render" $ do
+    it "can create and render HsRaster" $ do
       m <- Map.create
       loadFixture m
       Map.removeAllLayers m
@@ -407,34 +406,34 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
         }
       Datasource.features ds (queryBox theExtent) `shouldThrow` testException
 
-  it "can pass render variables" $ do
-    m <- Map.create
-    loadFixture m
-    Map.removeAllLayers m
-    l <- Layer.create "fooo"
-    ref <- newIORef Nothing
-    let theExtent = Box 0 0 100 100
-    ds <- Datasource.createHsDatasource HsVector
-      { _extent = theExtent
-      , fieldNames = []
-      , getFeatures = \q -> do
-          writeIORef ref (Just q)
-          --print q
-          return []
-      , getFeaturesAtPoint = \_ _ -> return []
-      }
-    Layer.setDatasource l ds
-    Layer.addStyle l "provlines"
-    Map.addLayer m l
-    let vars = [ ("foo", DoubleValue 2.4)
-               , ("bar", IntValue 42)
-               , ("bar", NullValue)
-               , ("mar", BoolValue False)
-               , ("car", TextValue "some text wíẗḧ unicode")
-               ]
-    _ <- render m $ renderSettings 512 512 theExtent & variables .~  vars
-    Just q <- readIORef ref
-    q^.variables `shouldBe` vars
+    it "can receive render variables" $ do
+      m <- Map.create
+      loadFixture m
+      Map.removeAllLayers m
+      l <- Layer.create "fooo"
+      ref <- newIORef Nothing
+      let theExtent = Box 0 0 100 100
+      ds <- Datasource.createHsDatasource HsVector
+        { _extent = theExtent
+        , fieldNames = []
+        , getFeatures = \q -> do
+            writeIORef ref (Just q)
+            --print q
+            return []
+        , getFeaturesAtPoint = \_ _ -> return []
+        }
+      Layer.setDatasource l ds
+      Layer.addStyle l "provlines"
+      Map.addLayer m l
+      let vars = [ ("foo", DoubleValue 2.4)
+                 , ("bar", IntValue 42)
+                 , ("bar", NullValue)
+                 , ("mar", BoolValue False)
+                 , ("car", TextValue "some text wíẗḧ unicode")
+                 ]
+      _ <- render m $ renderSettings 512 512 theExtent & variables .~  vars
+      Just q <- readIORef ref
+      q^.variables `shouldBe` vars
 
 
   describe "property tests" $ do

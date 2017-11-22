@@ -4,7 +4,7 @@
 // stl
 #include <string>
 
-typedef std::pair<double,double> dash_t;
+using dash_t = std::pair<double,double>;
 
 using namespace mapnik;
 

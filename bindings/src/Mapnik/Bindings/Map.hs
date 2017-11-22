@@ -210,7 +210,7 @@ getFontDirectory m = fmap (fmap unpack) $ newTextMaybe "Map.getFontDirectory" $ 
     *$(char **p) = nullptr;
   }
   }|]
-  
+
 setSrs :: Map -> Text -> IO ()
 setSrs m (encodeUtf8 -> srs) =
   [C.block|void { $fptr-ptr:(Map *m)->set_srs(std::string($bs-ptr:srs, $bs-len:srs));}|]
@@ -244,7 +244,7 @@ zoomAll :: Map -> IO ()
 zoomAll m = [C.catchBlock|$fptr-ptr:(Map *m)->zoom_all();|]
 
 zoomToBox :: Map -> Box -> IO ()
-zoomToBox m box = with box $ \boxPtr -> 
+zoomToBox m box = with box $ \boxPtr ->
   [C.block|void {$fptr-ptr:(Map *m)->zoom_to_box(*$(bbox *boxPtr));}|]
 
 addLayer :: Map -> Layer -> IO ()
@@ -260,9 +260,8 @@ getLayers m = do
         layer <- Layer.unsafeNew (`poke` ptr)
         modifyIORef' layersRef (layer:)
   [C.safeBlock|void {
-  typedef std::vector<layer> layer_list;
-  layer_list const& layers = $fptr-ptr:(Map *m)->layers();
-  for (layer_list::const_iterator it=layers.begin(); it!=layers.end(); ++it) {
+  auto const& layers = $fptr-ptr:(Map *m)->layers();
+  for (auto it=layers.begin(); it!=layers.end(); ++it) {
     $fun:(void (*callback)(layer*))(new layer(*it));
   }
   }|]
@@ -277,9 +276,8 @@ getStyles m = do
         styleName <- unsafePackMallocCStringLen (ptr, len)
         modifyIORef' stylesRef ((styleName,style):)
   [C.safeBlock|void {
-  typedef std::map<std::string,feature_type_style> style_map;
-  style_map const& styles = $fptr-ptr:(Map *m)->styles();
-  for (style_map::const_iterator it=styles.begin(); it!=styles.end(); ++it) {
+  auto const& styles = $fptr-ptr:(Map *m)->styles();
+  for (auto it=styles.begin(); it!=styles.end(); ++it) {
     char *buf;
     int len;
     mallocedString(it->first, &buf, &len);
@@ -320,7 +318,7 @@ insertFontSet :: Map -> FontSetName -> Mapnik.FontSet -> IO ()
 insertFontSet m name@(encodeUtf8->n) faceNames = withFontSet name faceNames $ \fs -> [C.block|void {
   $fptr-ptr:(Map *m)->insert_fontset(std::string($bs-ptr:n, $bs-len:n), *$(font_set *fs));
   }|]
-  
+
 getFontSetMap :: Map -> IO FontSetMap
 getFontSetMap m = do
   ref <- newIORef []

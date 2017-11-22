@@ -35,7 +35,7 @@ C.include "<mapnik/proj_transform.hpp>"
 C.include "hs_proj_transform.hpp"
 
 C.using "namespace mapnik"
-C.verbatim "typedef box2d<double> bbox;"
+C.using "bbox = box2d<double>"
 
 -- * Projection
 

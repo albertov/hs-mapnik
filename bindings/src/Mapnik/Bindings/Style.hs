@@ -77,9 +77,8 @@ getRules s = do
         rule <- Rule.unsafeNew (`poke` ptr)
         modifyIORef' rulesRef (rule:)
   [C.safeBlock|void {
-  typedef std::vector<rule> rule_list;
-  rule_list const& rules = $fptr-ptr:(feature_type_style *s)->get_rules();
-  for (rule_list::const_iterator it=rules.begin(); it!=rules.end(); ++it) {
+  auto const& rules = $fptr-ptr:(feature_type_style *s)->get_rules();
+  for (auto it=rules.begin(); it!=rules.end(); ++it) {
     $fun:(void (*callback)(rule *))(new rule(*it));
   }
   }|]

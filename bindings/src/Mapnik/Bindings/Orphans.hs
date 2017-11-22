@@ -38,8 +38,7 @@ C.include "<mapnik/params.hpp>"
 C.include "value_util.hpp"
 
 C.using "namespace mapnik"
-
-C.verbatim "typedef box2d<double> bbox;"
+C.using "bbox = box2d<double>"
 
 
 instance Storable Mapnik.Color where
