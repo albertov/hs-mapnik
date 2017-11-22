@@ -8,18 +8,14 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DuplicateRecordFields #-}
 module Mapnik.BindingsSpec (main, spec) where
 
 import           Mapnik.Bindings
 import qualified Mapnik.Bindings.Map as Map
 import qualified Mapnik.Bindings.Layer as Layer
-import qualified Mapnik.Bindings.Rule as Rule
-import qualified Mapnik.Bindings.Style as Style
 import qualified Mapnik.Bindings.Transform as Transform
 import qualified Mapnik.Bindings.Expression as Expression
 import qualified Mapnik.Bindings.Datasource as Datasource
-import qualified Mapnik.Bindings.Symbolizer as Symbolizer
 import           Mapnik.QuickCheck
 
 import           Control.Lens hiding ((.=))
@@ -30,15 +26,15 @@ import           Data.Typeable
 import           Data.Int
 import           Data.IORef
 import           Data.Maybe
-import           Data.List (lookup)
 import           Data.Either
-import qualified Data.Vector.Storable as St
 import qualified Data.Vector.Generic as G
 import qualified Data.ByteString as BS
+import qualified Data.HashMap.Strict as M
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
 import           Test.QuickCheck
 import           Test.QuickCheck.IO ()
+import           Prelude hiding (filter)
 
 
 main :: IO ()
@@ -55,22 +51,58 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
 
   describe "Map" $ do
     it "renders as PNG" $ do
-      m <- Map.create
-      loadFixture m
+      m <- fromFixture
       img <- render m rSettings
       -- BS.writeFile "map.webp" (serialize "webp" img)
-      let Just bs = serialize "png8" img
-      bs `shouldSatisfy` isPng
-
+      fmap isPng (serialize "png8" img) `shouldBe` Just True
 
     it "throws on broken XML" $ do
-      m <- Map.create
-      loadFixtureFrom "spec/bad.xml" m `shouldThrow` cppStdException
+      Map.fromXmlFile "spec/bad.xml" `shouldThrow` cppStdException
+
+    it "fromMapnik map.xml returns expected values" $ do
+      m <- fromMapnik =<< fromFixture
+
+      m^.layers.to length  `shouldBe` 5
+
+      m^.srs `shouldBe` Just merc
+
+      m^? styles.at "provlines"._Just.rules.ix 0.symbolizers.ix 0
+          .strokeDashArray._Just._Val
+        `shouldBe` Just [Dash 8 4, Dash 2 2, Dash 2 2]
+
+      m^..styles.at "raster-style"._Just.rules
+           .ix 0.symbolizers
+           .ix 0.colorizer._Just.stops.traverse.value
+        `shouldBe` [0,100,200,400,800,1600,3200,6400,12800,25600]
+
+      m^.styles.to M.keys  `shouldMatchList` [ "drainage"
+                                             , "highway-border"
+                                             , "highway-fill"
+                                             , "popplaces"
+                                             , "provinces"
+                                             , "provlines"
+                                             , "road-border"
+                                             , "road-fill"
+                                             , "smallroads"
+                                             , "raster-style" ]
+
+      m^?styles.at "provinces"._Just.rules.to length `shouldBe` Just 2
+
+      m^?styles.at "provinces"._Just.rules.ix 0.symbolizers.to length
+        `shouldBe` Just 1
+
+      m^?styles.at "provinces"._Just.rules.ix 1.filter._Just
+        `shouldBe` Just "([NOM_FR]='Québec')"
+
+      m^?styles.at "provinces"._Just.rules.ix 1.symbolizers.ix 0
+        `shouldBe` Just ( polygonSym
+                        & fill   ?~ Val (RGBA 217 235 203 255)
+                        & compOp ?~ Val SrcOver)
+
 
     it "can add layer and render" $ do
-      m <- Map.create
-      loadFixture m
-
+      m <- fromFixture
+      Map.removeAllLayers m
       l <- Layer.create "Populated places"
       Layer.setSrs l "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
       Layer.addStyle l "popplaces"
@@ -82,35 +114,6 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
       Map.addLayer m l
       void $ render m rSettings
 
-    it "can get styles" $ do
-      m <- Map.create
-      loadFixture m
-      sts <- map fst <$> Map.getStyles m
-      sts `shouldMatchList` ["drainage","highway-border","highway-fill","popplaces","provinces","provlines","road-border","road-fill","smallroads","raster-style"]
-
-    it "can get layers" $ do
-      m <- Map.create
-      loadFixture m
-      ls <- Map.getLayers m
-      length ls `shouldBe` 5
-
-
-    it "can get srs" $ do
-      m <- Map.create
-      Map.setSrs m merc
-      s <- Map.getSrs m
-      s `shouldBe` merc
-
-    it "can get max extent when Nothing" $ do
-      m <- Map.create
-      e <- Map.getMaxExtent m
-      e `shouldBe` Nothing
-
-    it "can get max extent when Just" $ do
-      m <- Map.create
-      Map.setMaxExtent m aBox
-      e <- Map.getMaxExtent m
-      e `shouldBe` Just aBox
 
     it "throws on invalid size" $ do
       m <- Map.create
@@ -124,7 +127,7 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
                          (-247003.8133187965)
                          1746737.6177269476
                          (-25098.59307479199)
-      forward trans aBox `shouldBe` expected
+      forward trans aBox `shouldBe` expected --TODO: compare loosely for portability
 
     it "can trasform with num points" $ do
       let dst = "+proj=lcc +ellps=GRS80 +lat_0=49 +lon_0=-95 +lat+1=49 +lat_2=77 +datum=NAD83 +units=m +no_defs"
@@ -133,89 +136,11 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
                          (-247003.81331879605)
                          (1746737.6177269486)
                          (-25098.593074791526)
-      fst (forward trans (aBox,100::Int)) `shouldBe` expected
+      fst (forward trans (aBox,100::Int)) `shouldBe` expected --TODO: compare loosely for portability
 
     it "cannot create invalid" $
       projTransform merc "foo" `shouldSatisfy` isLeft
 
-  describe "Color" $ do
-    it "can set good" $ do
-      m <- Map.create
-      let bg = RGBA 3 4 5 255
-      Map.setBackground m bg
-      Just bg2 <- Map.getBackground m
-      bg2 `shouldBe` bg
-
-
-  describe "Layer" $ do
-    it "getDatasource returns Nothing if no datasource" $ do
-      l <- Layer.create "fooo"
-      ds <- Layer.getDatasource l
-      ds `shouldSatisfy` isNothing
-
-    it "getDatasource returns Just if datasource" $ do
-      l <- Layer.create "fooo"
-      Layer.setDatasource l =<< Datasource.create
-        [ "type"     .= ("shape" :: Text)
-        , "encoding" .= ("latin1" :: Text)
-        , "file"     .= ("spec/data/popplaces" :: FilePath)
-        ]
-      ds <- Layer.getDatasource l
-      ds `shouldSatisfy` isJust
-
-    it "can get styles" $ do
-      l <- Layer.create "fooo"
-      sts <- Layer.getStyles l
-      sts `shouldBe` []
-      Layer.addStyle l "foo"
-      Layer.addStyle l "bar"
-      sts2 <- Layer.getStyles l
-      sts2 `shouldBe` ["foo", "bar"]
-
-  describe "Style" $ do
-    it "can get rules" $ do
-      m <- Map.create
-      loadFixture m
-      Just style <- lookup "provinces" <$> Map.getStyles m
-      rs <- Style.getRules style
-      length rs `shouldBe` 2
-
-  describe "Rule" $ do
-    it "no filter returns Nothing" $ do
-      r <- Rule.create
-      f <- Rule.getFilter r
-      f `shouldBe` Nothing
-
-    it "can get/set filter" $ do
-      r <- Rule.create
-      let Right e = Expression.parse expr
-          expr = "([foo]='bar')"
-      Rule.setFilter r e
-      Just f <- Rule.getFilter r
-      Expression.toText f `shouldBe` expr
-
-    it "can get/set name" $ do
-      r <- Rule.create
-      let theName = "foo"
-      Rule.setName r theName
-      name' <- Rule.getName r
-      name' `shouldBe` theName
-
-    it "can get symbolizers" $ do
-      m <- Map.create
-      loadFixture m
-      Just style <- lookup "provinces" <$> Map.getStyles m
-      [r1,r2] <- Style.getRules style
-      syms1 <- Rule.getSymbolizers r1
-      length syms1 `shouldBe` 1
-      [sym] <- Rule.getSymbolizers r2
-      Just f <- Rule.getFilter r2
-      Expression.toText f `shouldBe` "([NOM_FR]='Québec')"
-      mSym <- Symbolizer.unCreate sym
-      let expected = polygonSym
-                       & fill   ?~ Val (RGBA 217 235 203 255)
-                       & compOp ?~ Val SrcOver
-      mSym `shouldBe` expected
 
   describe "Parameters" $ do
     it "paramsToList/paramsFromList = id" $ do
@@ -254,8 +179,122 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
       G.toList (fields (head feats)) `shouldMatchList` [TextValue "Sorel-Tracy", IntValue 0]
       toWkt (fromJust (geometry (head feats))) `shouldBe` "POINT(1681422.74999858 -39049.2656230889)"
 
+    describe "HsDataSource" $ do
+      it "can create and render HsVector" $ do
+        m <- fromFixture
+        Map.removeAllLayers m
+        Map.setSrs m "+init=epsg:3857"
+        let theExtent = Box 0 0 100 100
+
+        imgBase <- render m (renderSettings 512 512 theExtent)
+        --BS.writeFile "map.webp" (fromJust (serialize "webp" imgBase))
+        snd (toRgba8 imgBase) `shouldSatisfy` G.all (== transparent)
+
+        l <- Layer.create "fooo"
+        Layer.setSrs l "+init=epsg:3857"
+        ref <- newIORef Nothing
+        ds <- Datasource.createHsDatasource HsVector
+          { _extent = theExtent
+          , fieldNames = ["aString", "anInt", "aBool", "aDouble", "aNull"]
+          , getFeatures = \q -> do
+              writeIORef ref (Just q)
+              return [ feature
+                       { fid=105
+                       , geometry=Just "LINESTRING (30 10, 10 30, 40 40)"
+                       , fields=["batróñ~", IntValue 3, BoolValue False, DoubleValue 3.2, NullValue]
+                       }
+                     ]
+          , getFeaturesAtPoint = \_ _ -> return []
+          }
+        (_,feats) <- Datasource.features ds (queryBox theExtent)
+        raster (head feats) `shouldSatisfy` isNothing
+        Layer.setDatasource l ds
+        Layer.addStyle l "provlines"
+        Map.addLayer m l
+        img <- render m (renderSettings 512 512 theExtent)
+        snd (toRgba8 img) `shouldSatisfy` G.any (/= transparent)
+        Just q <- readIORef ref
+        q^.box `shouldBe` theExtent
+        q^.unBufferedBox `shouldBe` theExtent
+        q^.resolution `shouldBe` Pair 5.12 5.12
+
+      it "can create and render HsRaster" $ do
+        m <- fromFixture
+        Map.removeAllLayers m
+        Map.setSrs m "+init=epsg:3857"
+        l <- Layer.create "fooo"
+        Layer.setSrs l "+init=epsg:3857"
+        let theExtent = Box 0 0 100 100
+            boxes = [Box 0 0 50 50, Box 50 50 100 100]
+            thePixels = G.generate (50*50) fromIntegral
+        ds <- Datasource.createHsDatasource HsRaster
+          { _extent = theExtent
+          , fieldNames = []
+          , getRasters = \_ ->
+              return $ flip map boxes $ \b ->
+                mkRaster b (50,50) thePixels :: Raster Int32
+          , getFeaturesAtPoint = \_ _ -> return []
+          }
+        (_,feats) <- Datasource.features ds (queryBox theExtent)
+        geometry (head feats) `shouldSatisfy` isNothing
+        let Just r = raster (head feats)
+        getPixels r `shouldBe` Just thePixels
+        Layer.setDatasource l ds
+        Layer.addStyle l "raster-style"
+        Map.addLayer m l
+        let h=256; w=256
+        img <- render m $ rSettings
+                        & extent .~ theExtent
+                        & width  .~ w
+                        & height .~ h
+        --BS.writeFile "map.webp" (fromJust (serialize "webp" img))
+        let (_, imData) = toRgba8 img
+        imData G.! 0 `shouldBe` transparent
+        imData G.! 128 `shouldNotBe` transparent
+        imData G.! (256*128) `shouldNotBe` transparent
+        imData G.! (256*128+128) `shouldBe` transparent
+
+      it "can throw exception" $ do
+        let theExtent = Box 0 0 100 100
+        ds <- Datasource.createHsDatasource HsRaster
+          { _extent = theExtent
+          , fieldNames = []
+          , getRasters = \_ ->
+              throwIO TestException :: IO [Raster Int32]
+          , getFeaturesAtPoint = \_ _ -> return []
+          }
+        Datasource.features ds (queryBox theExtent) `shouldThrow` testException
+
+      it "can receive render variables" $ do
+        m <- fromFixture
+        Map.removeAllLayers m
+        l <- Layer.create "fooo"
+        ref <- newIORef Nothing
+        let theExtent = Box 0 0 100 100
+        ds <- Datasource.createHsDatasource HsVector
+          { _extent = theExtent
+          , fieldNames = []
+          , getFeatures = \q -> do
+              writeIORef ref (Just q)
+              --print q
+              return []
+          , getFeaturesAtPoint = \_ _ -> return []
+          }
+        Layer.setDatasource l ds
+        Layer.addStyle l "provlines"
+        Map.addLayer m l
+        let vars = [ ("foo", DoubleValue 2.4)
+                   , ("bar", IntValue 42)
+                   , ("bar", NullValue)
+                   , ("mar", BoolValue False)
+                   , ("car", TextValue "some text wíẗḧ unicode")
+                   ]
+        _ <- render m $ renderSettings 512 512 theExtent & variables .~  vars
+        Just q <- readIORef ref
+        q^.variables `shouldBe` vars
+
   describe "Image" $ do
-    it "can convert to rgba8 data and read it back" $ do
+    it "can convert to rgba8 and read it back" $ do
       m <- Map.create
       img <- render m rSettings
       let rgba8 = toRgba8 img
@@ -293,147 +332,7 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
       let e = Transform.parse "([foo"
       e `shouldSatisfy` isLeft
 
-  describe "fromMapnik" $ do
-    it "works for Map" $ do
-      m' <- Map.create
-      loadFixture m'
-      m <- fromMapnik m'
-      do
-        let lns :: Traversal' Map DashArray
-            lns = styles . at "provlines" . _Just
-                . rules . ix 0
-                . symbolizers . ix 0
-                . strokeDashArray
-                . _Just . _Val
-        m^?lns `shouldBe` Just [Dash 8 4, Dash 2 2, Dash 2 2]
-      do
-        let lns :: Traversal' Map Double
-            lns = styles . at "raster-style" . _Just
-                . rules . ix 0
-                . symbolizers . ix 0
-                . colorizer
-                . _Just
-                . stops
-                . traverse
-                . value
-        m^..lns `shouldBe` [0,100,200,400,800,1600,3200,6400,12800,25600]
 
-  describe "HsDataSource" $ do
-    it "can create and render HsVector" $ do
-      m <- Map.create
-      loadFixture m
-      Map.removeAllLayers m
-      Map.setSrs m "+init=epsg:3857"
-      let theExtent = Box 0 0 100 100
-
-      imgBase <- render m (renderSettings 512 512 theExtent)
-      --BS.writeFile "map.webp" (fromJust (serialize "webp" imgBase))
-      snd (toRgba8 imgBase) `shouldSatisfy` G.all (== transparent)
-
-      l <- Layer.create "fooo"
-      Layer.setSrs l "+init=epsg:3857"
-      ref <- newIORef Nothing
-      ds <- Datasource.createHsDatasource HsVector
-        { _extent = theExtent
-        , fieldNames = ["aString", "anInt", "aBool", "aDouble", "aNull"]
-        , getFeatures = \q -> do
-            writeIORef ref (Just q)
-            return [ feature
-                     { fid=105
-                     , geometry=Just "LINESTRING (30 10, 10 30, 40 40)"
-                     , fields=["batróñ~", IntValue 3, BoolValue False, DoubleValue 3.2, NullValue]
-                     }
-                   ]
-        , getFeaturesAtPoint = \_ _ -> return []
-        }
-      (_,feats) <- Datasource.features ds (queryBox theExtent)
-      raster (head feats) `shouldSatisfy` isNothing
-      Layer.setDatasource l ds
-      Layer.addStyle l "provlines"
-      Map.addLayer m l
-      img <- render m (renderSettings 512 512 theExtent)
-      snd (toRgba8 img) `shouldSatisfy` G.any (/= transparent)
-      Just q <- readIORef ref
-      q^.box `shouldBe` theExtent
-      q^.unBufferedBox `shouldBe` theExtent
-      q^.resolution `shouldBe` Pair 5.12 5.12
-
-    it "can create and render HsRaster" $ do
-      m <- Map.create
-      loadFixture m
-      Map.removeAllLayers m
-      Map.setSrs m "+init=epsg:3857"
-      l <- Layer.create "fooo"
-      Layer.setSrs l "+init=epsg:3857"
-      let theExtent = Box 0 0 100 100
-          boxes = [Box 0 0 50 50, Box 50 50 100 100]
-          thePixels = G.generate (50*50) fromIntegral :: St.Vector Int32
-      ds <- Datasource.createHsDatasource HsRaster
-        { _extent = theExtent
-        , fieldNames = []
-        , getRasters = \_ ->
-            return $ flip map boxes $ \b ->
-              mkRaster b (50,50) thePixels
-        , getFeaturesAtPoint = \_ _ -> return []
-        }
-      (_,feats) <- Datasource.features ds (queryBox theExtent)
-      geometry (head feats) `shouldSatisfy` isNothing
-      let Just r = raster (head feats)
-      getPixels r `shouldBe` Just thePixels
-      Layer.setDatasource l ds
-      Layer.addStyle l "raster-style"
-      Map.addLayer m l
-      let h=256; w=256
-      img <- render m $ rSettings
-                      & extent .~ theExtent
-                      & width  .~ w
-                      & height .~ h
-      --BS.writeFile "map.webp" (fromJust (serialize "webp" img))
-      let (_, imData) = toRgba8 img
-      imData G.! 0 `shouldBe` transparent
-      imData G.! 128 `shouldNotBe` transparent
-      imData G.! (256*128) `shouldNotBe` transparent
-      imData G.! (256*128+128) `shouldBe` transparent
-
-    it "can throw exception" $ do
-      let theExtent = Box 0 0 100 100
-      ds <- Datasource.createHsDatasource HsRaster
-        { _extent = theExtent
-        , fieldNames = []
-        , getRasters = \_ ->
-            throwIO TestException :: IO [Raster Int32]
-        , getFeaturesAtPoint = \_ _ -> return []
-        }
-      Datasource.features ds (queryBox theExtent) `shouldThrow` testException
-
-    it "can receive render variables" $ do
-      m <- Map.create
-      loadFixture m
-      Map.removeAllLayers m
-      l <- Layer.create "fooo"
-      ref <- newIORef Nothing
-      let theExtent = Box 0 0 100 100
-      ds <- Datasource.createHsDatasource HsVector
-        { _extent = theExtent
-        , fieldNames = []
-        , getFeatures = \q -> do
-            writeIORef ref (Just q)
-            --print q
-            return []
-        , getFeaturesAtPoint = \_ _ -> return []
-        }
-      Layer.setDatasource l ds
-      Layer.addStyle l "provlines"
-      Map.addLayer m l
-      let vars = [ ("foo", DoubleValue 2.4)
-                 , ("bar", IntValue 42)
-                 , ("bar", NullValue)
-                 , ("mar", BoolValue False)
-                 , ("car", TextValue "some text wíẗḧ unicode")
-                 ]
-      _ <- render m $ renderSettings 512 512 theExtent & variables .~  vars
-      Just q <- readIORef ref
-      q^.variables `shouldBe` vars
 
 
   describe "property tests" $ do
@@ -490,14 +389,8 @@ setExistingDatasources = layers . traverse . dataSource ?~ existingDatasource
 setExistingFontDir :: Map -> Map
 setExistingFontDir = fontDirectory ?~ "spec/data/fonts"
 
-loadFixture :: Map.Map -> IO ()
-loadFixture = loadFixtureFrom "spec/map.xml"
-
 fromFixture :: IO Map.Map
-fromFixture = Map.fromXml =<< BS.readFile "spec/map.xml"
-
-loadFixtureFrom :: FilePath -> Map.Map -> IO ()
-loadFixtureFrom p m = Map.loadXml m =<< BS.readFile p
+fromFixture = Map.fromXmlFile "spec/map.xml"
 
 transparent :: PixelRgba8
 transparent = PixelRgba8 0xFFFFFFFF

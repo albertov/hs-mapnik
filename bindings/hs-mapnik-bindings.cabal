@@ -79,6 +79,7 @@ test-suite spec
                   , text
                   , lens
                   , vector
+                  , unordered-containers
 
   hs-source-dirs:   spec
   main-is:          Main.hs
