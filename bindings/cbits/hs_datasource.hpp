@@ -5,14 +5,15 @@
 #include <mapnik/datasource.hpp>
 #include <mapnik/feature_layer_desc.hpp>
 
+#include "HsFFI.h"
 #include "hs_featureset.hpp"
 
 using feature_list = mapnik::hs_featureset::feature_list;
 
 namespace mapnik {
 
-typedef void (*features_callback)(context_ptr*,feature_list*, query const *q);
-typedef void (*features_at_point_callback)(context_ptr*,feature_list*, double x, double y, double tol);
+typedef HsStablePtr (*features_callback)(context_ptr*,feature_list*, query const *q);
+typedef HsStablePtr (*features_at_point_callback)(context_ptr*,feature_list*, double x, double y, double tol);
 
 class MAPNIK_DECL hs_datasource : public datasource
 {

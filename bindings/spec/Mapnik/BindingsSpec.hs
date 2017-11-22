@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -25,6 +26,7 @@ import           Control.Lens hiding ((.=))
 import           Control.Exception
 import           Control.Monad
 import           Data.Text (Text)
+import           Data.Typeable
 import           Data.Int
 import           Data.IORef
 import           Data.Maybe
@@ -394,6 +396,17 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
       imData G.! (256*128) `shouldNotBe` transparent
       imData G.! (256*128+128) `shouldBe` transparent
 
+    it "can throw exception" $ do
+      let theExtent = Box 0 0 100 100
+      ds <- Datasource.createHsDatasource HsRaster
+        { _extent = theExtent
+        , fieldNames = []
+        , getRasters = \_ ->
+            throwIO TestException :: IO [Raster Int32]
+        , getFeaturesAtPoint = \_ _ -> return []
+        }
+      Datasource.features ds (queryBox theExtent) `shouldThrow` testException
+
   it "can pass render variables" $ do
     m <- Map.create
     loadFixture m
@@ -510,3 +523,9 @@ instance Arbitrary RenderSettings where
     _renderSettingsSrs <- maybeArb arbitrarySrs
     _renderSettingsAspectFixMode <- arbitrary
     return RenderSettings{..}
+
+data TestException = TestException
+  deriving (Eq, Show, Typeable, Exception)
+
+testException :: Selector TestException
+testException TestException = True

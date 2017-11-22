@@ -5,6 +5,7 @@
 
 #include "hs_datasource.hpp"
 #include "hs_featureset.hpp"
+#include "hs_exception.hpp"
 
 
 using mapnik::datasource;
@@ -47,7 +48,10 @@ datasource::datasource_t hs_datasource::type() const
 featureset_ptr hs_datasource::features(const query& q) const
 {
   hs_featureset::feature_list_ptr features = std::make_shared<hs_featureset::feature_list>();
-  get_features_(const_cast<context_ptr*>(&ctx_), features.get(), &q);
+  HsStablePtr err = get_features_(const_cast<context_ptr*>(&ctx_), features.get(), &q);
+  if (err) {
+    throw hs_exception(err);
+  }
   return std::make_shared<hs_featureset>(features, type_);
 }
 
@@ -55,7 +59,11 @@ featureset_ptr hs_datasource::features(const query& q) const
 featureset_ptr hs_datasource::features_at_point(coord2d const& pt, double tol) const
 {
   hs_featureset::feature_list_ptr features = std::make_shared<hs_featureset::feature_list>();
-  get_features_at_point_(const_cast<context_ptr*>(&ctx_), features.get(), pt.x, pt.y, tol);
+  HsStablePtr err = get_features_at_point_(const_cast<context_ptr*>(&ctx_),
+                                           features.get(), pt.x, pt.y, tol);
+  if (err) {
+    throw hs_exception(err);
+  }
   return std::make_shared<hs_featureset>(features, type_);
 }
 

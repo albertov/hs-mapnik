@@ -49,9 +49,8 @@ import qualified Mapnik.Bindings.Feature as Feature
 import           Mapnik.Bindings.Variant
 import           Mapnik.Bindings.Raster
 
-import           System.IO
 import           Control.Lens
-import           Control.Exception (catch, bracket, SomeException)
+import           Control.Exception (bracket, try, SomeException)
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
 import           Control.Monad (forM_)
@@ -62,7 +61,8 @@ import           Data.Function (on)
 import           Data.Text.Encoding (encodeUtf8)
 import           Data.IORef
 import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
-import           Foreign.Ptr (Ptr)
+import           Foreign.StablePtr
+import           Foreign.Ptr (Ptr, nullPtr)
 import           Foreign.C.String (CString)
 import           Foreign.Marshal.Utils (with)
 import           System.IO.Unsafe (unsafePerformIO)
@@ -169,7 +169,7 @@ features ds query = withQuery query $ \q -> do
       cbField p len i = do
         f <- packCStringLen (p, fromIntegral len)
         modifyIORef' fields ((f,i):)
-  [C.safeBlock|void { do {
+  [C.catchBlock|do {
     auto ds = $fptr-ptr:(datasource_ptr *ds)->get();
     if (!ds) break;
     auto fs = ds->features(*$(query *q));
@@ -189,7 +189,7 @@ features ds query = withQuery query $ \q -> do
         );
       }
     }
-  } while(0);}|]
+  } while(0);|]
   fs <- V.fromList . map fst . sortBy (compare `on` snd)
     <$> (decodeUtf8Keys "features" =<< readIORef fields)
   (,) <$> pure fs
@@ -197,7 +197,7 @@ features ds query = withQuery query $ \q -> do
   where
 
 featuresAtPoint :: Datasource -> Pair -> Double -> IO FeatureSet
-featuresAtPoint = undefined
+featuresAtPoint _TODO = undefined
 
 data Query = Query
   { _queryBox              :: !Box
@@ -240,8 +240,8 @@ data HsDatasource where
 
 createHsDatasource :: HsDatasource -> IO Datasource
 createHsDatasource HsVector{..} = with _extent $ \e -> unsafeNew $ \ ptr -> do
-  fs <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> Ptr QueryPtr -> IO ()|]) getFeatures'
-  fsp <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ()|]) getFeaturesAtPoint'
+  fs <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> Ptr QueryPtr -> IO (Ptr ())|]) getFeatures'
+  fsp <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO (Ptr ())|]) getFeaturesAtPoint'
   [C.block|void {
   datasource_ptr p = std::make_shared<hs_datasource>(
     "hs_vector_layer",                 //TODO
@@ -260,16 +260,16 @@ createHsDatasource HsVector{..} = with _extent $ \e -> unsafeNew $ \ ptr -> do
     }|]
 
   where
-    getFeatures' ctx fs q = catchingExceptions "getFeatures" $
+    getFeatures' ctx fs q = catchingExceptions $
       mapM_ (pushBack ctx fs) =<< getFeatures =<< unCreateQuery q
 
     getFeaturesAtPoint' ctx fs (realToFrac -> x) (realToFrac -> y) (realToFrac -> tol) =
-      catchingExceptions "getFeaturesAtPoint" $
+      catchingExceptions $
         mapM_ (pushBack ctx fs) =<< getFeaturesAtPoint (Pair x y) tol
 
 createHsDatasource HsRaster{..} = with _extent $ \e -> unsafeNew $ \ ptr -> do
-  fs <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> Ptr QueryPtr -> IO ()|]) getFeatures'
-  fsp <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO ()|]) getFeaturesAtPoint'
+  fs <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> Ptr QueryPtr -> IO (Ptr ())|]) getFeatures'
+  fsp <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO (Ptr ())|]) getFeaturesAtPoint'
   [C.block|void {
   datasource_ptr p = std::make_shared<hs_datasource>(
     "hs_raster_layer",                 //TODO
@@ -288,7 +288,7 @@ createHsDatasource HsRaster{..} = with _extent $ \e -> unsafeNew $ \ ptr -> do
     }|]
 
   where
-    getFeatures' ctx fs q = catchingExceptions "getRaster" $ do
+    getFeatures' ctx fs q = catchingExceptions $ do
       rs <- getRasters =<< unCreateQuery q
       forM_ rs $ \r -> do
         f <- Feature.create ctx $ feature {raster=Just (SomeRaster r)}
@@ -297,7 +297,7 @@ createHsDatasource HsRaster{..} = with _extent $ \e -> unsafeNew $ \ ptr -> do
         |]
 
     getFeaturesAtPoint' ctx fs (realToFrac -> x) (realToFrac -> y) (realToFrac -> tol) =
-      catchingExceptions "getFeaturesAtPoint" $
+      catchingExceptions $
         mapM_ (pushBack ctx fs) =<< getFeaturesAtPoint (Pair x y) tol
 
 pushBack :: Ptr FeatureCtx -> Ptr FeatureList -> Feature -> IO ()
@@ -308,9 +308,13 @@ pushBack ctx fs = \f -> do
   |]
 
 
-catchingExceptions :: String -> IO () -> IO ()
-catchingExceptions ctx = (`catch` (\e ->
-  hPutStrLn stderr ("Unhandled haskell exception in " ++ ctx ++ ": " ++ show @SomeException e)))
+catchingExceptions :: IO () -> IO (Ptr ())
+catchingExceptions act = do
+  res <- try act
+  case res of
+    Right () -> return nullPtr
+    Left  (e::SomeException) ->
+      castStablePtrToPtr <$> newStablePtr e
 
 withQuery :: Query -> (Ptr QueryPtr -> IO a) -> IO a
 withQuery query f =
@@ -339,11 +343,11 @@ withQuery query f =
         }|]
       f p
     Query { _queryResolution = Pair (realToFrac -> resx) (realToFrac -> resy)
-          , _queryScaleDenominator = (realToFrac -> scale) 
-          , _queryFilterFactor = (realToFrac -> ff) 
+          , _queryScaleDenominator = (realToFrac -> scale)
+          , _queryFilterFactor = (realToFrac -> ff)
           , ..
           } = query
-  
+
 
 unCreateQuery :: Ptr QueryPtr -> IO Query
 unCreateQuery q = do

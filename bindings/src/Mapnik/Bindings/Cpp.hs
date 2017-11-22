@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE PatternSynonyms #-}
 module Mapnik.Bindings.Cpp (
@@ -62,23 +63,31 @@ pattern ExTypeNoException = 0
 pattern ExTypeStdException :: CInt
 pattern ExTypeStdException = 1
 
-pattern ExTypeVariantTypeError :: CInt
-pattern ExTypeVariantTypeError = 2
+pattern ExTypeHsException :: CInt
+pattern ExTypeHsException = 2
 
-handleForeign :: MonadBaseControl IO m => (Ptr CInt -> Ptr CString -> IO ()) -> m ()
+pattern ExTypeConfigError :: CInt
+pattern ExTypeConfigError = 2
+
+handleForeign :: MonadBaseControl IO m => (Ptr CInt -> Ptr (Ptr ()) -> IO ()) -> m ()
 handleForeign cont = liftBase $
   alloca $ \exTypePtr ->
-  alloca $ \msgPtrPtr -> do
+  alloca $ \resPtrPtr -> do
     poke exTypePtr ExTypeNoException
-    cont exTypePtr msgPtrPtr `finally` do
+    cont exTypePtr resPtrPtr `finally` do
       exType <- peek exTypePtr
       case exType of
         ExTypeNoException -> return ()
         ExTypeStdException -> do
-          msgPtr <- peek msgPtrPtr
-          errMsg <- peekCString msgPtr
+          msgPtr <- peek resPtrPtr
+          errMsg <- peekCString (castPtr msgPtr)
           free msgPtr
           throwIO $ CppStdException errMsg
+        ExTypeHsException -> do
+          excPtr <- castPtrToStablePtr <$> peek resPtrPtr
+          exc :: SomeException <- deRefStablePtr excPtr
+          freeStablePtr excPtr
+          throwIO exc
         _ -> error "Unexpected C++ exception type."
 
 -- | Similar to `C.block`, but C++ exceptions will be caught and rethrown as `ForeignException`s.
@@ -91,23 +100,27 @@ catchBlock = QuasiQuoter
       _ <- C.include "<exception>"
       _ <- C.include "<cstring>"
       _ <- C.include "<cstdlib>"
+      _ <- C.include "hs_exception.hpp"
       typePtrVarName <- newName "exTypePtr"
-      msgPtrVarName <- newName "msgPtr"
+      resPtrVarName <- newName "resPtr"
       let inlineCStr = unlines
             [ "void {"
             , "  int* __inline_c_cpp_exception_type__ = $(int* " ++ nameBase typePtrVarName ++ ");"
-            , "  char** __inline_c_cpp_error_message__ = $(char** " ++ nameBase msgPtrVarName ++ ");"
+            , "  void** __inline_c_cpp_error__ = $(void** " ++ nameBase resPtrVarName ++ ");"
             , "  try {"
             , blockStr
+            , "  } catch (mapnik::hs_exception &e) {"
+            , "    *__inline_c_cpp_exception_type__ = " ++ show ExTypeHsException ++ ";"
+            , "    *__inline_c_cpp_error__ = e.getStablePtr();"
             , "  } catch (std::exception &e) {"
             , "    *__inline_c_cpp_exception_type__ = " ++ show ExTypeStdException ++ ";"
             , "    size_t whatLen = std::strlen(e.what()) + 1;"
-            , "    *__inline_c_cpp_error_message__ = static_cast<char*>(std::malloc(whatLen));"
-            , "    std::memcpy(*__inline_c_cpp_error_message__, e.what(), whatLen);"
+            , "    *__inline_c_cpp_error__ = static_cast<char*>(std::malloc(whatLen));"
+            , "    std::memcpy(*__inline_c_cpp_error__, e.what(), whatLen);"
             , "  }"
             , "}"
             ]
-      [e| handleForeign $ \ $(varP typePtrVarName) $(varP msgPtrVarName) -> $(quoteExp C.block inlineCStr) |]
+      [e| handleForeign $ \ $(varP typePtrVarName) $(varP resPtrVarName) -> $(quoteExp C.block inlineCStr) |]
 
   , quotePat = unsupported
   , quoteType = unsupported
