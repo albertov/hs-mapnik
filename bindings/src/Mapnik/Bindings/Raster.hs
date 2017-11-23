@@ -25,7 +25,7 @@ module Mapnik.Bindings.Raster (
 , HasNodata(..)
 ) where
 
-import           Mapnik (Box)
+import           Mapnik (Box, PixelRgba8(..))
 import           Mapnik.Lens
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Orphans()
@@ -172,7 +172,7 @@ data DType
 
 #define DTYPE_CASE(ENUM,TY) \
   ENUM -> \
-    let _rasterPixels = V.unsafeFromForeignPtr0 (castForeignPtr bytes) size \
+    let _rasterPixels = V.unsafeFromForeignPtr0 (castForeignPtr bytes) sz \
     in return $ SomeRaster (Raster {..} :: Raster TY)
 
 instance Variant RasterPtr SomeRaster where
@@ -210,7 +210,7 @@ instance Variant RasterPtr SomeRaster where
         *$(double **nd) = nullptr;
       }
       }|]
-    let size = _rasterWidth*_rasterHeight
+    let sz = _rasterWidth*_rasterHeight
     _rasterNodata <- if nodataPtr==nullPtr
                      then return Nothing
                      else Just . realToFrac <$> peek nodataPtr

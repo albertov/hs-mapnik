@@ -13,6 +13,7 @@ module Mapnik.Bindings.Image (
 , toRgba8
 ) where
 
+import           Mapnik.Common (ImageRgba8(..), Size)
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import qualified Mapnik.Bindings.Cpp as C
@@ -60,10 +61,9 @@ serialize (fromString -> fmt) im = unsafePerformIO $ newByteStringMaybe $ \(ptr,
   }
   }|]
 
-type Size = (Int,Int)
 
 
-toRgba8 :: Image -> (Size, V.Vector PixelRgba8)
+toRgba8 :: Image -> ImageRgba8
 toRgba8 im = unsafePerformIO $ do
   (fromIntegral -> w, fromIntegral -> h) <- C.withPtrs_ $ \(w,h) ->
     [C.block|void {
@@ -76,24 +76,25 @@ toRgba8 im = unsafePerformIO $ do
   mapnik::image_rgba8 *im = $fptr-ptr:(image_rgba8 *im);
   std::memcpy($vec-ptr:(pixel_rgba8 *vec), im->data(), im->size());
   }|]
-  (,) <$> pure (w,h) <*> V.unsafeFreeze vec
+  ImageRgba8 <$> pure (w,h) <*> V.unsafeFreeze vec
 {-# NOINLINE toRgba8 #-}
 
-fromRgba8 :: (Size, V.Vector PixelRgba8) -> Maybe Image
-fromRgba8 ((width, height), rgba8)
+fromRgba8 :: ImageRgba8 -> Maybe Image
+fromRgba8 (ImageRgba8 (width, height) rgba8)
   | 0 == V.length rgba8 = Nothing
   | height < 0 || width < 0 = Nothing
   | width*height /= V.length rgba8 = Nothing
-fromRgba8 ((fromIntegral -> width, fromIntegral -> height), rgba8) = unsafePerformIO $ fmap Just $ unsafeNew $ \ptr ->
-  [C.block|void {
-  *$(image_rgba8 **ptr) =
-    new mapnik::image_rgba8(
-      $(int width), $(int height),
-      $vec-ptr:(pixel_rgba8 *rgba8)
-      );
-  }|]
+fromRgba8 (ImageRgba8 (fromIntegral -> width, fromIntegral -> height) rgba8) =
+  unsafePerformIO $ fmap Just $ unsafeNew $ \ptr ->
+    [C.block|void {
+    *$(image_rgba8 **ptr) =
+      new mapnik::image_rgba8(
+        $(int width), $(int height),
+        $vec-ptr:(pixel_rgba8 *rgba8)
+        );
+    }|]
 {-# NOINLINE fromRgba8 #-}
-  
+
 {-# RULES
 "fromRgba8/toRgba8"  forall im. fromRgba8 (toRgba8 im) = Just im
   #-}

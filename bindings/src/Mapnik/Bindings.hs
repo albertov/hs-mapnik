@@ -11,7 +11,6 @@ This module is the public API of the Haskell Mapnik bindings. The internal
 modules are exported and can be used but their API might change unexpectedly
 -}
 module Mapnik.Bindings (
--- $doc
 -- * Conversion between pure and impure structures
   FromMapnik (..)
 , ToMapnik (..)
@@ -61,8 +60,6 @@ module Mapnik.Bindings (
 
 -- * Image
 , Image
-, Size
-, PixelRgba8 (..)
 , fromRgba8
 , toRgba8
 , serialize
@@ -90,9 +87,6 @@ module Mapnik.Bindings (
 -- * Re-exports
 , module Mapnik
 ) where
-
--- $doc
--- TBD write examples, etc...
 
 import Mapnik
 import Mapnik.Bindings.Map

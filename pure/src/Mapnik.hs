@@ -165,6 +165,10 @@ module Mapnik (
 , ToValue (..)
 , Value (..)
 
+-- * Other
+, Size
+, PixelRgba8(..)
+, ImageRgba8(ImageRgba8)
 
 -- * Lenses
 , module Mapnik.Lens

@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FunctionalDependencies #-}
@@ -19,6 +20,7 @@ import Mapnik.Symbolizer
 
 import Control.Lens
 import qualified Data.HashMap.Strict as M
+import Data.Bits
 import Data.Text (Text)
 import Data.Word (Word8)
 
@@ -48,6 +50,7 @@ makeMapnikFields ''GroupLayout
 makeMapnikFields ''Colorizer
 makeMapnikFields ''Stop
 makeMapnikFields ''Box
+makeMapnikFields ''ImageRgba8
 makePrisms ''Value
 makePrisms ''Symbolizer
 makePrisms ''Prop
@@ -88,3 +91,16 @@ instance HasWidth Box Double where
 instance HasHeight Box Double where
   height = lens (\b -> b^.maxy - b^.miny) (\b h -> b & maxy .~ (b^.miny + h))
   {-# INLINE height #-}
+
+#define COLOR_LENS(cname, name, off) \
+instance cname PixelRgba8 Word8 where {\
+  {-# INLINE name #-}; \
+  name = lens \
+    (fromIntegral . (.&. 0xFF) . (`unsafeShiftR` off) . unRgba8) \
+    (\(PixelRgba8 c) v -> PixelRgba8 (c .&. complement (0xFF `unsafeShiftL` off) .|. (fromIntegral v `unsafeShiftL` off))) \
+  };
+
+COLOR_LENS(HasRed,   red,    0)
+COLOR_LENS(HasGreen, green,  8)
+COLOR_LENS(HasBlue,  blue,  16)
+COLOR_LENS(HasAlpha, alpha, 24)

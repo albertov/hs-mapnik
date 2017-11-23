@@ -206,7 +206,7 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
 
         imgBase <- render m (renderSettings 512 512 theExtent)
         --BS.writeFile "map.webp" (fromJust (serialize "webp" imgBase))
-        snd (toRgba8 imgBase) `shouldSatisfy` G.all (== transparent)
+        (toRgba8 imgBase ^. pixels) `shouldSatisfy` G.all (== transparent)
 
         l <- Layer.create "fooo"
         Layer.setSrs l "+init=epsg:3857"
@@ -230,7 +230,7 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
         Layer.addStyle l "provlines"
         Map.addLayer m l
         img <- render m (renderSettings 512 512 theExtent)
-        snd (toRgba8 img) `shouldSatisfy` G.any (/= transparent)
+        (toRgba8 img ^. pixels) `shouldSatisfy` G.any (/= transparent)
         Just q <- readIORef ref
         q^.box `shouldBe` theExtent
         q^.unBufferedBox `shouldBe` theExtent
@@ -266,7 +266,7 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
                         & width  .~ w
                         & height .~ h
         --BS.writeFile "map.webp" (fromJust (serialize "webp" img))
-        let (_, imData) = toRgba8 img
+        let imData = toRgba8 img ^. pixels
         imData G.! 0 `shouldBe` transparent
         imData G.! 128 `shouldNotBe` transparent
         imData G.! (256*128) `shouldNotBe` transparent
@@ -319,15 +319,17 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
           Just img2  = fromRgba8 rgba8
           w = rSettings^?!width
           h = rSettings^?!height
-      G.length (snd rgba8)  `shouldBe` (w * h)
+      G.length (rgba8^.pixels)  `shouldBe` (w * h)
       --BS.writeFile "map.webp" (serialize "webp" img2)
       serialize "png8" img `shouldBe` serialize "png8" img2
 
     it "cannot create empty image" $
-      fromRgba8 ((0,0), G.empty) `shouldSatisfy` isNothing
+      fromRgba8 (ImageRgba8 (0,0) G.empty) `shouldSatisfy` isNothing
 
     it "doesnt serialize bad format" $ do
-      let Just img = fromRgba8 ((10, 10), (G.replicate (10*10) (PixelRgba8 0)))
+      let Just img =
+            fromRgba8 (ImageRgba8 (10, 10)
+                      (G.replicate (10*10) (PixelRgba8 0)))
       serialize "bad" img `shouldSatisfy` isNothing
 
   describe "Expression" $ do

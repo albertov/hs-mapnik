@@ -42,7 +42,6 @@ module Mapnik.Bindings.Types (
 , QueryPtr
 , Geometry (..)
 , FeaturePtr (..)
-, PixelRgba8 (..)
 , Pair (..)
 , MapnikError (..)
 , RasterPtr
@@ -55,14 +54,10 @@ module Mapnik.Bindings.Types (
 ) where
 
 import           Mapnik ( Color, Dash(..), GroupRule, Box, Value
-                        , PathExpression)
-import           Mapnik.Lens ( HasRed(..), HasBlue(..), HasGreen(..)
-                              , HasAlpha(..))
+                        , PathExpression, PixelRgba8)
 
-import           Control.Lens (lens)
 import           Control.Exception
 import           Data.Typeable
-import           Data.Bits
 import qualified Language.C.Inline as C
 import           Data.Monoid (mempty, (<>))
 import           Language.C.Inline.Context
@@ -71,7 +66,6 @@ import           Data.Word
 import           Data.Int
 import           Data.Text
 import qualified Data.HashMap.Strict as M
-import           Foreign.Storable (Storable)
 import           Foreign.ForeignPtr (ForeignPtr)
 import           Foreign.Ptr (Ptr, FunPtr)
 import qualified Language.C.Inline.Cpp as C
@@ -128,21 +122,7 @@ data MapnikError = ConfigError String
 data Pair = Pair { x, y :: !Double }
   deriving (Eq, Show)
 
-newtype PixelRgba8 = PixelRgba8 { unRgba8 :: Word32 }
-  deriving newtype (Eq, Show, Storable)
 
-#define COLOR_LENS(cname, name, off) \
-instance cname PixelRgba8 Word8 where {\
-  {-# INLINE name #-}; \
-  name = lens \
-    (fromIntegral . (.&. 0xFF) . (`unsafeShiftR` off) . unRgba8) \
-    (\(PixelRgba8 c) v -> PixelRgba8 (c .&. complement (0xFF `unsafeShiftL` off) .|. (fromIntegral v `unsafeShiftL` off))) \
-  };
-
-COLOR_LENS(HasRed,   red,    0)
-COLOR_LENS(HasGreen, green,  8)
-COLOR_LENS(HasBlue,  blue,  16)
-COLOR_LENS(HasAlpha, alpha, 24)
 
 type Attributes = M.HashMap Text Mapnik.Value
 
