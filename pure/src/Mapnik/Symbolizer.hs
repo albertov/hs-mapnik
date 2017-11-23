@@ -15,6 +15,7 @@ module Mapnik.Symbolizer where
 
 import Mapnik.Imports
 import Mapnik.Common
+import Mapnik.Color
 import Mapnik.Enums
 
 import Data.Text (Text)

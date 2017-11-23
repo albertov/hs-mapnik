@@ -13,6 +13,8 @@ import           Mapnik.Datasource
 import           Mapnik.Style
 import           Mapnik.Rule
 import           Mapnik.Symbolizer
+import           Mapnik.Color
+import           Mapnik.ImageFilter
 import           Mapnik.Enums
 import           Mapnik.Parameter
 
@@ -36,7 +38,9 @@ instance Arbitrary Map where
     bufferSize             <- arbitrary
     maximumExtent          <- arbitrary
     fontDirectory          <- arbitrary
+    basePath               <- arbitrary
     fontSets               <- arbitrary
+    parameters             <- arbitrary
     styles                 <- M.fromList <$> listOf ((,) <$> arbitrary <*> arbitraryStyle fontSets)
     layers                 <- listOf (arbitraryLayer (M.keys styles))
     pure Map{..}
@@ -53,6 +57,10 @@ arbitraryStyle :: FontSetMap -> Gen Style
 arbitraryStyle fontMap = do
   opacity             <- arbitrary
   imageFiltersInflate <- arbitrary
+  filters             <- arbitrary
+  directFilters       <- arbitrary
+  filterMode          <- arbitrary
+  compOp              <- arbitrary
   rules               <- listOf (arbitraryRule fontMap)
   pure Style{..}
 
@@ -68,6 +76,7 @@ arbitraryRule fontMap = do
 instance Arbitrary Expression where
   arbitrary = elements ["[GEONAME]", "[SCALE_CAT]"] --TODO
 
+
 instance Arbitrary Transform where
   arbitrary = Transform <$> (T.intercalate " " <$> listOf1 parts)
     where
@@ -76,7 +85,30 @@ instance Arbitrary Transform where
         , pure "rotate(45, 50, 50)"
         ]
 
+instance Arbitrary ImageFilter where
+  arbitrary = oneof
+        [ pure Blur
+        , pure Emboss
+        , pure Sharpen
+        , pure EdgeDetect
+        , pure Sobel
+        , pure Gray
+        , pure XGradient
+        , pure YGradient
+        , pure Invert
+        , pure ColorBlindProtanope
+        , pure ColorBlindDeuteranope
+        , pure ColorBlindTritanope
+        , AggStackBlur <$> arbitrary <*> arbitrary
+        , ColorToAlpha <$> arbitrary
+        , ScaleHsla <$> arbitrary <*> arbitrary
+                    <*> arbitrary <*> arbitrary
+                    <*> arbitrary <*> arbitrary
+        , ColorizeAlpha <$> arbitrary
+        ]
 
+instance Arbitrary ColorStop where
+  arbitrary = ColorStop <$> arbitrary <*> arbitrary
 
 instance Arbitrary Color where
   arbitrary =
@@ -223,7 +255,7 @@ arbitraryShieldSym fontMap = do
   geometryTransform <- arbitrary
   simplifyAlgorithm <- arbitrary
   pure ShieldSymbolizer{..}
- 
+
 arbitraryTextSym fontMap = do
   placements     <- arbitraryPlacements fontMap
   haloCompOp     <- arbitrary
@@ -236,7 +268,7 @@ arbitraryTextSym fontMap = do
   geometryTransform <- arbitrary
   simplifyAlgorithm <- arbitrary
   pure TextSymbolizer{..}
-  
+
 arbitraryBuildingSym = do
   fill        <- arbitrary
   fillOpacity <- arbitrary
@@ -341,6 +373,7 @@ instance Arbitrary VerticalAlignment where arbitrary = arbitraryEnum
 instance Arbitrary PlacementDirection where arbitrary = arbitraryEnum
 instance Arbitrary TextTransform where arbitrary = arbitraryEnum
 instance Arbitrary AspectFixMode where arbitrary = arbitraryEnum
+instance Arbitrary FilterMode where arbitrary = arbitraryEnum
 
 instance Arbitrary a => Arbitrary (Prop a) where
   arbitrary = oneof [ Exp <$> arbitrary, Val <$> arbitrary ]

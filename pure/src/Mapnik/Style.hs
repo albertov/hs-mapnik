@@ -6,6 +6,8 @@
 module Mapnik.Style where
 
 import Mapnik.Imports
+import Mapnik.ImageFilter
+import Mapnik.Enums
 import Mapnik.Rule
 import Data.Default
 import Data.Text
@@ -17,7 +19,11 @@ type Styles = M.HashMap StyleName Style
 
 data Style = Style
   { opacity             :: !(Maybe Double)
+  , filterMode          :: !(Maybe FilterMode)
+  , filters             :: ![ImageFilter]
+  , directFilters       :: ![ImageFilter]
   , imageFiltersInflate :: !(Maybe Bool)
   , rules               :: ![Rule]
+  , compOp              :: !(Maybe CompositeMode)
   } deriving (Eq, Show, Generic, Default)
 deriveMapnikJSON ''Style

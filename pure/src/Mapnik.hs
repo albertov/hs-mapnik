@@ -167,6 +167,7 @@ module Mapnik (
 
 import Mapnik.Common hiding (minx,maxx,miny,maxy)
 import Mapnik.Map
+import Mapnik.Color
 import Mapnik.Layer
 import Mapnik.Style
 import Mapnik.Rule

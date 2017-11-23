@@ -8,10 +8,12 @@ module Mapnik.Map where
 
 import Mapnik.Imports
 import Mapnik.Common
+import Mapnik.Color
 import Mapnik.Enums
+import Mapnik.Parameter
 import Data.Monoid (mempty)
 import Data.Default
-import Mapnik.Style 
+import Mapnik.Style
 import Mapnik.Layer
 
 import Prelude hiding (map)
@@ -26,9 +28,11 @@ data Map = Map
   , bufferSize             :: !(Maybe Int)
   , maximumExtent          :: !(Maybe Box)
   , fontDirectory          :: !(Maybe FilePath)
+  , basePath               :: !(Maybe FilePath)
   , fontSets               :: !FontSetMap
   , styles                 :: !Styles
   , layers                 :: ![Layer]
+  , parameters             :: !Parameters
   } deriving (Eq, Show, Generic)
 deriveMapnikJSON ''Map
 
@@ -42,7 +46,9 @@ instance Default Map where
     , bufferSize             = Nothing
     , maximumExtent          = Nothing
     , fontDirectory          = Nothing
+    , basePath               = Nothing
     , fontSets               = mempty
     , styles                 = mempty
     , layers                 = mempty
+    , parameters             = mempty
     }

@@ -9,6 +9,8 @@ import Mapnik.TH
 import qualified Mapnik.Map as Map
 import Mapnik.Common hiding (maxx,maxy,minx,miny)
 import Mapnik.Layer
+import Mapnik.Color
+import Mapnik.ImageFilter
 import Mapnik.Rule
 import Mapnik.Style
 import Mapnik.Parameter
@@ -52,18 +54,19 @@ makePrisms ''Prop
 makePrisms ''Format
 makePrisms ''GroupLayout
 makePrisms ''Font
+makePrisms ''ImageFilter
 
 
 --------------------------------------------------------------------------
--- Instances  
+-- Instances
 --------------------------------------------------------------------------
 
 instance HasStyleLst Map.Map [(StyleName,Style)] where
   styleLst = lens (M.toList . Map.styles)
-                  (\s a -> s { Map.styles = M.fromList a}) 
+                  (\s a -> s { Map.styles = M.fromList a})
 
 instance HasParameters Datasource (M.HashMap Text Value) where
-  parameters = lens (\(Datasource s) -> s) (const Datasource) 
+  parameters = lens (\(Datasource s) -> s) (const Datasource)
 
 instance HasRed Color Word8 where
   red   = lens (\(RGBA r _ _ _) -> r) (\(RGBA _ g b a) r -> RGBA r g b a)

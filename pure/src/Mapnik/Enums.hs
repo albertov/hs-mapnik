@@ -35,7 +35,7 @@ data CompositeMode
   | Difference
   | Exclusion
   | Contrast
-  | Invert
+  | InvertOp
   | InvertRgb
   | GrainMerge
   | GrainExtract
@@ -248,3 +248,9 @@ data ColorizerMode
   | CExact
   deriving (Eq, Show, Bounded, Enum, Generic)
 deriveMapnikJSON ''ColorizerMode
+
+data FilterMode
+  = FilterAll
+  | FilterFirst
+  deriving (Eq, Show, Bounded, Enum, Generic)
+deriveMapnikJSON ''FilterMode

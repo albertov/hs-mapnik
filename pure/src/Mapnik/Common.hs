@@ -9,7 +9,6 @@
 module Mapnik.Common where
 
 import Mapnik.Imports
-import Data.Word
 import Data.String (IsString(..))
 import Data.Text (Text)
 import Data.Vector.Storable (Vector)
@@ -21,11 +20,6 @@ import Foreign.C.Types (CDouble)
 
 data Box = Box { minx, miny, maxx, maxy :: {-# UNPACK #-}!Double }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
-
-data Color = RGBA !Word8 !Word8 !Word8 !Word8
-  deriving (Eq, Show, Generic)
-
-deriveMapnikJSON ''Color
 
 newtype Transform = Transform Text
   deriving (Generic)
@@ -47,8 +41,6 @@ type FaceName = Text
 type FontSetName = Text
 type FontSetMap = M.HashMap FontSetName FontSet
 type FontSet = [FaceName]
-
--- | See <https://github.com/mapnik/mapnik/wiki/RasterColorizer>
 
 instance Storable Dash where
   sizeOf   _ = 2 * sizeOf (undefined :: CDouble)

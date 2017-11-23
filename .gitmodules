@@ -1,0 +1,6 @@
+[submodule "bindings/spec/test-data"]
+	path = bindings/spec/test-data
+	url = https://github.com/mapnik/test-data.git
+[submodule "bindings/spec/data/visual"]
+	path = bindings/spec/data/visual
+	url = https://github.com/mapnik/test-data-visual.git
