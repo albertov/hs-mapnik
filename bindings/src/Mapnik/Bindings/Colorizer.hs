@@ -60,6 +60,12 @@ createColorizer Mapnik.Colorizer{..} = unsafeNewColorizer $ \p -> do
       static_cast<raster_colorizer*>($(void *ret));
     colorizer->set_default_mode(static_cast<colorizer_mode_enum>($(int m)));
     }|]
+  forM_ epsilon $ \(realToFrac -> v) ->
+    [C.block|void {
+    raster_colorizer *colorizer =
+      static_cast<raster_colorizer*>($(void *ret));
+    colorizer->set_epsilon($(float v));
+    }|]
   forM_ color $ \c -> with c $ \cPtr ->
     [C.block|void {
     raster_colorizer *colorizer =
@@ -148,7 +154,7 @@ getStops p = do
 
 unCreateColorizer :: Colorizer -> IO Mapnik.Colorizer
 unCreateColorizer (Colorizer colorizer) = withForeignPtr colorizer $ \p -> do
-  (mMode, colorPtr) <- C.withPtrs_ $ \(mode,col) ->
+  (mMode,eps,hasEps,colorPtr) <- C.withPtrs_ $ \(mode,eps,hasEps,col) ->
     [C.block|void {
     const raster_colorizer *colorizer =
       (*$(raster_colorizer_ptr *p)).get();
@@ -159,6 +165,12 @@ unCreateColorizer (Colorizer colorizer) = withForeignPtr colorizer $ \p -> do
         );
     } else {
       *$(int *mode) = -1;
+    }
+    if (colorizer->get_epsilon() != def.get_epsilon()) {
+      *$(float *eps) = (*$(raster_colorizer_ptr *p))->get_epsilon();
+      *$(int *hasEps) = 1;
+    } else {
+      *$(int *hasEps) = 0;
     }
     if (colorizer->get_default_color() != def.get_default_color()) {
       *$(color **col) = const_cast<color*>(
@@ -174,5 +186,6 @@ unCreateColorizer (Colorizer colorizer) = withForeignPtr colorizer $ \p -> do
   mode <- if mMode < 0
           then return Nothing
           else return (Just (toEnum (fromIntegral mMode)))
+  let epsilon = if hasEps==0 then Nothing else Just (realToFrac eps)
   stops <- getStops p
   return Mapnik.Colorizer{..}

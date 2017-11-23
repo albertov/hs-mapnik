@@ -38,25 +38,26 @@ instance ToJSON a => ToJSON (Prop a) where
 type PropValue a = Maybe (Prop a)
 
 data Stop = Stop
-  { value :: !Double
+  { value :: !Float
   , color :: !Color
   , mode  :: !(Maybe ColorizerMode)
   , label :: !(Maybe Text)
   } deriving (Eq, Show, Generic)
 
-stop :: Double -> Color -> Stop
+stop :: Float -> Color -> Stop
 stop v c = Stop v c Nothing Nothing
 
 -- | See <https://github.com/mapnik/mapnik/wiki/RasterColorizer>
 data Colorizer = Colorizer
   { mode   :: !(Maybe ColorizerMode)
   , color  :: !(Maybe Color)
+  , epsilon :: !(Maybe Float)
   , stops  :: ![Stop]
   } deriving (Eq, Show, Generic, Default)
 
 instance IsList Colorizer where
   type Item Colorizer = Stop
-  fromList = Colorizer Nothing Nothing
+  fromList = Colorizer Nothing Nothing Nothing
   toList   = stops
 
 -- | See <https://github.com/mapnik/mapnik/wiki/GroupSymbolizer>
@@ -135,7 +136,7 @@ data TextLayoutProperties = TextLayoutProperties
   , wrapChar            :: !(PropValue Char)
   , wrapBefore          :: !(PropValue Bool)
   , repeatWrapChar      :: !(PropValue Bool)
-  , rotateDisplacement  :: !(PropValue Double)
+  , rotateDisplacement  :: !(PropValue Bool)
   , horizontalAlignment :: !(PropValue HorizontalAlignment)
   , justifyAlignment    :: !(PropValue JustifyAlignment)
   , verticalAlignment   :: !(PropValue VerticalAlignment)
@@ -149,6 +150,7 @@ data Format
   | Format
     { font             :: !(Maybe Font)
     , textSize         :: !(PropValue Double)
+    , opacity          :: !(PropValue Double)
     , characterSpacing :: !(PropValue Double)
     , lineSpacing      :: !(PropValue Double)
     , wrapBefore       :: !(PropValue Bool)
@@ -170,7 +172,7 @@ data Format
     , wrapChar            :: !(PropValue Char)
     , wrapBefore          :: !(PropValue Bool)
     , repeatWrapChar      :: !(PropValue Bool)
-    , rotateDisplacement  :: !(PropValue Double)
+    , rotateDisplacement  :: !(PropValue Bool)
     , horizontalAlignment :: !(PropValue HorizontalAlignment)
     , justifyAlignment    :: !(PropValue JustifyAlignment)
     , verticalAlignment   :: !(PropValue VerticalAlignment)
@@ -192,6 +194,7 @@ format_ :: Format
 format_ = Format
   { font             = Nothing
   , textSize         = Nothing
+  , opacity          = Nothing
   , characterSpacing = Nothing
   , lineSpacing      = Nothing
   , wrapBefore       = Nothing
@@ -289,7 +292,7 @@ newtype TextPlacements = Dummy TextSymProperties
 
 data Symbolizer
   = PointSymbolizer
-    { file            :: !(PropValue FilePath)
+    { file            :: !(Maybe PathExpression)
     , opacity         :: !(PropValue Double)
     , allowOverlap    :: !(PropValue Bool)
     , ignorePlacement :: !(PropValue Bool)
@@ -303,7 +306,7 @@ data Symbolizer
     , STROKE_PROPS
     }
   | LinePatternSymbolizer
-    { file             :: !(PropValue FilePath)
+    { file             :: !(Maybe PathExpression)
     , opacity          :: !(PropValue Double)
     , offset           :: !(PropValue Double)
     , imageTransform   :: !(PropValue Transform)
@@ -317,7 +320,7 @@ data Symbolizer
     , BASE_PROPS
     }
   | PolygonPatternSymbolizer
-    { file            :: !(PropValue FilePath)
+    { file            :: !(Maybe PathExpression)
     , opacity         :: !(PropValue Double)
     , gamma           :: !(PropValue Double)
     , gammaMethod     :: !(PropValue GammaMethod)
@@ -341,7 +344,7 @@ data Symbolizer
     , dy              :: !(PropValue Double)
     , opacity         :: !(PropValue Double)
     , unlockImage     :: !(PropValue Bool)
-    , file            :: !(PropValue FilePath)
+    , file            :: !(Maybe PathExpression)
     , haloRasterizer  :: !(PropValue HaloRasterizer)
     , BASE_PROPS
     }
@@ -359,7 +362,7 @@ data Symbolizer
     , BASE_PROPS
     }
   | MarkersSymbolizer
-    { file            :: !(PropValue FilePath)
+    { file            :: !(Maybe PathExpression)
     , opacity         :: !(PropValue Double)
     , fill            :: !(PropValue Color)
     , fillOpacity     :: !(PropValue Double)

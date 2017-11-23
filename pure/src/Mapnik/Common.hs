@@ -29,6 +29,11 @@ newtype Expression = Expression Text
   deriving (Generic)
   deriving newtype (Eq, Show, ToJSON, FromJSON, IsString)
 
+newtype PathExpression = PathExpression Text
+  deriving (Generic)
+  deriving newtype (Eq, Show, ToJSON, FromJSON, IsString)
+
+
 newtype FontFeatureSettings = FontFeatureSettings Text
   deriving (Generic)
   deriving newtype (Eq, Show, ToJSON, FromJSON, IsString)

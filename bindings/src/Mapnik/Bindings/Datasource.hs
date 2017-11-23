@@ -197,7 +197,7 @@ features ds query = withQuery query $ \q -> do
   where
 
 featuresAtPoint :: Datasource -> Pair -> Double -> IO FeatureSet
-featuresAtPoint _TODO = undefined
+featuresAtPoint aTODO = undefined
 
 data Query = Query
   { _queryBox              :: !Box

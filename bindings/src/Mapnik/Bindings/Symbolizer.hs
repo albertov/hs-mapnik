@@ -48,10 +48,11 @@ import           Control.Monad
 import           Control.Monad.Base (MonadBase, liftBase)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Control.Monad.Reader
+import           Data.Coerce
 import           Data.Maybe
 import qualified Data.HashMap.Strict as M
 import qualified Data.Text as T
-import           Data.Text (Text, pack, unpack)
+import           Data.Text (Text, unpack)
 import           Data.IORef.Lifted
 import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Vector.Storable.Mutable as VM
@@ -74,7 +75,7 @@ C.include "<mapnik/symbolizer_base.hpp>"
 C.include "<mapnik/symbolizer_utils.hpp>"
 C.include "<mapnik/symbolizer_keys.hpp>"
 C.include "<mapnik/expression_string.hpp>"
-C.include "<mapnik/expression_evaluator.hpp>"
+C.include "<mapnik/parse_path.hpp>"
 C.include "<mapnik/transform_processor.hpp>"
 C.include "<mapnik/text/font_feature_settings.hpp>"
 C.include "<mapnik/text/placements/base.hpp>"
@@ -267,7 +268,7 @@ data Key a where
     IgnorePlacement :: Key Bool
     Width :: Key Double
     Height :: Key Double
-    File :: Key FilePath
+    File :: Key Mapnik.PathExpression
     ShieldDx :: Key Double
     ShieldDy :: Key Double
     UnlockImage :: Key Bool
@@ -309,7 +310,7 @@ symbolizerProps :: Lens' Mapnik.Symbolizer Properties
 symbolizerProps = lens getProps setProps where
   setProps sym@Mapnik.PointSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
-    step (File               :=> v) = file ?~ v
+    step (File               :=> Val v) = file ?~ v
     step (Opacity            :=> v) = opacity ?~ v
     step (AllowOverlap       :=> v) = allowOverlap ?~ v
     step (IgnorePlacement    :=> v) = ignorePlacement ?~ v
@@ -326,7 +327,7 @@ symbolizerProps = lens getProps setProps where
 
   setProps sym@Mapnik.LinePatternSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
-    step (File            :=> v) = file ?~ v
+    step (File            :=> Val v) = file ?~ v
     step (Opacity         :=> v) = opacity ?~ v
     step (Offset          :=> v) = offset ?~ v
     step (ImageTransform  :=> v) = imageTransform ?~ v
@@ -342,7 +343,7 @@ symbolizerProps = lens getProps setProps where
 
   setProps sym@Mapnik.PolygonPatternSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
-    step (File           :=> v) = file ?~ v
+    step (File           :=> Val v) = file ?~ v
     step (Opacity        :=> v) = opacity ?~ v
     step (Gamma          :=> v) = gamma ?~ v
     step (GammaMethod    :=> v) = gammaMethod ?~ v
@@ -368,7 +369,7 @@ symbolizerProps = lens getProps setProps where
     step (ShieldDy       :=> v) = dy ?~ v
     step (Opacity        :=> v) = opacity ?~ v
     step (UnlockImage    :=> v) = unlockImage ?~ v
-    step (File           :=> v) = file ?~ v
+    step (File           :=> Val v) = file ?~ v
     step (HaloRasterizer :=> v) = haloRasterizer ?~ v
     step p                      = stepBase p
 
@@ -389,7 +390,7 @@ symbolizerProps = lens getProps setProps where
 
   setProps sym@Mapnik.MarkersSymbolizer{} = foldr step sym  where
     step :: Property -> Mapnik.Symbolizer -> Mapnik.Symbolizer
-    step (File                 :=> v) = file ?~ v
+    step (File                 :=> Val v) = file ?~ v
     step (Opacity              :=> v) = opacity ?~ v
     step (Fill                 :=> v) = fill ?~ v
     step (FillOpacity          :=> v) = fillOpacity ?~ v
@@ -474,7 +475,7 @@ symbolizerProps = lens getProps setProps where
 
   getProps sym = catMaybes $ case sym of
     Mapnik.PointSymbolizer{} ->
-      [ fmap (File               :=>) (sym^?!file)
+      [ fmap ((File               :=>) . Val) (sym^?!file)
       , fmap (Opacity            :=>) (sym^?!opacity)
       , fmap (AllowOverlap       :=>) (sym^?!allowOverlap)
       , fmap (IgnorePlacement    :=>) (sym^?!ignorePlacement)
@@ -488,7 +489,7 @@ symbolizerProps = lens getProps setProps where
       , GET_STROKE_PROPS
       ]
     Mapnik.LinePatternSymbolizer{} ->
-      [ fmap (File           :=>) (sym^?!file)
+      [ fmap ((File               :=>) . Val) (sym^?!file)
       , fmap (Opacity        :=>) (sym^?!opacity)
       , fmap (Offset         :=>) (sym^?!offset)
       , fmap (ImageTransform :=>) (sym^?!imageTransform)
@@ -502,7 +503,7 @@ symbolizerProps = lens getProps setProps where
       , GET_BASE_PROPS
       ]
     Mapnik.PolygonPatternSymbolizer{} ->
-      [ fmap (File           :=>) (sym^?!file)
+      [ fmap ((File               :=>) . Val) (sym^?!file)
       , fmap (Opacity        :=>) (sym^?!opacity)
       , fmap (Gamma          :=>) (sym^?!gamma)
       , fmap (GammaMethod    :=>) (sym^?!gammaMethod)
@@ -526,7 +527,7 @@ symbolizerProps = lens getProps setProps where
       , fmap (ShieldDy          :=>) (sym^?!dy)
       , fmap (Opacity           :=>) (sym^?!opacity)
       , fmap (UnlockImage       :=>) (sym^?!unlockImage)
-      , fmap (File              :=>) (sym^?!file)
+      , fmap ((File               :=>) . Val) (sym^?!file)
       , fmap (HaloRasterizer    :=>) (sym^?!haloRasterizer)
       , GET_BASE_PROPS
       ]
@@ -544,7 +545,7 @@ symbolizerProps = lens getProps setProps where
       , GET_BASE_PROPS
       ]
     Mapnik.MarkersSymbolizer{} ->
-      [ fmap (File                 :=>) (sym^?!file)
+      [ fmap ((File               :=>) . Val) (sym^?!file)
       , fmap (Opacity              :=>) (sym^?!opacity)
       , fmap (Fill                 :=>) (sym^?!fill)
       , fmap (FillOpacity          :=>) (sym^?!fillOpacity)
@@ -757,11 +758,13 @@ createTextPlacements (Mapnik.Dummy defs) = unsafeNew $ \p -> do
 unCreateTextPlacements :: TextPlacements -> SvM Mapnik.TextPlacements
 unCreateTextPlacements p =
   fmap Mapnik.Dummy . unCreateTextSymProps =<< C.withPtr_ (\ret ->
-    [C.block|void {
+    [C.catchBlock|
     auto ptr = dynamic_cast<text_placements_dummy *>($fptr-ptr:(text_placements_ptr *p)->get());
-    assert(ptr);
+    if (!ptr) {
+       throw (std::runtime_error("hs-mapnik only supports DummyPlacements"));
+       }
     *$(text_symbolizer_properties **ret) = &ptr->defaults;
-    }|])
+    |])
 
 
 instance Variant SymbolizerValue Mapnik.TextPlacements where
@@ -844,6 +847,7 @@ createFormat f = unsafeNewFormat $ \p -> case f of
             }|]
           Nothing -> throwIO (ConfigError ("No fontset named " ++ show name ++ " found in map"))
     SET_NODE_PROP(format_node, textSize, text_size)
+    SET_NODE_PROP(format_node, opacity, text_opacity)
     SET_NODE_PROP(format_node, characterSpacing, character_spacing)
     SET_NODE_PROP(format_node, lineSpacing, line_spacing)
     SET_NODE_PROP(format_node, wrapBefore, wrap_before)
@@ -893,6 +897,7 @@ withTextProperties Mapnik.TextProperties{..} = bracket alloc dealloc . enter
       SET_PROP_T(margin,margin)
       SET_PROP_T(repeatDistance,repeat_distance)
       SET_PROP_T(minimumDistance,minimum_distance)
+      SET_PROP_T(minimumPadding,minimum_padding)
       SET_PROP_T(minimumPathLength,minimum_path_length)
       SET_PROP_T(maxCharAngleDelta,max_char_angle_delta)
       SET_PROP_T(allowOverlap,allow_overlap)
@@ -1068,6 +1073,7 @@ unFormat p = do
         &dynamic_cast<format_node*>($fptr-ptr:(node_ptr *p)->get())->fontset
         }|];
       GET_OPT_PROP(format_node, textSize, text_size);
+      GET_OPT_PROP(format_node, opacity, text_opacity);
       GET_OPT_PROP(format_node, characterSpacing, character_spacing);
       GET_OPT_PROP(format_node, lineSpacing, line_spacing);
       GET_OPT_PROP(format_node, wrapBefore, wrap_before);
@@ -1316,7 +1322,9 @@ instance Variant SymbolizerValue HS where {\
 }
 
 SYM_VAL(Int,value_integer,fromIntegral,"Int")
-SYM_VAL(Double,double,realToFrac,"Double")
+-- We use coerce to work around https://ghc.haskell.org/trac/ghc/ticket/3676
+-- TODO: s/realToFrac/coerce/g everywhere
+SYM_VAL(Double,double,coerce,"Double")
 SYM_VAL_ENUM(CompositeMode,composite_mode_e)
 SYM_VAL_ENUM(LineCap,line_cap_enum)
 SYM_VAL_ENUM(LineJoin,line_join_enum)
@@ -1355,8 +1363,8 @@ instance Variant SymbolizerValue a => Variant SymbolizerValue (Mapnik.Prop a) wh
   peekV p = do
     val <- try (peekV p)
     case val of
-      Right v -> return (Mapnik.Exp v)
-      Left (VariantTypeError _) -> Mapnik.Val <$> peekV p
+      Right v -> return (Mapnik.Val v)
+      Left (VariantTypeError _) -> Mapnik.Exp <$> peekV p
   pokeV p (Mapnik.Exp a) = pokeV p a
   pokeV p (Mapnik.Val a) = pokeV p a
 
@@ -1384,10 +1392,6 @@ instance Variant SymbolizerValue Char where
       Nothing    -> throwIO (FromMapnikError "Unexpected empty string")
   pokeV p (T.singleton -> c) = pokeV p c
 
-instance Variant SymbolizerValue String where
-  peekV = fmap unpack . peekV
-  pokeV p = pokeV p . pack
-
 instance Variant SymbolizerValue Mapnik.Expression where
   peekV p =
     fmap Mapnik.Expression $ justOrTypeError "Expression" $ newTextMaybe "peekV(Expression)" $ \(ret, len) ->
@@ -1409,6 +1413,27 @@ instance Variant SymbolizerValue Mapnik.Expression where
       Right v ->
         [C.block|void{ *$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(expression_ptr *v)); }|]
       Left e -> throwIO (ConfigError e)
+
+instance Variant SymbolizerValue Mapnik.PathExpression where
+  peekV p =
+    fmap Mapnik.PathExpression $ justOrTypeError "PathExpression" $ newTextMaybe "peekV(PathExpression)" $ \(ret, len) ->
+      [C.block|void {
+      try {
+        auto expr = util::get<path_expression_ptr>(*$(sym_value_type *p));
+        if (expr) {
+          std::string s = path_processor::to_string(*expr);
+          mallocedString(s, $(char **ret), $(int *len));
+        } else {
+          *$(char** ret) = nullptr;
+        }
+      } catch (mapbox::util::bad_variant_access) {
+        *$(char** ret) = nullptr;
+      }
+      }|]
+  pokeV p (Mapnik.PathExpression (encodeUtf8 -> expr)) = [C.block|void{
+    *$(sym_value_type *p) = sym_value_type(
+      parse_path(std::string($bs-ptr:expr, $bs-len:expr)));
+    }|]
 
 instance Variant SymbolizerValue Mapnik.FontFeatureSettings where
   peekV p =

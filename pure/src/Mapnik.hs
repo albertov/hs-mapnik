@@ -60,6 +60,10 @@ module Mapnik (
 -- ** Expression
 , Expression
 
+-- ** PathExpression
+, PathExpression
+
+
 -- ** Fonts
 , Font
 , FontSet

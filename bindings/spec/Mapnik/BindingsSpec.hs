@@ -124,7 +124,29 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
     it "can parse and serialize all mapnik test maps" $ do
       let styleDir = "spec"</>"data"</>"visual"</>"styles"
       maps <- listDirectory styleDir
-      forM_ maps $ \sty -> do
+      let unsupported = [ "formatting.xml" -- XXX: Has non-dummy placements
+                        , "list.xml" -- XXX: Has non-dummy placements
+                        , "shield-on-polygon.xml" -- XXX: Has non-dummy placements
+                        , "simple-E.xml" -- XXX: Has non-dummy placements
+                        , "simple-N.xml" -- XXX: Has non-dummy placements
+                        , "simple-NE.xml" -- XXX: Has non-dummy placements
+                        , "simple-NW.xml" -- XXX: Has non-dummy placements
+                        , "simple-SE.xml" -- XXX: Has non-dummy placements
+                        , "simple-SW.xml" -- XXX: Has non-dummy placements
+                        , "simple-W.xml" -- XXX: Has non-dummy placements
+                        , "simple-S.xml" -- XXX: Has non-dummy placements
+                        , "simple-shield.xml" -- XXX: Has non-dummy placements
+                        , "simple.xml" -- XXX: Has non-dummy placements
+                        , "text-bug1533.xml" -- Ditto
+                        , "text-multi-layout-1.xml" -- ditto
+
+                        , "multipolygon-centroid-postgis.xml" -- No postgis for tests
+                        , "text-line-null.xml" -- ditto
+                        , "text-point-null.xml" --ditto
+                        , "postgis-inline.xml"
+                        , "rasterlite-globe.xml"
+                        ] :: [String]
+      forM_ maps $ \sty -> unless (sty `elem` unsupported) $ do
         m1 <- Map.fromXmlFile (styleDir</>sty)
         xml1 <- Map.toXml m1
         m2 <- (toMapnik <=< fromMapnik) m1
@@ -386,7 +408,8 @@ setExistingDatasources = layers . traverse . dataSource ?~ existingDatasource
 
 setExistingFontDir :: Map -> Map
 setExistingFontDir =
-  fontDirectory ?~ "spec"</>"data"</>"visual"</>"fonts"</>"Awesome"
+    (fontDirectory ?~ "spec"</>"data"</>"visual"</>"fonts"</>"Awesome")
+  . (basePath ?~ ".")
 
 fromFixture :: IO Map.Map
 fromFixture = Map.fromXmlFile ("spec"</>"map.xml")

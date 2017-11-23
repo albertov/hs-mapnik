@@ -66,9 +66,6 @@ pattern ExTypeStdException = 1
 pattern ExTypeHsException :: CInt
 pattern ExTypeHsException = 2
 
-pattern ExTypeConfigError :: CInt
-pattern ExTypeConfigError = 2
-
 handleForeign :: MonadBaseControl IO m => (Ptr CInt -> Ptr (Ptr ()) -> IO ()) -> m ()
 handleForeign cont = liftBase $
   alloca $ \exTypePtr ->

@@ -63,6 +63,8 @@ instance FromMapnik Rule where
     minimumScaleDenominator <- Just <$> Rule.getMinScale r
     maximumScaleDenominator <- Just <$> Rule.getMaxScale r
     symbolizers             <- mapM fromMapnik =<< Rule.getSymbolizers r
+    hasElse                 <- Just <$> Rule.hasElseFilter r
+    hasAlso                 <- Just <$> Rule.hasAlsoFilter r
     return Mapnik.Rule {..}
 
 
@@ -89,6 +91,10 @@ instance FromMapnik Style where
     opacity             <- Just <$> Style.getOpacity s
     imageFiltersInflate <- Just <$> Style.getImageFiltersInflate s
     rules               <- mapM fromMapnik =<< Style.getRules s
+    compOp              <- Style.getCompOp s
+    filterMode          <- Style.getFilterMode s
+    filters             <- Style.getFilters s
+    directFilters       <- Style.getDirectFilters s
     return Mapnik.Style{..}
 
 instance FromMapnik Datasource where

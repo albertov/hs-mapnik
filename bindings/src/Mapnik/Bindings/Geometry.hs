@@ -83,7 +83,7 @@ instance IsString Geometry where
   fromString = fromMaybe (error "Invalid WKT geometry") . fromWkt . fromString
 
 toWkb :: Geometry -> ByteString
-toWkb _TODO = undefined
+toWkb aTODO = undefined
 
 toWkt :: Geometry -> ByteString
 toWkt g = unsafePerformIO $ newByteString $ \(p, len) ->

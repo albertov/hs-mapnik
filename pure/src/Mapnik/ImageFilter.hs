@@ -17,6 +17,7 @@ import Mapnik.Util
 import Mapnik.Color (Color, colorParser)
 import qualified Mapnik.Color as Color
 
+import Control.Applicative (optional)
 import Data.Monoid
 import Data.List
 import Data.Text (Text)
@@ -29,7 +30,7 @@ import qualified Data.Text.Lazy.Builder.Int as B
 import qualified Data.Text.Lazy.Builder.RealFloat as B
 
 
-data ColorStop = ColorStop Color Double
+data ColorStop = ColorStop Color (Maybe Double)
   deriving (Eq, Show, Generic)
 deriveMapnikJSON ''ColorStop
 
@@ -48,13 +49,13 @@ data ImageFilter
   | ColorBlindTritanope
   | AggStackBlur Int Int
   | ColorToAlpha Color
-  | ScaleHsla Double Double Double Double Double Double
+  | ScaleHsla Double Double Double Double Double Double Double Double
   | ColorizeAlpha [ColorStop]
   deriving (Eq, Show, Generic)
 deriveMapnikJSON ''ImageFilter
 
 parseMany :: Text -> Either String [ImageFilter]
-parseMany = parseOnly (imageFilterParser `sepBy` space <* endOfInput)
+parseMany = parseOnly (imageFilterParser `sepBy` (optional space) <* endOfInput)
 
 parse :: Text -> Either String ImageFilter
 parse = parseOnly (imageFilterParser <* endOfInput)
@@ -78,14 +79,14 @@ imageFilterParser = choice [
       pure (AggStackBlur rx ry)
       )
   , "scale-hsla" *> bracketed (do
-      [a,b,c,d,e,f] <- sepByCommas (signed double)
-      pure (ScaleHsla a b c d e f)
+      [a,b,c,d,e,f,g,h] <- sepByCommas (signed cppDouble)
+      pure (ScaleHsla a b c d e f g h)
       )
   , "color-to-alpha" *> (ColorToAlpha <$> bracketed (stripWs colorParser))
   , "colorize-alpha" *> (ColorizeAlpha <$> bracketed (sepByCommas stopParser))
   ]
   where
-    stopParser = ColorStop <$> colorParser <*> (skipSpace *> signed double)
+    stopParser = ColorStop <$> colorParser <*> optional (skipSpace *> signed cppDouble)
 
 
 toText :: ImageFilter -> Text
@@ -105,14 +106,15 @@ toText (AggStackBlur a b) = toStrict $ toLazyText $
   "agg-stack-blur(" <> B.decimal a <> ", " <> B.decimal b <> ")"
 toText (ColorToAlpha a) = toStrict $ toLazyText $
   "color-to-alpha(" <> B.fromText (Color.toText a) <> ")"
-toText (ScaleHsla a b c d e f) = toStrict $ toLazyText $ (mconcat $
+toText (ScaleHsla a b c d e f g h) = toStrict $ toLazyText $ (mconcat $
   "scale-hsla(" : intersperse ", " nums) <> ")"
-  where nums = map (B.formatRealFloat B.Fixed Nothing) [a,b,c,d,e,f]
+  where nums = map (B.formatRealFloat B.Fixed Nothing) [a,b,c,d,e,f,g,h]
 toText (ColorizeAlpha stops) = toStrict $ toLazyText $ (mconcat $
   "colorize-alpha(" : intersperse ", " (map strStop stops)) <> ")"
   where
     strStop (ColorStop c o) =
-      B.fromText (Color.toText c) <> " " <> B.formatRealFloat B.Fixed Nothing o
+         B.fromText (Color.toText c)
+      <> maybe "" ((" " <>) . B.formatRealFloat B.Fixed Nothing) o
 
 toTextMany :: [ImageFilter] -> Text
 toTextMany = T.intercalate " " . map toText

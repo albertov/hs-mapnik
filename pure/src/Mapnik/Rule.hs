@@ -17,6 +17,8 @@ data Rule = Rule
   { name                    :: !(Maybe Text)
   , symbolizers             :: ![Symbolizer]
   , filter                  :: !(Maybe Expression)
+  , hasElse                 :: !(Maybe Bool)
+  , hasAlso                 :: !(Maybe Bool)
   , minimumScaleDenominator :: !(Maybe Double)
   , maximumScaleDenominator :: !(Maybe Double)
   } deriving (Eq, Show, Generic, Default)

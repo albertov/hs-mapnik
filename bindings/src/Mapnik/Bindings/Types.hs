@@ -54,8 +54,10 @@ module Mapnik.Bindings.Types (
 , mapnikCtx
 ) where
 
-import           Mapnik (Color, Dash(..), GroupRule, Box, Value)
-import           Mapnik.Lens (HasRed(..), HasBlue(..), HasGreen(..), HasAlpha(..))
+import           Mapnik ( Color, Dash(..), GroupRule, Box, Value
+                        , PathExpression)
+import           Mapnik.Lens ( HasRed(..), HasBlue(..), HasGreen(..)
+                              , HasAlpha(..))
 
 import           Control.Lens (lens)
 import           Control.Exception
@@ -120,6 +122,7 @@ type MapnikInt = C.CInt
 data MapnikError = ConfigError String
                  | FromMapnikError String
                  | CppStdException String
+                 | InternalError String
   deriving (Eq, Ord, Show, Typeable, Exception)
 
 data Pair = Pair { x, y :: !Double }
@@ -158,6 +161,7 @@ mapnikCtx = C.baseCtx <> C.cppCtx <> C.bsCtx <> C.fptrCtx <> C.funCtx <> C.vecCt
       , (C.TypeName "symbolizer", [t| Symbolizer |])
       , (C.TypeName "symbolizer_base", [t| SymbolizerBase |])
       , (C.TypeName "expression_ptr", [t| Expression |])
+      , (C.TypeName "path_expression_ptr", [t| Mapnik.PathExpression |])
       , (C.TypeName "transform_type", [t| Transform |])
       , (C.TypeName "keys", [t| C.CUChar |])
       , (C.TypeName "value_type", [t| C.CInt |])

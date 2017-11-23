@@ -55,6 +55,7 @@ library
                      , vector
                      , lens
                      , template-haskell
+                     , filepath
   default-language:    Haskell2010
   ghc-options:         -Wall -optc-g -funbox-strict-fields
 

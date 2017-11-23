@@ -69,12 +69,17 @@ arbitraryRule fontMap = do
   name                      <- maybeArb arbitrary
   symbolizers               <- resize 5 (listOf (arbitrarySymbolizer fontMap))
   filter                    <- arbitrary
+  hasElse                   <- arbitrary
+  hasAlso                   <- arbitrary
   ( minimumScaleDenominator
    ,maximumScaleDenominator) <- arbitraryMinMaxScaleDenom
   pure Rule{..}
 
 instance Arbitrary Expression where
   arbitrary = elements ["[GEONAME]", "[SCALE_CAT]"] --TODO
+
+instance Arbitrary PathExpression where
+  arbitrary = elements ["/foo/[BAR].gif", "[SCALE_CAT]"] --TODO
 
 
 instance Arbitrary Transform where
@@ -102,6 +107,7 @@ instance Arbitrary ImageFilter where
         , AggStackBlur <$> arbitrary <*> arbitrary
         , ColorToAlpha <$> arbitrary
         , ScaleHsla <$> arbitrary <*> arbitrary
+                    <*> arbitrary <*> arbitrary
                     <*> arbitrary <*> arbitrary
                     <*> arbitrary <*> arbitrary
         , ColorizeAlpha <$> arbitrary
@@ -395,6 +401,7 @@ instance Arbitrary Colorizer where
     mode   <- arbitrary
     color  <- arbitrary
     stops  <- arbitrary
+    epsilon  <- arbitrary
     pure Colorizer{..}
 
 instance Arbitrary Stop where
@@ -504,6 +511,7 @@ arbitraryFormat fontMap = oneof
   arbitraryF n = do
     font             <- maybeArb (arbitraryFont fontMap)
     textSize         <- arbitrary
+    opacity          <- arbitrary
     characterSpacing <- arbitrary
     lineSpacing      <- arbitrary
     wrapBefore       <- arbitrary

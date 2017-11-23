@@ -25,6 +25,7 @@ import           Control.Monad
 import           Data.HashMap.Strict (toList)
 import qualified GHC.Exts as Exts
 import           Prelude hiding (filter)
+import           System.FilePath ((</>))
 
 class ToMapnik a where
   type MapnikType a :: *
@@ -42,10 +43,11 @@ instance ToMapnik Mapnik.Map where
     forM_ srs                    (Map.setSrs m')
     forM_ bufferSize             (Map.setBufferSize m')
     forM_ maximumExtent          (Map.setMaxExtent m')
-    forM_ fontDirectory          (setAndRegisterFontDirectory m')
+    forM_ fontDirectory          (setAndRegisterFontDirectory basePath m')
     forM_ basePath               (Map.setBasePath m')
     forM_ layers                 (addLayer m' <=< toMapnik)
-    forM_ (toList styles)        (\(k,v) -> insertStyle m' k =<< toMapnikStyle fontSets v)
+    forM_ (toList styles)        (\(k,v) -> insertStyle m' k
+                                  =<< toMapnikStyle fontSets v)
     forM_ (toList fontSets)      (uncurry (insertFontSet m'))
     setExtraParameters m'        (paramsFromMap parameters)
     return m'
@@ -56,21 +58,30 @@ instance ToMapnik Mapnik.Map where
       forM_ opacity             (Style.setOpacity s)
       forM_ imageFiltersInflate (Style.setImageFiltersInflate s)
       forM_ rules               (addRule s <=< toMapnikRule fontMap)
+      Style.setFilters s filters
+      Style.setDirectFilters s directFilters
+      forM_ compOp              (Style.setCompOp s)
+      forM_ filterMode          (Style.setFilterMode s)
       return s
 
     toMapnikRule fontMap Mapnik.Rule {..} = do
       r <- Rule.create
       forM_ name                    (Rule.setName r)
       forM_ filter                  (Rule.setFilter r <=< toMapnik)
+      forM_ hasElse                 (Rule.setElse r)
+      forM_ hasAlso                 (Rule.setAlso r)
       forM_ minimumScaleDenominator (Rule.setMinScale r)
       forM_ maximumScaleDenominator (Rule.setMaxScale r)
       forM_ symbolizers             (appendSymbolizer r <=< Symbolizer.create fontMap)
       return r
 
-    setAndRegisterFontDirectory m d = do
+    setAndRegisterFontDirectory mBase m d = do
       Map.setFontDirectory m d
-      ok <- Map.registerFonts m d
+      ok <- Map.registerFonts m (ensureRelative mBase d)
       unless ok (throwIO (ConfigError ("Could not register fonts at " ++ show d)))
+
+    ensureRelative Nothing s = s
+    ensureRelative (Just b) s = b </> s
 
 instance ToMapnik Mapnik.Layer where
   type MapnikType Mapnik.Layer = Layer
