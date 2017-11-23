@@ -33,6 +33,7 @@ import           Data.IORef
 import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
 import           Foreign.ForeignPtr (FinalizerPtr)
+import           Foreign.Storable (poke)
 import           Foreign.Ptr (Ptr)
 
 C.context mapnikCtx
@@ -94,7 +95,7 @@ getSymbolizers r = do
   symsRef <- newIORef []
   let callback :: Ptr Symbolizer -> IO ()
       callback ptr = do
-        sym <- Symbolizer.unsafeNew ptr
+        sym <- Symbolizer.unsafeNew (flip poke ptr)
         modifyIORef' symsRef (sym:)
   [C.safeBlock|void {
   for (rule::symbolizers::const_iterator it=$fptr-ptr:(rule *r)->begin(); it!=$fptr-ptr:(rule *r)->end(); ++it) {

@@ -45,7 +45,7 @@ import           Control.Applicative
 import           Control.Exception.Lifted
 import           Control.Lens hiding (has)
 import           Control.Monad
-import           Control.Monad.Base (MonadBase, liftBase)
+import           Control.Monad.Base (liftBase)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Control.Monad.Reader
 import           Data.Coerce
@@ -108,18 +108,21 @@ C.using "string = const std::string"
 
 foreign import ccall "&hs_mapnik_destroy_Symbolizer" destroySymbolizer :: FinalizerPtr Symbolizer
 
-unsafeNew :: MonadBase IO m => Ptr Symbolizer -> m Symbolizer
-unsafeNew = fmap Symbolizer . liftBase . newForeignPtr destroySymbolizer
 
 create :: Mapnik.FontSetMap -> Mapnik.Symbolizer -> IO Symbolizer
 create m = flip runReaderT m . create'
+
+unsafeNew :: MonadBaseControl IO m
+          => (Ptr (Ptr Symbolizer) -> m ()) -> m Symbolizer
+unsafeNew = mkUnsafeNew Symbolizer destroySymbolizer
 
 type SvM = VariantM SymbolizerValue
 
 create' :: Mapnik.Symbolizer -> SvM Symbolizer
 create' sym = bracket alloc dealloc $ \p -> do
   mapM_ (`setProperty` p) (sym^.symbolizerProps)
-  unsafeNew =<< toSym p
+  unsafeNew $ \ret ->
+    toSym p >>= liftBase . poke ret
   where
     dealloc p = [C.block|void { delete $(symbolizer_base *p);}|]
     alloc = case sym of
@@ -743,15 +746,15 @@ keyIndex FfSettings = [C.pure|keys{keys::ff_settings}|]
 foreign import ccall "&hs_mapnik_destroy_TextPlacements" destroyTextPlacements :: FinalizerPtr TextPlacements
 
 createTextPlacements :: Mapnik.TextPlacements -> SvM TextPlacements
-createTextPlacements (Mapnik.Dummy defs) = unsafeNew $ \p -> do
+createTextPlacements (Mapnik.Dummy defs) = unsafeNew' $ \p -> do
   defaults <- createTextSymProps defs
   [C.block|void {
-    auto placements = std::make_shared<text_placements_dummy>();
+    auto placements = new text_placements_dummy;
     *$(text_placements_ptr **p) = new text_placements_ptr(placements);
     placements->defaults = *$fptr-ptr:(text_symbolizer_properties *defaults);
   }|]
   where
-    unsafeNew = mkUnsafeNew TextPlacements destroyTextPlacements
+    unsafeNew' = mkUnsafeNew TextPlacements destroyTextPlacements
 
 
 
@@ -769,7 +772,7 @@ unCreateTextPlacements p =
 
 instance Variant SymbolizerValue Mapnik.TextPlacements where
   peekV p = unCreateTextPlacements =<<
-    justOrTypeError "TextPlacements" (unsafeNewMaybe $ \ret ->
+    justOrTypeError "TextPlacements" (unsafeNewMaybe' $ \ret ->
       [C.block|void {
       try {
         *$(text_placements_ptr **ret) =
@@ -779,7 +782,7 @@ instance Variant SymbolizerValue Mapnik.TextPlacements where
       }
       }|])
     where
-      unsafeNewMaybe = mkUnsafeNewMaybe TextPlacements destroyTextPlacements
+      unsafeNewMaybe' = mkUnsafeNewMaybe TextPlacements destroyTextPlacements
   pokeV p v' = do
     v <- createTextPlacements v'
     [C.block|void { *$(sym_value_type *p) = sym_value_type(*$fptr-ptr:(text_placements_ptr *v)); }|]
@@ -807,16 +810,15 @@ createFormat f = unsafeNewFormat $ \p -> case f of
     case Expression.parse e' of
       Right e ->
         [C.block|void {
-        auto node = std::make_shared<text_node>(*$fptr-ptr:(expression_ptr *e));
-        *$(node_ptr **p) = new node_ptr(node);
+        *$(node_ptr **p) =
+          new node_ptr(new text_node(*$fptr-ptr:(expression_ptr *e)));
         }|]
       Left e -> throwIO (ConfigError ("Could not parse format expression" ++ e))
   Mapnik.NullFormat ->
     [C.block|void { *$(node_ptr **p) = new node_ptr(nullptr); }|]
   Mapnik.FormatList fs -> do
     [C.block|void {
-    auto node = std::make_shared<list_node>();
-    *$(node_ptr **p) = new node_ptr(node);
+    *$(node_ptr **p) = new node_ptr(new list_node);
     }|]
     forM_ fs $ \f' -> do
       f'' <- createFormat f'
@@ -827,9 +829,9 @@ createFormat f = unsafeNewFormat $ \p -> case f of
   Mapnik.Format {..} -> do
     next' <- createFormat next
     [C.block|void {
-    auto node = std::make_shared<format_node>();
-    node->set_child(*$fptr-ptr:(node_ptr *next'));
+    auto node = new format_node;
     *$(node_ptr **p) = new node_ptr(node);
+    node->set_child(*$fptr-ptr:(node_ptr *next'));
     }|]
     forM_ font $ \case
       Mapnik.FaceName (encodeUtf8 -> v) ->
@@ -861,7 +863,7 @@ createFormat f = unsafeNewFormat $ \p -> case f of
   Mapnik.FormatLayout {..} -> do
     next' <- createFormat next
     [C.block|void {
-    auto node = std::make_shared<layout_node>();
+    auto node = new layout_node();
     node->set_child(*$fptr-ptr:(node_ptr *next'));
     *$(node_ptr **p) = new node_ptr(node);
     }|]
@@ -1462,7 +1464,7 @@ instance Variant SymbolizerValue Mapnik.DashArray where
       *$(sym_value_type *p) = sym_value_type(dashes);
     }|]
 
-  peekV p = liftBase $ do
+  peekV p = liftBase $ mask_ $ do
     (fromIntegral -> len, castPtr -> ptr) <- C.withPtrs_ $ \(len,ptr) ->
       [C.block|void{
       try {
@@ -1533,8 +1535,8 @@ unsafeNewGroupSymProperties = mkUnsafeNew GroupSymProperties destroyGroupSymProp
 createGroupSymProperties :: Mapnik.GroupSymProperties -> SvM GroupSymProperties
 createGroupSymProperties Mapnik.GroupSymProperties{..} = unsafeNewGroupSymProperties $ \p -> do
   [C.block|void{
-    auto ret = std::make_shared<group_symbolizer_properties>();
-    *$(group_symbolizer_properties_ptr **p) = new group_symbolizer_properties_ptr(ret);
+    *$(group_symbolizer_properties_ptr **p) =
+      new group_symbolizer_properties_ptr(new group_symbolizer_properties);
     }|]
   case layout of
     Mapnik.SimpleRowLayout (realToFrac . fromMaybe defaultSimpleMargin -> margin) ->
@@ -1556,7 +1558,7 @@ createGroupSymProperties Mapnik.GroupSymProperties{..} = unsafeNewGroupSymProper
 
 withGroupRule :: Mapnik.GroupRule -> (Ptr Mapnik.GroupRule -> SvM a) -> SvM a
 withGroupRule Mapnik.GroupRule{..} f = bracket alloc dealloc enter where
-  alloc = [C.exp|group_rule_ptr * { new group_rule_ptr(std::make_shared<group_rule>()) }|]
+  alloc = [C.exp|group_rule_ptr * { new group_rule_ptr(new group_rule) }|]
   dealloc p = [C.exp|void { delete $(group_rule_ptr *p) }|]
   enter p = do
     forM_ filter $ \(Mapnik.Expression e) ->  case Expression.parse e of
@@ -1605,7 +1607,7 @@ peekGroupRule p = do
     }|]
   symsRef <- newIORef []
   let cb :: Ptr Symbolizer -> IO ()
-      cb p = do s <- unsafeNew p
+      cb p = do s <- mkUnsafeNew Symbolizer destroySymbolizer (flip poke p)
                 modifyIORef' symsRef (s:)
   [C.safeBlock|void {
     auto const r = *$(group_rule_ptr *p);

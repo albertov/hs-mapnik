@@ -16,10 +16,9 @@ module Mapnik.Bindings.Image (
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import qualified Mapnik.Bindings.Cpp as C
-import           Control.Monad ((<=<))
 import           Data.ByteString (ByteString)
 import           Data.String (fromString)
-import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
+import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
 import qualified Data.Vector.Storable as V
 import qualified Data.Vector.Storable.Mutable as MV
@@ -44,7 +43,7 @@ C.using "pixel_rgba8 = std::uint32_t"
 foreign import ccall "&hs_mapnik_destroy_Image" destroyImage :: FinalizerPtr Image
 
 unsafeNew :: (Ptr (Ptr Image) -> IO ()) -> IO Image
-unsafeNew = fmap Image . newForeignPtr destroyImage <=< C.withPtr_
+unsafeNew = mkUnsafeNew Image destroyImage
 
 
 --TODO: Format should not be stringly typed so we can change signature to:

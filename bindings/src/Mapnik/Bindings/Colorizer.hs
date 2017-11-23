@@ -21,7 +21,7 @@ import           Foreign.ForeignPtr (FinalizerPtr, withForeignPtr)
 import           Foreign.Marshal.Utils (with)
 import           Foreign.Ptr (Ptr, nullPtr)
 
-import           Control.Exception (bracket)
+import           Control.Exception (bracket, mask_)
 import           Control.Monad (forM_)
 import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
 import           Data.Text.Encoding (encodeUtf8)
@@ -49,9 +49,7 @@ unsafeNewColorizer = mkUnsafeNew Colorizer destroyColorizer
 createColorizer :: Mapnik.Colorizer -> IO Colorizer
 createColorizer Mapnik.Colorizer{..} = unsafeNewColorizer $ \p -> do
   ret <- C.withPtr_ $ \ret -> [C.block|void {
-    *$(raster_colorizer_ptr **p) = new raster_colorizer_ptr(
-      std::make_shared<raster_colorizer>()
-      );
+    *$(raster_colorizer_ptr **p) = new raster_colorizer_ptr(new raster_colorizer);
     *$(void **ret) = (*$(raster_colorizer_ptr **p))->get();
   }|]
   forM_ mode $ \(fromIntegral . fromEnum -> m) ->
@@ -104,7 +102,7 @@ withStop Mapnik.Stop
       fun p
 
 unCreateStop :: Ptr Stop -> IO Mapnik.Stop
-unCreateStop p = do
+unCreateStop p = mask_ $ do
   (  realToFrac -> value
    , colorPtr
    , mMode

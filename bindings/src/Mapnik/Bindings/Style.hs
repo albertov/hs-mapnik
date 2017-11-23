@@ -31,10 +31,9 @@ import qualified Mapnik.Bindings.Rule as Rule
 import qualified Mapnik.Bindings.Cpp as C
 
 import           Control.Exception
-import           Control.Monad ((<=<))
 import           Data.IORef
 import           Data.Text.Encoding (encodeUtf8)
-import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
+import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
 import           Foreign.Storable (poke)
 
@@ -56,7 +55,7 @@ C.using "namespace mapnik"
 foreign import ccall "&hs_mapnik_destroy_Style" destroyStyle :: FinalizerPtr Style
 
 unsafeNew :: (Ptr (Ptr Style) -> IO ()) -> IO Style
-unsafeNew = fmap Style . newForeignPtr destroyStyle <=< C.withPtr_
+unsafeNew = mkUnsafeNew Style destroyStyle
 
 create :: IO Style
 create  = unsafeNew $ \p ->

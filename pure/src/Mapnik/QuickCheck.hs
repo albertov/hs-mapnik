@@ -57,8 +57,8 @@ arbitraryStyle :: FontSetMap -> Gen Style
 arbitraryStyle fontMap = do
   opacity             <- arbitrary
   imageFiltersInflate <- arbitrary
-  filters             <- arbitrary
-  directFilters       <- arbitrary
+  filters             <- scale (min 5) arbitrary
+  directFilters       <- scale (min 5) arbitrary
   filterMode          <- arbitrary
   compOp              <- arbitrary
   rules               <- listOf (arbitraryRule fontMap)
@@ -67,7 +67,7 @@ arbitraryStyle fontMap = do
 arbitraryRule :: FontSetMap -> Gen Rule
 arbitraryRule fontMap = do
   name                      <- maybeArb arbitrary
-  symbolizers               <- resize 5 (listOf (arbitrarySymbolizer fontMap))
+  symbolizers               <- scale (min 5) (listOf (arbitrarySymbolizer fontMap))
   filter                    <- arbitrary
   hasElse                   <- arbitrary
   hasAlso                   <- arbitrary
@@ -110,7 +110,7 @@ instance Arbitrary ImageFilter where
                     <*> arbitrary <*> arbitrary
                     <*> arbitrary <*> arbitrary
                     <*> arbitrary <*> arbitrary
-        , ColorizeAlpha <$> arbitrary
+        , ColorizeAlpha <$> scale (min 10) arbitrary
         ]
 
 instance Arbitrary ColorStop where

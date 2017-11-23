@@ -62,7 +62,7 @@ import           Data.List (sortBy)
 import           Data.Function (on)
 import           Data.Text.Encoding (encodeUtf8)
 import           Data.IORef
-import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
+import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Ptr (Ptr)
 import           Foreign.C.String (CString)
 import           Foreign.Marshal.Utils (with)
@@ -130,7 +130,8 @@ paramsFromMap ps = unsafePerformIO $ do
   return p
 
 emptyValues :: IO Parameters
-emptyValues = fmap Parameters . newForeignPtr destroyParameters =<< [C.exp|parameters *{ new parameters }|]
+emptyValues = mkUnsafeNew Parameters destroyParameters $ \p ->
+  [C.exp|void { *$(parameters **p) = new parameters }|]
 
 paramsToMap :: Parameters -> Mapnik.Parameters
 paramsToMap p = unsafePerformIO $ do
@@ -243,15 +244,14 @@ createHsDatasource HsVector{..} = with _extent $ \e -> unsafeNew $ \ ptr -> do
   fs <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> Ptr QueryPtr -> IO (Ptr ())|]) getFeatures'
   fsp <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO (Ptr ())|]) getFeaturesAtPoint'
   [C.block|void {
-  datasource_ptr p = std::make_shared<hs_datasource>(
+  *$(datasource_ptr** ptr) = new datasource_ptr(new hs_datasource(
     "hs_vector_layer",                 //TODO
     datasource::Vector,                //TODO
     datasource_geometry_t::Collection, //TODO
     *$(bbox *e),
     $(features_callback fs),
     $(features_at_point_callback fsp)
-    );
-  *$(datasource_ptr** ptr) = new datasource_ptr(p);
+    ));
   }|]
   forM_ fieldNames $ \(encodeUtf8 -> v) ->
     [C.block|void {
@@ -271,15 +271,14 @@ createHsDatasource HsRaster{..} = with _extent $ \e -> unsafeNew $ \ ptr -> do
   fs <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> Ptr QueryPtr -> IO (Ptr ())|]) getFeatures'
   fsp <- $(C.mkFunPtr [t|Ptr FeatureCtx -> Ptr FeatureList -> C.CDouble -> C.CDouble -> C.CDouble -> IO (Ptr ())|]) getFeaturesAtPoint'
   [C.block|void {
-  datasource_ptr p = std::make_shared<hs_datasource>(
+  *$(datasource_ptr** ptr) = new datasource_ptr(new hs_datasource(
     "hs_raster_layer",                 //TODO
     datasource::Raster,                //TODO
     boost::optional<mapnik::datasource_geometry_t>(),
     *$(bbox *e),
     $(features_callback fs),
     $(features_at_point_callback fsp)
-    );
-  *$(datasource_ptr** ptr) = new datasource_ptr(p);
+    ));
   }|]
   forM_ fieldNames $ \(encodeUtf8 -> v) ->
     [C.block|void {

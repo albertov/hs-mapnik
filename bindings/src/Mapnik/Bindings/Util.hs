@@ -5,9 +5,9 @@ module Mapnik.Bindings.Util where
 
 import qualified Mapnik.Bindings.Cpp as C
 
-import           Control.Monad ((<=<))
+import           Control.Monad
 import           Control.Monad.Base (MonadBase(..))
-import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Control.Monad.Trans.Control
 import           Control.Exception.Lifted
 import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
 import           Data.ByteString (ByteString)
@@ -15,7 +15,8 @@ import           Data.Text (Text)
 import           Data.Text.Encoding (decodeUtf8')
 import           Foreign.Ptr (Ptr, nullPtr)
 import           Foreign.ForeignPtr (ForeignPtr, FinalizerPtr, newForeignPtr)
-import           Foreign.Storable (Storable)
+import           Foreign.Storable
+import           Foreign.Marshal.Alloc (alloca)
 import           Foreign.StablePtr
 import           Foreign.C.String (CString)
 
@@ -36,7 +37,7 @@ newByteString =
 
 newByteStringMaybe :: MonadBaseControl IO m
   => ((Ptr CString, Ptr C.CInt) -> m ()) -> m (Maybe ByteString)
-newByteStringMaybe fun = do
+newByteStringMaybe fun = mask_ $ do
   (ptr,len) <- C.withPtrs_ fun
   if ptr == nullPtr then return Nothing else
     Just <$> liftBase (unsafePackMallocCStringLen (ptr, fromIntegral len))
@@ -50,9 +51,24 @@ mkUnsafeNewMaybe
   :: MonadBaseControl IO m
   => (ForeignPtr a -> c) -> FinalizerPtr a -> (Ptr (Ptr a) -> m ()) -> m (Maybe c)
 mkUnsafeNewMaybe ctor dtor fun = do
-  ptr <- C.withPtr_ fun
-  if ptr == nullPtr then return Nothing else
-    Just . ctor <$> liftBase (newForeignPtr dtor ptr)
+  liftBaseOp alloca $ \pptr -> do
+    liftBase (poke pptr nullPtr)
+    -- We mask so we dont' leak memory on async exceptions
+    (mask_ $ do
+      fun pptr
+      liftBase $ do
+        ptr <- peek pptr
+        if ptr == nullPtr then return Nothing else
+          Just . ctor <$> newForeignPtr dtor ptr
+      )
+      `onException`
+      -- If the pointer has been poked before throwing exception
+      -- we need to free it or we'll leak memory
+      (liftBase $ do ptr <- peek pptr
+                     when (ptr/=nullPtr) (mkFinalizer dtor ptr))
+
+foreign import ccall "dynamic"
+   mkFinalizer :: FinalizerPtr a -> Ptr a -> IO ()
 
 newMaybe :: (MonadBaseControl IO m, Storable a)
   => ((Ptr C.CInt, Ptr a) -> m ()) -> m (Maybe a)

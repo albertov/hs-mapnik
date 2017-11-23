@@ -39,6 +39,8 @@ import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Orphans()
 import qualified Mapnik.Bindings.Datasource as Datasource
+
+import           Control.Exception (mask_)
 import           Data.IORef
 import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
@@ -83,7 +85,7 @@ getStyles :: Layer -> IO [StyleName]
 getStyles l = do
   stylesRef <- newIORef []
   let callback :: CString -> C.CInt -> IO ()
-      callback ptr (fromIntegral -> len) = do
+      callback ptr (fromIntegral -> len) = mask_ $ do
         styleName <- unsafePackMallocCStringLen (ptr, len)
         modifyIORef' stylesRef (styleName:)
   [C.safeBlock|void {

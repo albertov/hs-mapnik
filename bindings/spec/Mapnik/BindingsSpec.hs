@@ -358,7 +358,7 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
             -- ^ we need to make sure the datasource exists or loadMap will barf
             . setExistingFontDir
             -- ^ we need to make sure the font dir exists or toMapnik(Map) will barf
-            --
+
       prop "fromMapnik <=< toMapnik = return" $ \(cleanupMap -> a) -> do
         -- We can't really compare equality here because we need to account for
         -- the default values. Instead of re-implementing mapnik's logic we
@@ -373,6 +373,7 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
                         else fontSets .~ mempty
         swallowExceptions $
           flip render opts =<< toMapnik (dirtyMap a)
+
 
       prop "render preserves Map observable configuration" $ \opts -> do
         m <- fromFixture
@@ -429,8 +430,8 @@ cppStdException _ = False
 
 instance Arbitrary RenderSettings where
   arbitrary = do
-    _renderSettingsWidth <- choose (1, 100)
-    _renderSettingsHeight <- choose (1, 100)
+    _renderSettingsWidth <- choose (5, 100) -- FIXME MAPNIK Smaller than 5 and it will double free end agg_renderer!
+    _renderSettingsHeight <- choose (5, 100)-- FIXME MAPNIK Smaller than 5 and it will double free end agg_renderer!
     _renderSettingsExtent <- oneof [arbitrary, pure aBox]
     _renderSettingsVariables <- arbitrary
     _renderSettingsScaleFactor <- getPositive <$> arbitrary

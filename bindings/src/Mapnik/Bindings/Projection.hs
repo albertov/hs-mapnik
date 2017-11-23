@@ -13,13 +13,14 @@ module Mapnik.Bindings.Projection (
 ) where
 
 import           Mapnik (Proj4)
+import           Mapnik.Bindings.Util
 import           Mapnik.Bindings.Types
 import qualified Mapnik.Bindings.Cpp as C
 import           Mapnik.Bindings.Orphans()
 
 import           Control.Exception (try)
 import           Data.Text.Encoding (encodeUtf8)
-import           Foreign.ForeignPtr (FinalizerPtr, newForeignPtr)
+import           Foreign.ForeignPtr (FinalizerPtr)
 import           Foreign.Marshal.Utils (with)
 
 
@@ -42,12 +43,11 @@ C.using "bbox = box2d<double>"
 foreign import ccall "&hs_mapnik_destroy_ProjTransform" destroyProjTransform :: FinalizerPtr ProjTransform
 
 projTransform :: Proj4 -> Proj4 -> Either String ProjTransform
-projTransform (encodeUtf8->src) (encodeUtf8->dst) = unsafePerformIO $ fmap showExc $ try $ do
-  ptr <- C.withPtr_ $ \ptr ->
-    [C.catchBlock|
-    *$(hs_proj_transform **ptr) = new hs_proj_transform($bs-ptr:src, $bs-ptr:dst);
-    |]
-  ProjTransform <$> newForeignPtr destroyProjTransform ptr
+projTransform (encodeUtf8->src) (encodeUtf8->dst) = unsafePerformIO $ fmap showExc $ try $ mkUnsafeNew ProjTransform destroyProjTransform $ \ptr ->
+  [C.catchBlock|
+  *$(hs_proj_transform **ptr) =
+    new hs_proj_transform($bs-ptr:src, $bs-ptr:dst);
+  |]
   where
     showExc = either (Left . show @MapnikError) Right
 

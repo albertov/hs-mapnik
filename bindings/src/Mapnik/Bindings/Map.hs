@@ -60,6 +60,7 @@ import           Mapnik.Bindings.Symbolizer (withFontSet)
 import           Mapnik.Bindings.Datasource (unsafeNewParameters)
 import qualified Mapnik.Bindings.Cpp as C
 
+import           Control.Exception (mask_)
 import           Data.IORef
 import           Data.String (fromString)
 import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
@@ -288,7 +289,7 @@ getStyles :: Map -> IO [(StyleName,Style)]
 getStyles m = do
   stylesRef <- newIORef []
   let callback :: CString -> C.CInt -> Ptr Style -> IO ()
-      callback ptr (fromIntegral -> len) ptrStyle = do
+      callback ptr (fromIntegral -> len) ptrStyle = mask_ $ do
         style <- Style.unsafeNew (`poke` ptrStyle)
         styleName <- unsafePackMallocCStringLen (ptr, len)
         modifyIORef' stylesRef ((styleName,style):)
