@@ -23,10 +23,11 @@ module Mapnik.Bindings.Datasource (
 , unsafeNew
 , unsafeNewMaybe
 , getParameters
+, unsafeNewParameters
 , create
 , createHsDatasource
-, paramsFromList
-, paramsToList
+, paramsFromMap
+, paramsToMap
 , features
 , featuresAtPoint
 , queryBox
@@ -39,6 +40,7 @@ module Mapnik.Bindings.Datasource (
 , module X
 ) where
 
+import qualified Mapnik
 import           Mapnik.Lens
 import           Mapnik.Parameter as X (Value(..), Parameter, (.=))
 import           Mapnik.Bindings.Types
@@ -103,25 +105,24 @@ create params = unsafeNew $ \ ptr ->
 
 
 
-unsafeNewValues :: (Ptr (Ptr Parameters) -> IO ()) -> IO Parameters
-unsafeNewValues = mkUnsafeNew Parameters destroyParameters
-
+unsafeNewParameters :: (Ptr (Ptr Parameters) -> IO ()) -> IO Parameters
+unsafeNewParameters = mkUnsafeNew Parameters destroyParameters
 
 getParameters :: Datasource -> IO Parameters
-getParameters ds = unsafeNewValues $ \ ptr ->
+getParameters ds = unsafeNewParameters $ \ ptr ->
   [C.block|void{
   *$(parameters** ptr) = new parameters((*$fptr-ptr:(datasource_ptr *ds))->params());
   }|]
 
 instance Exts.IsList Parameters where
   type Item Parameters = Parameter
-  fromList = paramsFromList
-  toList = paramsToList
+  fromList = paramsFromMap . Exts.fromList
+  toList = Exts.toList . paramsToMap
 
-paramsFromList :: [(Text,Value)] -> Parameters
-paramsFromList ps = unsafePerformIO $ do
+paramsFromMap :: Mapnik.Parameters -> Parameters
+paramsFromMap ps = unsafePerformIO $ do
   p <- emptyValues
-  forM_ ps $ \(encodeUtf8 -> k, val) -> withV val $ \v ->
+  forM_ (M.toList ps) $ \(encodeUtf8 -> k, val) -> withV val $ \v ->
     [C.block|void {
       std::string k($bs-ptr:k, $bs-len:k);
       (*$fptr-ptr:(parameters *p))[k] = *$(value_holder *v);
@@ -131,8 +132,8 @@ paramsFromList ps = unsafePerformIO $ do
 emptyValues :: IO Parameters
 emptyValues = fmap Parameters . newForeignPtr destroyParameters =<< [C.exp|parameters *{ new parameters }|]
 
-paramsToList :: Parameters -> [(Text,Value)]
-paramsToList p = unsafePerformIO $ do
+paramsToMap :: Parameters -> Mapnik.Parameters
+paramsToMap p = unsafePerformIO $ do
   ref <- newIORef []
   let cb :: CString -> C.CInt -> Ptr Param -> IO ()
       cb k l v = do
@@ -151,7 +152,7 @@ paramsToList p = unsafePerformIO $ do
           );
      }
   }|]
-  decodeUtf8Keys "paramsToList" =<< readIORef ref
+  M.fromList <$> (decodeUtf8Keys "paramsToMap" =<< readIORef ref)
 
 
 type FeatureSet = (Vector Text, [Feature])

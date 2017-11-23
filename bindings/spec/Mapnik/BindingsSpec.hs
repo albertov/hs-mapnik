@@ -35,6 +35,8 @@ import           Test.Hspec.QuickCheck
 import           Test.QuickCheck
 import           Test.QuickCheck.IO ()
 import           Prelude hiding (filter)
+import           System.Directory (listDirectory)
+import           System.FilePath ((</>))
 
 
 main :: IO ()
@@ -57,7 +59,7 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
       fmap isPng (serialize "png8" img) `shouldBe` Just True
 
     it "throws on broken XML" $ do
-      Map.fromXmlFile "spec/bad.xml" `shouldThrow` cppStdException
+      Map.fromXmlFile ("spec"</>"bad.xml") `shouldThrow` cppStdException
 
     it "fromMapnik map.xml returns expected values" $ do
       m <- fromMapnik =<< fromFixture
@@ -109,7 +111,7 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
       Layer.setDatasource l =<< Datasource.create
         [ "type"     .= ("shape" :: String)
         , "encoding" .= ("latin1" :: String)
-        , "file"     .= ("spec/data/popplaces" :: String)
+        , "file"     .= ("spec"</>"data"</>"popplaces")
         ]
       Map.addLayer m l
       void $ render m rSettings
@@ -118,6 +120,15 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
     it "throws on invalid size" $ do
       m <- Map.create
       render m (renderSettings (-1) (-1) aBox) `shouldThrow` cppStdException
+
+    it "can parse and serialize all mapnik test maps" $ do
+      let styleDir = "spec"</>"data"</>"visual"</>"styles"
+      maps <- listDirectory styleDir
+      forM_ maps $ \sty -> do
+        m1 <- Map.fromXmlFile (styleDir</>sty)
+        xml1 <- Map.toXml m1
+        m2 <- (toMapnik <=< fromMapnik) m1
+        Map.toXml m2 `shouldReturn` xml1
 
   describe "Projection" $ do
     it "can trasform" $ do
@@ -142,21 +153,6 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
       projTransform merc "foo" `shouldSatisfy` isLeft
 
 
-  describe "Parameters" $ do
-    it "paramsToList/paramsFromList = id" $ do
-      let params =
-            [ "type"     .= ("shape" :: String)
-            , "encoding" .= ("latin1" :: String)
-            , "aDouble"  .= (7.4 :: Double)
-            , "anInt"    .= (-45 :: Int)
-            , "aTrue"    .= True
-            , "aFalse"   .= False
-            , "aNull"    .= (Nothing :: Maybe Int)
-            , "aNullInt" .= (Just 5 :: Maybe Int)
-            , "file"     .= ("spec/data/popplaces" :: String)
-            ]
-      Datasource.paramsToList (Datasource.paramsFromList params) `shouldMatchList` params
-
   describe "Datasource" $ do
     it "throws on invalid datasource" $
       Datasource.create ["type".= ("shapes" :: String)] `shouldThrow` cppStdException
@@ -165,7 +161,7 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
       ds <- Datasource.create
             [ "type"     .= ("shape" :: String)
             , "encoding" .= ("latin1" :: String)
-            , "file"     .= ("spec/data/popplaces" :: String)
+            , "file"     .= ("spec"</>"data"</>"popplaces")
             ]
       let theBox = Box 1372637.1001942465
                        (-247003.8133187965)
@@ -333,8 +329,6 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
       e `shouldSatisfy` isLeft
 
 
-
-
   describe "property tests" $ do
     describe "Map" $ parallel $ do
       let cleanupMap
@@ -365,6 +359,10 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
         xml2 <- Map.toXml m
         xml1 `shouldBe` xml2
 
+    describe "Parameters" $ do
+      prop "paramsToList.paramsFromList = id" $ \params ->
+        (Datasource.paramsToMap . Datasource.paramsFromMap) params
+          `shouldBe` params
 
 swallowExceptions :: IO a -> IO ()
 swallowExceptions = void . try @SomeException
@@ -383,14 +381,15 @@ setExistingDatasources = layers . traverse . dataSource ?~ existingDatasource
     existingDatasource = Datasource
       [ "type"     .= ("shape" :: String)
       , "encoding" .= ("latin1" :: String)
-      , "file"     .= ("spec/data/popplaces" :: String)
+      , "file"     .= ("spec"</>"data"</>"popplaces")
       ]
 
 setExistingFontDir :: Map -> Map
-setExistingFontDir = fontDirectory ?~ "spec/data/fonts"
+setExistingFontDir =
+  fontDirectory ?~ "spec"</>"data"</>"visual"</>"fonts"</>"Awesome"
 
 fromFixture :: IO Map.Map
-fromFixture = Map.fromXmlFile "spec/map.xml"
+fromFixture = Map.fromXmlFile ("spec"</>"map.xml")
 
 transparent :: PixelRgba8
 transparent = PixelRgba8 0xFFFFFFFF

@@ -823,12 +823,26 @@ createFormat f = unsafeNewFormat $ \p -> case f of
         }|]
   Mapnik.Format {..} -> do
     next' <- createFormat next
-    --TODO Handle font
     [C.block|void {
     auto node = std::make_shared<format_node>();
     node->set_child(*$fptr-ptr:(node_ptr *next'));
     *$(node_ptr **p) = new node_ptr(node);
     }|]
+    forM_ font $ \case
+      Mapnik.FaceName (encodeUtf8 -> v) ->
+        [C.block|void {
+        auto node = dynamic_cast<format_node*>((*$(node_ptr **p))->get());
+        node->face_name = std::string($bs-ptr:v, $bs-len:v);
+        }|]
+      Mapnik.FontSetName name -> do
+        mFs <- asks (M.lookup name)
+        case mFs of
+          Just faceNames -> withFontSet name faceNames $ \fs ->
+            [C.block|void {
+            auto node = dynamic_cast<format_node*>((*$(node_ptr **p))->get());
+            node->fontset = *$(font_set *fs);
+            }|]
+          Nothing -> throwIO (ConfigError ("No fontset named " ++ show name ++ " found in map"))
     SET_NODE_PROP(format_node, textSize, text_size)
     SET_NODE_PROP(format_node, characterSpacing, character_spacing)
     SET_NODE_PROP(format_node, lineSpacing, line_spacing)

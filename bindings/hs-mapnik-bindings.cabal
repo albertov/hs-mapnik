@@ -80,6 +80,8 @@ test-suite spec
                   , lens
                   , vector
                   , unordered-containers
+                  , directory
+                  , filepath
 
   hs-source-dirs:   spec
   main-is:          Main.hs

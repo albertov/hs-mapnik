@@ -14,6 +14,7 @@ import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Layer as Layer
 import           Mapnik.Bindings.Map as Map
 import qualified Mapnik.Bindings.Datasource as Datasource
+import           Mapnik.Bindings.Datasource (paramsFromMap)
 import           Mapnik.Bindings.Style as Style
 import           Mapnik.Bindings.Symbolizer as Symbolizer
 import           Mapnik.Bindings.Rule as Rule
@@ -42,9 +43,11 @@ instance ToMapnik Mapnik.Map where
     forM_ bufferSize             (Map.setBufferSize m')
     forM_ maximumExtent          (Map.setMaxExtent m')
     forM_ fontDirectory          (setAndRegisterFontDirectory m')
+    forM_ basePath               (Map.setBasePath m')
     forM_ layers                 (addLayer m' <=< toMapnik)
     forM_ (toList styles)        (\(k,v) -> insertStyle m' k =<< toMapnikStyle fontSets v)
     forM_ (toList fontSets)      (uncurry (insertFontSet m'))
+    setExtraParameters m'        (paramsFromMap parameters)
     return m'
 
     where

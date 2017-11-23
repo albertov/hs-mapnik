@@ -18,6 +18,7 @@ import qualified Mapnik.Bindings.Style as Style
 import qualified Mapnik.Bindings.Rule as Rule
 import qualified Mapnik.Bindings.Expression as Expression
 import qualified Mapnik.Bindings.Datasource as Datasource
+import           Mapnik.Bindings.Datasource (paramsToMap)
 import qualified Mapnik.Bindings.Symbolizer as Symbolizer
 
 import qualified Data.HashMap.Strict as M
@@ -43,9 +44,11 @@ instance FromMapnik Map where
     bufferSize <- Just <$> Map.getBufferSize m
     maximumExtent <- Map.getMaxExtent m
     fontDirectory <- Map.getFontDirectory m
+    basePath <- Map.getBasePath m
     layers <- mapM fromMapnik =<< Map.getLayers m
     styles <- M.fromList <$> (mapM (\(k,v) -> (k,) <$> fromMapnik v) =<< Map.getStyles m)
     fontSets <- Map.getFontSetMap m
+    parameters <- paramsToMap <$> Map.getExtraParameters m
     return Mapnik.Map{..}
 
 instance FromMapnik Expression where
@@ -90,7 +93,7 @@ instance FromMapnik Style where
 
 instance FromMapnik Datasource where
   type HsType Datasource = Mapnik.Datasource
-  fromMapnik = fmap (Mapnik.Datasource . M.fromList . Datasource.paramsToList)
+  fromMapnik = fmap (Mapnik.Datasource . Datasource.paramsToMap)
              . Datasource.getParameters
 
 instance FromMapnik Symbolizer where

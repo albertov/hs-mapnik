@@ -16,6 +16,7 @@ module Mapnik.Bindings.Map (
 , zoom
 , zoomAll
 , zoomToBox
+, getBasePath
 , setBasePath
 , setBackground
 , getBackground
@@ -26,6 +27,8 @@ module Mapnik.Bindings.Map (
 , getBackgroundImageCompOp
 , setBackgroundImageCompOp
 , setFontDirectory
+, getExtraParameters
+, setExtraParameters
 , getFontDirectory
 , getSrs
 , setSrs
@@ -54,6 +57,7 @@ import           Mapnik.Bindings.Orphans()
 import qualified Mapnik.Bindings.Layer as Layer
 import qualified Mapnik.Bindings.Style as Style
 import           Mapnik.Bindings.Symbolizer (withFontSet)
+import           Mapnik.Bindings.Datasource (unsafeNewParameters)
 import qualified Mapnik.Bindings.Cpp as C
 
 import           Data.IORef
@@ -187,6 +191,19 @@ setBackgroundImageOpacity m (realToFrac -> opacity) =
 getBackgroundImageOpacity :: Map -> IO Double
 getBackgroundImageOpacity m = realToFrac <$>
   [C.exp| float { $fptr-ptr:(Map *m)->background_image_opacity() }|]
+
+getBasePath :: Map -> IO (Maybe FilePath)
+getBasePath m =
+  fmap (fmap unpack) $ newTextMaybe "Map.getBasePath" $ \(p,len) ->
+  [C.block| void {
+  static const Map dfl;
+  auto path = $fptr-ptr:(Map *m)->base_path();
+  if (path!=dfl.base_path()) {
+    mallocedString(path, $(char **p), $(int *len));
+  } else {
+    *$(char **p) = nullptr;
+  }
+  }|]
 
 setBasePath :: Map -> FilePath -> IO ()
 setBasePath m (encodeUtf8 . fromString -> path) =
@@ -353,3 +370,15 @@ peekFontSet fs = do
 registerFonts :: Map -> FilePath -> IO Bool
 registerFonts m (encodeUtf8 . fromString -> d) =
   (toEnum . fromIntegral) <$> [C.exp|int { static_cast<int>($fptr-ptr:(Map *m)->register_fonts(std::string($bs-ptr:d, $bs-len:d)))}|]
+
+
+getExtraParameters :: Map -> IO Parameters
+getExtraParameters m = unsafeNewParameters $ \p -> [C.block|void {
+  *$(parameters **p) =
+      new parameters($fptr-ptr:(Map *m)->get_extra_parameters());
+  }|]
+
+setExtraParameters :: Map -> Parameters -> IO ()
+setExtraParameters m ps = [C.block|void {
+  $fptr-ptr:(Map *m)->set_extra_parameters(*$fptr-ptr:(parameters *ps));
+  }|]
