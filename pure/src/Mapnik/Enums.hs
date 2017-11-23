@@ -236,7 +236,7 @@ data ScalingMethod
   | Bessel
   | Mitchell
   | Sinc
-  | Lanczos
+ | Lanczos
   | Blackman
   deriving (Eq, Show, Bounded, Enum, Generic)
 deriveMapnikJSON ''ScalingMethod

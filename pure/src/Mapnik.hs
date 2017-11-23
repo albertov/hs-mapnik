@@ -40,6 +40,10 @@ module Mapnik (
 , Style
 , StyleName
 , Styles
+-- *** ImageFilter
+, ImageFilter(..)
+-- *** ColorStop
+, ColorStop(..)
 
 -- ** Rule
 , Rule
@@ -171,6 +175,7 @@ module Mapnik (
 
 import Mapnik.Common hiding (minx,maxx,miny,maxy)
 import Mapnik.Map
+import Mapnik.ImageFilter
 import Mapnik.Color
 import Mapnik.Layer
 import Mapnik.Style
@@ -202,6 +207,7 @@ import Mapnik.Enums (
  , SimplifyAlgorithm(..)
  , ScalingMethod(..)
  , ColorizerMode(..)
+ , FilterMode(..)
  )
 import Mapnik.Lens
 

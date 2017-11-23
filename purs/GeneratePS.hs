@@ -37,7 +37,12 @@ generatePS frontEndRoot = writePSTypes frontEndRoot (buildBridge myBridge) myTyp
 
 
 myBridge :: BridgePart
-myBridge = defaultBridge <|> vectorBridge <|> wordBridge <|> stringMapBridge
+myBridge = defaultBridge
+       <|> vectorBridge
+       <|> wordBridge
+       <|> floatBridge
+       <|> charBridge
+       <|> stringMapBridge
 
 stringMapBridge :: BridgePart
 stringMapBridge = do
@@ -71,6 +76,16 @@ wordBridge = do
   typeName ^== "Word8"
   return psInt
 
+charBridge :: BridgePart
+charBridge = do
+  typeName ^== "Char"
+  return psString
+
+floatBridge :: BridgePart
+floatBridge = do
+  typeName ^== "Float"
+  return psNumber
+
 myTypes :: [SumType 'Haskell]
 myTypes = [ mkSumType (Proxy :: Proxy Map)
           , mkSumType (Proxy :: Proxy Layer)
@@ -78,6 +93,7 @@ myTypes = [ mkSumType (Proxy :: Proxy Map)
           , mkSumType (Proxy :: Proxy Rule)
           , mkSumType (Proxy :: Proxy Symbolizer)
           , mkSumType (Proxy :: Proxy Expression)
+          , mkSumType (Proxy :: Proxy PathExpression)
           , mkSumType (Proxy :: Proxy Color)
           , mkSumType (Proxy :: Proxy Transform)
           , mkSumType (Proxy :: Proxy Box)
@@ -97,7 +113,9 @@ myTypes = [ mkSumType (Proxy :: Proxy Map)
           , mkSumType (Proxy :: Proxy TextFormatProperties)
           , mkSumType (Proxy :: Proxy Format)
           , mkSumType (Proxy :: Proxy TextPlacements)
-          , mkSumType (Proxy :: Proxy FontSet)
+          , mkSumType (Proxy :: Proxy Font)
+          , mkSumType (Proxy :: Proxy ImageFilter)
+          , mkSumType (Proxy :: Proxy ColorStop)
 
           -- Enums
           , mkSumType (Proxy :: Proxy CompositeMode)
@@ -123,4 +141,5 @@ myTypes = [ mkSumType (Proxy :: Proxy Map)
           , mkSumType (Proxy :: Proxy ColorizerMode)
           , mkSumType (Proxy :: Proxy ScalingMethod)
           , mkSumType (Proxy :: Proxy SimplifyAlgorithm)
+          , mkSumType (Proxy :: Proxy FilterMode)
           ]
