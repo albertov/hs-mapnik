@@ -64,7 +64,6 @@ library
     cbits/destructors.cpp
     cbits/hs_exception.cpp
     cbits/hs_datasource.cpp
-    cbits/wkt_instances.cpp
   include-dirs:        cbits
 
 test-suite spec

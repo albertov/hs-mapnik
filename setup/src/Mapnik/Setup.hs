@@ -1,22 +1,25 @@
-module Mapnik.Setup (mapnikConfigHook, defaultMapnikMain) where
+module Mapnik.Setup (mapnikConfigHook, defaultMapnikMainWith, defaultMapnikMain) where
 
 import Control.Monad
 import System.Process
 import System.Environment (lookupEnv)
 import Data.List
+import Data.Maybe
 import Distribution.Simple
 import Distribution.Simple.Setup (configConfigurationsFlags)
 import Distribution.PackageDescription
 import Distribution.Simple.LocalBuildInfo
 
 defaultMapnikMain :: IO ()
-defaultMapnikMain  = defaultMainWithHooks simpleUserHooks {confHook = mapnikConfigHook}
+defaultMapnikMain  = defaultMapnikMainWith id
 
-mapnikConfigHook (pkg0, pbi) flags = do
+defaultMapnikMainWith f = defaultMainWithHooks simpleUserHooks {confHook = mapnikConfigHook f}
+
+mapnikConfigHook f (pkg0, pbi) flags = do
  lbi <- confHook simpleUserHooks (pkg0, pbi) flags
- configureWithMapnikConfig lbi flags
+ configureWithMapnikConfig f lbi flags
 
-configureWithMapnikConfig lbi flags = do
+configureWithMapnikConfig f lbi flags = do
   myExtraLibs    <- getFlagValues 'l' <$> mapnikConfig ["--libs"]
   myExtraLibDirs <- getFlagValues 'L' <$> mapnikConfig ["--ldflags"]
   myIncludeDirs  <- getFlagValues 'I' <$> mapnikConfig ["--includes", "--dep-includes"]
@@ -30,14 +33,14 @@ configureWithMapnikConfig lbi flags = do
   mapnikInputPluginDir <- (escapeWinPathSep . head . words) <$>
     mapnikConfig ["--input-plugins"]
   mapnikFontDir <- (escapeWinPathSep . head . words) <$> (mapnikConfig ["--fonts"])
-  let updBinfo bi = bi { extraLibDirs = extraLibDirs bi ++ myExtraLibDirs
-                       , extraLibs    = extraLibs    bi ++ myExtraLibs
-                       , includeDirs  = includeDirs  bi ++ myIncludeDirs
-                       , ccOptions    = ccOptions    bi ++ myCcOptions
-                       , ldOptions    = ldOptions    bi ++ myLdOptions ++ icuLdOptions
-                       , cppOptions   = cppOptions   bi ++ mapnikCppOptions
-                       , options      = options      bi ++ myGhcOptions
-                       }
+  let updBinfo bi = f $ bi { extraLibDirs = extraLibDirs bi ++ myExtraLibDirs
+                           , extraLibs    = extraLibs    bi ++ myExtraLibs
+                           , includeDirs  = includeDirs  bi ++ myIncludeDirs
+                           , ccOptions    = ccOptions    bi ++ myCcOptions
+                           , ldOptions    = ldOptions    bi ++ myLdOptions ++ icuLdOptions
+                           , cppOptions   = cppOptions   bi ++ mapnikCppOptions
+                           , options      = options      bi ++ myGhcOptions
+                           }
 
       -- | Work around https://github.com/haskell/cabal/issues/4435
       -- | We *must* compile auto-generated code with, at least, the correct
@@ -74,10 +77,8 @@ escapeWinPathSep = concatMap go
 rstrip c = reverse . dropWhile (==c) . reverse
 
 configProg isShellScript progName envName args = do
-  mCmd <- lookupEnv envName
-  cmd <- maybe (liftM (rstrip '\n') (getOutput "sh" ["-c", "which " ++ progName])) return mCmd
-  rstrip '\n' <$> getOutput (if isShellScript then "sh"       else cmd)
-                            (if isShellScript then (cmd:args) else args)
+  cmd <- fromMaybe progName <$> lookupEnv envName
+  rstrip '\n' <$> getOutput cmd args
 
 mapnikConfig = configProg True "mapnik-config" "MAPNIK_CONFIG"
 gdalConfig = configProg True "gdal-config" "GDAL_CONFIG"
