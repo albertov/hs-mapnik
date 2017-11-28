@@ -1,0 +1,63 @@
+name:                hs-mapnik-vectortile
+version:             0.2.0.0
+synopsis:            Haskell bindings for Mapnik VectorTile
+description:         Please see README.md
+homepage:            https://github.com/albertov/hs-mapnik#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Alberto Valverde González
+maintainer:          allberto@toscat.net
+copyright:           2017 Alberto Valverde González
+category:            Bindings
+build-type:          Custom
+cabal-version:       >=1.10
+
+custom-setup
+  setup-depends: base, hs-mapnik-setup, Cabal
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Mapnik.Bindings.VectorTile
+                     , Mapnik.Bindings.VectorTile.Types
+                     , Mapnik.Bindings.VectorTile.Render
+                     , Mapnik.Bindings.VectorTile.Datasource
+                     , Mapnik.Bindings.VectorTile.Lens
+  build-depends:       base                >= 4.7  && < 5
+                     , bytestring          >= 0.10 && < 0.11
+                     , inline-c-cpp        >= 0.2.1.0 && < 0.3
+                     , inline-c            >= 0.6.0.5
+                     , text
+                     , hs-mapnik
+                     , hs-mapnik-bindings
+                     , unordered-containers
+                     , vector
+                     , lens
+  default-language:    Haskell2010
+  ghc-options:         -Wall -optc-g -funbox-strict-fields
+                       -optc-DMAPNIK_VECTOR_TILE_LIBRARY
+  cc-options: -DMAPNIK_VECTOR_TILE_LIBRARY
+
+  c-sources:
+    cbits/destructors.cpp
+  include-dirs:        cbits
+
+test-suite spec
+  type:             exitcode-stdio-1.0
+  build-depends:    base
+                  , hspec
+                  , hspec-core >= 1.13
+                  , hs-mapnik-bindings
+                  , hs-mapnik-vectortile
+                  , text
+                  , filepath
+                  , lens
+
+  hs-source-dirs:   spec
+  main-is:          Main.hs
+  other-modules:    Mapnik.Bindings.VectorTileSpec
+  default-language: Haskell2010
+  ghc-options:     -Wall -rtsopts -threaded -with-rtsopts=-N -optc-g
+
+source-repository head
+  type:     git
+  location: https://github.com/albertov/hs-mapnik
