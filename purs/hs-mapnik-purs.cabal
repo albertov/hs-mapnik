@@ -1,0 +1,31 @@
+name:                hs-mapnik-purs
+version:             0.1.0.0
+synopsis:            Mapnik purescript data model generator
+description:         Please see README.md
+homepage:            https://github.com/albertov/hs-mapnik#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Alberto Valverde González
+maintainer:          allberto@toscat.net
+copyright:           2017 Alberto Valverde González
+build-type:          Simple
+cabal-version:       >=1.10
+
+
+executable hs-mapnik-purs
+  main-is:             GeneratePS.hs
+  default-language:    Haskell2010
+  hs-source-dirs:      .
+  build-depends:       base                >= 4.7  && < 5
+                     , purescript-bridge   >= 0.11.1.1 && < 2
+                     , hs-mapnik
+                     , lens
+                     , text
+  ghc-options:
+    -Wall
+    -fwarn-incomplete-patterns
+    -fwarn-incomplete-uni-patterns
+
+source-repository head
+  type:     git
+  location: https://github.com/albertov/hs-mapnik

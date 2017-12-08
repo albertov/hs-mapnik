@@ -1,0 +1,108 @@
+name:                hs-mapnik-bindings
+version:             0.2.0.0
+synopsis:            Haskel bindings for Mapnik
+description:         Please see README.md
+homepage:            https://github.com/albertov/hs-mapnik#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Alberto Valverde González
+maintainer:          allberto@toscat.net
+copyright:           2016-2017 Alberto Valverde González
+category:            Bindings
+build-type:          Custom
+cabal-version:       >=1.10
+
+custom-setup
+  setup-depends: base, hs-mapnik-setup, Cabal
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Mapnik.Bindings
+                     , Mapnik.Bindings.Types
+                     , Mapnik.Bindings.Map
+                     , Mapnik.Bindings.Orphans
+                     , Mapnik.Bindings.Image
+                     , Mapnik.Bindings.Layer
+                     , Mapnik.Bindings.Style
+                     , Mapnik.Bindings.Datasource
+                     , Mapnik.Bindings.Feature
+                     , Mapnik.Bindings.Geometry
+                     , Mapnik.Bindings.Projection
+                     , Mapnik.Bindings.Colorizer
+                     , Mapnik.Bindings.Registry
+                     , Mapnik.Bindings.Rule
+                     , Mapnik.Bindings.Symbolizer
+                     , Mapnik.Bindings.Variant
+                     , Mapnik.Bindings.Raster
+                     , Mapnik.Bindings.Expression
+                     , Mapnik.Bindings.Transform
+                     , Mapnik.Bindings.Util
+                     , Mapnik.Bindings.Render
+                     , Mapnik.Bindings.ToMapnik
+                     , Mapnik.Bindings.FromMapnik
+                     , Mapnik.Bindings.Cpp
+  build-depends:       base                >= 4.7  && < 5
+                     , bytestring          >= 0.10 && < 0.11
+                     , inline-c-cpp        >= 0.2.1.0 && < 0.3
+                     , inline-c            >= 0.6.0.5
+                     , lifted-base
+                     , transformers-base
+                     , monad-control
+                     , mtl
+                     , text
+                     , hs-mapnik
+                     , unordered-containers
+                     , vector
+                     , lens
+                     , template-haskell
+                     , filepath
+  default-language:    Haskell2010
+
+  ghc-options:         -Wall -optc-g -funbox-strict-fields
+
+  extra-libraries:     mapnik stdc++
+  c-sources:
+    cbits/destructors.cpp
+    cbits/hs_exception.cpp
+    cbits/hs_datasource.cpp
+  include-dirs:        cbits
+  install-includes: hs_exception.hpp hs_datasource.hpp
+
+test-suite spec
+  type:             exitcode-stdio-1.0
+  build-depends:    base
+                  , hspec
+                  , QuickCheck
+                  , quickcheck-io
+                  , hspec-core >= 1.13
+                  , hs-mapnik
+                  , hs-mapnik-bindings
+                  , bytestring
+                  , text
+                  , lens
+                  , vector
+                  , unordered-containers
+                  , directory
+                  , filepath
+
+  hs-source-dirs:   spec
+  main-is:          Main.hs
+  other-modules:    Mapnik.BindingsSpec
+  default-language: Haskell2010
+  ghc-options:     -Wall -rtsopts -threaded -with-rtsopts=-N -optc-g
+
+executable hs-mapnik-conv
+  build-depends:       base
+                     , hs-mapnik-bindings
+                     , hs-mapnik
+                     , text
+                     , aeson
+  ghc-options:         -Wall -rtsopts -O2
+  hs-source-dirs:      examples
+  main-is:             Json.hs
+  default-language:    Haskell2010
+
+
+source-repository head
+  type:     git
+  location: https://github.com/albertov/hs-mapnik

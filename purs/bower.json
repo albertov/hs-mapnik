@@ -1,0 +1,18 @@
+{
+  "name": "hs-mapnik-purs",
+  "homepage": "https://github.com/albertov/hs-mapnik",
+  "authors": [
+    "Alberto Valverde González <alberto@toscat.net>"
+  ],
+  "description": "",
+  "license": "BSD3",
+  "dependencies": {
+    "purescript-profunctor-lenses": "^3.8.0",
+    "purescript-maybe": "^3.0.0",
+    "purescript-prelude": "^3.1.1",
+    "purescript-generics": "^4.0.0",
+    "purescript-tuples": "^4.1.0",
+    "purescript-generics-rep": "^5.3.0",
+    "purescript-maps": "^3.5.2"
+  }
+}
