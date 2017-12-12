@@ -20,10 +20,10 @@ import           Mapnik.Parameter
 
 import qualified Data.HashMap.Strict as M
 import qualified Data.Text as T
+import qualified Data.Vector.Storable as St
 import           Data.Text.IO as T
 import           System.IO.Unsafe (unsafePerformIO)
 import           Test.QuickCheck hiding (label)
-import           Test.QuickCheck.Instances ()
 import           Prelude hiding (filter)
 import qualified Prelude as P
 import           Paths_hs_mapnik (getDataFileName)
@@ -173,7 +173,7 @@ arbitraryLineSym = do
   lineRasterizer <- arbitrary
   strokeGamma       <- arbitrary
   strokeGammaMethod <- arbitrary
-  strokeDashArray   <- arbitrary
+  strokeDashArray   <- maybeArb arbitraryStrokeDashArrayProp
   strokeDashOffset  <- arbitrary
   strokeMiterLimit  <- arbitrary
   strokeWidth       <- arbitrary
@@ -306,7 +306,7 @@ arbitraryMarkersSym = do
   direction       <- arbitrary
   strokeGamma       <- arbitrary
   strokeGammaMethod <- arbitrary
-  strokeDashArray   <- arbitrary
+  strokeDashArray   <- maybeArb arbitraryStrokeDashArrayProp
   strokeDashOffset  <- arbitrary
   strokeMiterLimit  <- arbitrary
   strokeWidth       <- arbitrary
@@ -321,6 +321,10 @@ arbitraryMarkersSym = do
   geometryTransform <- arbitrary
   simplifyAlgorithm <- arbitrary
   pure MarkersSymbolizer{..}
+
+arbitraryStrokeDashArrayProp :: Gen (Prop (St.Vector Dash))
+arbitraryStrokeDashArrayProp =
+  arbitraryPropWith (St.fromList <$> arbitrary)
 
 arbitraryGroupSym fontMap = do
   groupProperties <- arbitraryGroupSymProperties fontMap
@@ -382,7 +386,13 @@ instance Arbitrary AspectFixMode where arbitrary = arbitraryEnum
 instance Arbitrary FilterMode where arbitrary = arbitraryEnum
 
 instance Arbitrary a => Arbitrary (Prop a) where
-  arbitrary = oneof [ Exp <$> arbitrary, Val <$> arbitrary ]
+  arbitrary = arbitraryProp
+
+arbitraryProp :: Arbitrary a => Gen (Prop a)
+arbitraryProp = arbitraryPropWith arbitrary
+
+arbitraryPropWith :: Gen a -> Gen (Prop a)
+arbitraryPropWith a = oneof [ Exp <$> arbitrary, Val <$> a ]
 
 instance Arbitrary Dash where
   arbitrary = Dash <$> (getPositive <$> arbitrary)
@@ -610,3 +620,14 @@ arbitraryLayer stylesInMap = do
 
 maybeArb :: Gen a -> Gen (Maybe a)
 maybeArb gen = oneof [pure Nothing, Just <$> gen]
+
+instance Arbitrary v => Arbitrary (M.HashMap T.Text v) where
+  arbitrary = sized $ \n ->
+    M.fromList <$> (zip <$> vectorOf n arbitraryText <*> arbitrary)
+
+instance Arbitrary T.Text where
+  arbitrary = arbitraryText
+
+arbitraryText :: Gen T.Text
+arbitraryText =
+  sized $ \n -> T.pack <$> vectorOf n (choose ('a','\xff'))
