@@ -43,7 +43,7 @@ module Mapnik (
 -- *** ImageFilter
 , ImageFilter(..)
 -- *** ColorStop
-, ColorStop(..)
+, ColorStop(ColorStop)
 
 -- ** Rule
 , Rule
