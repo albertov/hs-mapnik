@@ -91,6 +91,16 @@ instance Arbitrary Transform where
         , pure "rotate(45, 50, 50)"
         ]
 
+instance Arbitrary PixelRgba8 where
+  arbitrary = PixelRgba8 <$> arbitrary
+
+instance Arbitrary ImageRgba8 where
+  arbitrary = do
+    w <- getPositive <$> arbitrary
+    h <- getPositive <$> arbitrary
+    pxs <- St.fromList <$> vectorOf (w*h) arbitrary
+    pure (ImageRgba8 (w,h) pxs)
+
 instance Arbitrary ImageFilter where
   arbitrary = oneof
         [ pure Blur
@@ -580,6 +590,15 @@ instance Arbitrary FontFeatureSettings where
         , pure "frac"
         ]
 
+instance Arbitrary Rule where arbitrary = scale (min 2) (arbitraryRule mempty)
+instance Arbitrary TextPlacements where arbitrary = scale (min 2) (arbitraryPlacements mempty)
+instance Arbitrary GroupRule where arbitrary = scale (min 2) (arbitraryGroupRule mempty)
+instance Arbitrary GroupSymProperties where arbitrary = scale (min 2) (arbitraryGroupSymProperties mempty)
+instance Arbitrary TextSymProperties where arbitrary = scale (min 2) (arbitraryTextSymProperties mempty)
+instance Arbitrary TextFormatProperties where arbitrary = scale (min 2) (arbitraryTextFormatProperties mempty)
+instance Arbitrary Symbolizer where arbitrary = scale (min 2) (arbitrarySymbolizer mempty)
+instance Arbitrary Style where arbitrary = scale (min 2) (arbitraryStyle mempty)
+    
 
 -----------------------------------------------------------------------------
 arbitraryEnum :: (Enum a, Bounded a) => Gen a

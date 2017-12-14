@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 module Mapnik.ImageFilter (
   ImageFilter(..)
 , ColorStop (..)
@@ -30,8 +31,10 @@ import qualified Data.Text.Lazy.Builder.Int as B
 import qualified Data.Text.Lazy.Builder.RealFloat as B
 
 
-data ColorStop = ColorStop Color (Maybe Double)
-  deriving (Eq, Show, Generic)
+data ColorStop = ColorStop
+  { color :: Color
+  , value :: Maybe Double
+  } deriving (Eq, Show, Generic)
 deriveMapnikJSON ''ColorStop
 
 data ImageFilter

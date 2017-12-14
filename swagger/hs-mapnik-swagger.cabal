@@ -1,0 +1,44 @@
+name:                hs-mapnik-swagger
+version:             0.1.0.0
+synopsis:            Mapnik data model ToSchema instances
+description:         Please see README.md
+homepage:            https://github.com/albertov/hs-mapnik#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Alberto Valverde González
+maintainer:          allberto@toscat.net
+copyright:           2017 Alberto Valverde González
+build-type:          Simple
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Mapnik.Swagger
+  build-depends:       base                >= 4.7  && < 5
+                     , swagger2
+                     , lens
+                     , hs-mapnik
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+
+test-suite spec
+  type:             exitcode-stdio-1.0
+  build-depends:    base
+                  , hspec
+                  , hspec-core >= 1.13
+                  , hs-mapnik
+                  , hs-mapnik-swagger
+                  , aeson
+                  , swagger2
+                  , QuickCheck
+
+  hs-source-dirs:   spec
+  main-is:          Main.hs
+  other-modules:    Mapnik.SwaggerSpec
+  default-language: Haskell2010
+  ghc-options:     -Wall -rtsopts -threaded -with-rtsopts=-N
+
+
+source-repository head
+  type:     git
+  location: https://github.com/albertov/hs-mapnik

@@ -17,9 +17,7 @@ deriveMapnikJSON = deriveJSON mapnikOptions
 
 mapnikOptions :: Options
 mapnikOptions = defaultOptions
-  { 
-    sumEncoding = TaggedObject "type" "value"
-  }
+  { sumEncoding = ObjectWithSingleField }
 
 makeMapnikFields :: Name -> DecsQ
 makeMapnikFields = makeLensesWith $ defaultFieldRules

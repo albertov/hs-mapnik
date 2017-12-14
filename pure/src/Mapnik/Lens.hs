@@ -51,6 +51,7 @@ makeMapnikFields ''Colorizer
 makeMapnikFields ''Stop
 makeMapnikFields ''Box
 makeMapnikFields ''ImageRgba8
+makeMapnikFields ''ColorStop
 makePrisms ''Value
 makePrisms ''Symbolizer
 makePrisms ''Prop
