@@ -85,7 +85,7 @@ swaggerProp
   => p a
   -> SpecWith ()
 swaggerProp _ = parallel $
-  prop "json correspondes to schema" $ \(a :: a) ->
+  prop "json corresponds to schema" $ \(a :: a) ->
     let errors = validateToJSON a
         s = toSchema (Proxy @a)
     in counterexample (show (errors, encode a, encode s, s)) $ errors == []
