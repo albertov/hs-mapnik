@@ -439,6 +439,8 @@ instance Arbitrary RenderSettings where
     _renderSettingsScaleFactor <- getPositive <$> arbitrary
     _renderSettingsSrs <- maybeArb arbitrarySrs
     _renderSettingsAspectFixMode <- arbitrary
+    _renderSettingsBackgroundColor <- arbitrary
+    _renderSettingsLayers <- maybeArb (listOf arbitraryText)
     return RenderSettings{..}
 
 data TestException = TestException

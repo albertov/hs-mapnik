@@ -18,6 +18,7 @@ module Mapnik.Bindings.Map (
 , zoomToBox
 , getBasePath
 , setBasePath
+, setActiveLayers
 , setBackground
 , getBackground
 , setBackgroundImage
@@ -61,6 +62,7 @@ import           Mapnik.Bindings.Datasource (unsafeNewParameters)
 import qualified Mapnik.Bindings.Cpp as C
 
 import           Control.Exception (mask_)
+import           Control.Monad (forM_)
 import           Data.IORef
 import           Data.String (fromString)
 import           Data.ByteString.Unsafe (unsafePackMallocCStringLen)
@@ -284,6 +286,23 @@ getLayers m = do
   }
   }|]
   reverse <$> readIORef layersRef
+
+-- | Activate only the layers listed in Just ls, activate all of them if Nothing
+setActiveLayers :: Map -> Maybe [Text] -> IO ()
+setActiveLayers m Nothing =
+  [C.block|void {
+  auto & layers = $fptr-ptr:(Map *m)->layers();
+  for (auto it=layers.begin(); it!=layers.end(); ++it) {
+    it->set_active(true);
+  }
+  }|]
+setActiveLayers m (Just ls) = forM_ ls $ \ (encodeUtf8 -> l) ->
+  [C.block|void {
+  auto & layers = $fptr-ptr:(Map *m)->layers();
+  for (auto it=layers.begin(); it!=layers.end(); ++it) {
+    it->set_active(std::string($bs-ptr:l, $bs-len:l) == it->name());
+  }
+  }|]
 
 getStyles :: Map -> IO [(StyleName,Style)]
 getStyles m = do

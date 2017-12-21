@@ -10,7 +10,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Mapnik.Bindings.Render where
 
-import           Mapnik (Proj4, AspectFixMode(..))
+import           Mapnik (Proj4, AspectFixMode(..), Color(RGBA))
 import           Mapnik.Lens
 import           Mapnik.Bindings.Types
 import           Mapnik.Bindings.Variant
@@ -22,14 +22,14 @@ import qualified Mapnik.Bindings.Image as Image
 import qualified Mapnik.Bindings.Map as Map
 
 import           Control.Exception (bracket)
-import           Control.Monad (forM_)
+import           Control.Monad (forM_, forM)
 import           Control.Lens
 import           Data.Monoid (mempty)
-import           Data.ByteString (useAsCStringLen)
+import           Data.Maybe (fromMaybe)
+import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.HashMap.Strict as M
 import           Foreign.Marshal.Utils (with)
-import           Foreign.Ptr
 
 
 
@@ -43,20 +43,22 @@ C.include "<mapnik/map.hpp>"
 C.using "namespace mapnik"
 C.using "bbox = box2d<double>"
 
-
 data RenderSettings = RenderSettings
-  { _renderSettingsWidth         :: !Int
-  , _renderSettingsHeight        :: !Int
-  , _renderSettingsExtent        :: !Box
-  , _renderSettingsVariables     :: !Attributes
-  , _renderSettingsScaleFactor   :: !Double
-  , _renderSettingsSrs           :: !(Maybe Proj4)
-  , _renderSettingsAspectFixMode :: !AspectFixMode
+  { _renderSettingsWidth           :: !Int
+  , _renderSettingsHeight          :: !Int
+  , _renderSettingsExtent          :: !Box
+  , _renderSettingsVariables       :: !Attributes
+  , _renderSettingsScaleFactor     :: !Double
+  , _renderSettingsSrs             :: !(Maybe Proj4)
+  , _renderSettingsAspectFixMode   :: !AspectFixMode
+  , _renderSettingsBackgroundColor :: !(Maybe Color)
+  , _renderSettingsLayers          :: !(Maybe [Text])
   } deriving (Eq, Show)
 makeFields ''RenderSettings
 
 renderSettings :: Int -> Int -> Box -> RenderSettings
-renderSettings w h e = RenderSettings w h e mempty 1 Nothing Respect
+renderSettings w h e =
+  RenderSettings w h e mempty 1 Nothing Respect Nothing Nothing
 
 -- | It is not safe to call this function on the same 'Map' from different
 -- threads. It is the responsability of the caller to implement locking, a
@@ -65,8 +67,7 @@ render :: Map -> RenderSettings-> IO Image
 render m cfg = Image.unsafeNew $ \ptr ->
                withAttributes $ \vars ->
                with (cfg^.extent) $ \ext ->
-               withMaybeSrs (cfg^.srs) $ \(srsPtr, fromIntegral -> srsLen) -> do
-  Map.setAspectFixMode m (cfg^.aspectFixMode)
+               bracket setRenderOverrides id $ \ _ -> do
   forM_ (cfg^.variables.to M.toList) $ \(encodeUtf8 -> k, val) -> withV val $ \v ->
     [C.block|void {
       std::string k($bs-ptr:k, $bs-len:k);
@@ -80,22 +81,12 @@ render m cfg = Image.unsafeNew $ \ptr ->
   mapnik::request req($(int w), $(int h), *$(bbox *ext));
   mapnik::image_rgba8 *im = new mapnik::image_rgba8($(int w), $(int h));
   std::string oldSrs;
-  if ($(int srsLen)) {
-    oldSrs = m.srs();
-    m.set_srs(std::string($(char *srsPtr), $(int srsLen)));
-  }
   try {
     mapnik::agg_renderer<mapnik::image_rgba8> ren(m, req, *$(attributes *vars), *im, $(double scale));
     ren.apply();
     *$(image_rgba8** ptr) = im;
-    if ($(int srsLen)) {
-      m.set_srs(oldSrs);
-    }
   } catch (...) {
     delete im;
-    if ($(int srsLen)) {
-      m.set_srs(oldSrs);
-    }
     throw;
   }
   |]
@@ -107,5 +98,20 @@ render m cfg = Image.unsafeNew $ \ptr ->
       alloc = [C.exp|attributes * { new attributes }|]
       dealloc p = [C.exp|void { delete $(attributes *p) }|]
 
-    withMaybeSrs Nothing f = f (nullPtr,0)
-    withMaybeSrs (Just (encodeUtf8 -> s)) f = useAsCStringLen s f
+    setRenderOverrides = do
+      rollbackSrs <- overrideWith Map.getSrs Map.setSrs (cfg^.srs)
+      rollbackBg <- overrideWith (fmap (fromMaybe (RGBA 0 0 0 0)) . Map.getBackground)
+                                 Map.setBackground (cfg^.backgroundColor)
+      rollbackLayers <- fromMaybe (return ()) <$> forM (cfg^.layers) (\ ls -> do
+        Map.setActiveLayers m (Just ls)
+        return (Map.setActiveLayers m Nothing)
+        )
+      return (sequence_ [rollbackSrs, rollbackBg, rollbackLayers])
+
+
+    overrideWith :: (Map -> IO a) -> (Map -> a -> IO ()) -> Maybe a -> IO (IO ())
+    overrideWith get_ set_ = fmap (fromMaybe (return ())) . mapM (\ x -> do
+      old <- get_ m
+      set_ m x
+      return (set_ m old))
+
