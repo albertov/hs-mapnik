@@ -57,6 +57,7 @@ data OgcEnv = OgcEnv
   , mapPool  :: P.Pool MapnikB.Map
   }
 
+type LiftedApplication r m = r -> (Response -> m ResponseReceived) -> m ResponseReceived
 
 -- TODO: Move to bindings
 finalizeMap :: MapnikB.Map -> IO ()
@@ -69,6 +70,7 @@ ogcServer
   -> m Application
 ogcServer cfg m = do
   logger_ <- askLoggerIO
+  $logInfo "Creating map pool for Mapnik OGCServer"
   app logger_ <$> liftBase
     (P.createPool
       (runLoggingT createMap_ logger_)
@@ -97,7 +99,7 @@ withMap f = asks mapPool >>= (`P.withResource` f)
 
 dispatchWms
   :: (MonadLogger m, MonadReader OgcEnv m, MonadBaseControl IO m)
-  => Wms.Request t -> (Response -> m ResponseReceived) -> m ResponseReceived
+  => LiftedApplication (Wms.Request t) m
 dispatchWms GetMap
   { wmsMapLayers
   , wmsMapCrs
@@ -193,10 +195,11 @@ toProj4 (Wms.Proj4 s) = Just (toS s)
 toProj4 (Wms.Epsg  s) = Just ("+init=epsg:" <> show s)
 toProj4 _             = Nothing  
 
--- | FIXME
+
+-- | FIXME: Should honor what wmsMap
 renderError
   :: (MonadLogger m, MonadReader OgcEnv m, MonadBaseControl IO m)
-  => ParseError -> Wai.Request -> (Response -> m ResponseReceived) -> m ResponseReceived
+  => ParseError -> LiftedApplication Wai.Request m
 renderError err _ respond = do
   $logDebug $ "Invalid WMS Request: " <> show err
   respond $ responseLBS status400 [("content-type", "text/plain")] (show err)
