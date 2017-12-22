@@ -17,7 +17,8 @@ import qualified Mapnik.Bindings.Types  as MapnikB (Map(Map))
 import Control.Lens
 import Control.Monad.Reader     ( MonadReader )
 import Control.Monad.Logger     ( MonadLogger, logDebug, runLoggingT
-                                , MonadLoggerIO(askLoggerIO))
+                                , MonadLoggerIO(askLoggerIO)
+                                , logInfo, logDebug)
 import Control.Monad.Base       (MonadBase(liftBase))
 import Control.Monad.Trans.Control (MonadBaseControl)
 import Codec.MIME.Type          (Type(..), MIMEType(..), showType)
@@ -111,10 +112,10 @@ dispatchWms GetMap
   , wmsMapDimensions
   } respond =
     case toMapnikFormatString wmsMapFormat of
-      Nothing -> respond unsupportedFormat
+      Nothing -> unsupportedFormat
       Just fmt ->
         case toProj4 wmsMapCrs of
-          Nothing -> respond (unsupportedCrs fmt)
+          Nothing -> unsupportedCrs fmt
           Just srs -> do
             img <- withMap $ \m ->
               liftBase $ RR.render m $ cfg
@@ -136,7 +137,7 @@ dispatchWms GetMap
         & Mapnik.aspectFixMode .~ Mapnik.Respect
     box = Mapnik.Box (realToFrac (Wms.minx wmsMapBbox))
                      (realToFrac (Wms.miny wmsMapBbox))
-                     (realToFrac (Wms.maxy wmsMapBbox))
+                     (realToFrac (Wms.maxx wmsMapBbox))
                      (realToFrac (Wms.maxy wmsMapBbox))
 
     mkBlankImg fmt = 
@@ -147,12 +148,14 @@ dispatchWms GetMap
       in toS (fromJust (Mapnik.serialize fmt blankImg))
 
     -- TODO: Implement ExcInImage and ExcXml
-    unsupportedCrs :: String -> Response
-    unsupportedCrs fmt = responseLBS
-      status400 [("content-type", toS (showType wmsMapFormat))] (mkBlankImg fmt)
+    unsupportedCrs fmt = do
+      $logDebug $ "Unsupported CRS: " <> show wmsMapCrs
+      respond $ responseLBS
+        status400 [("content-type", toS (showType wmsMapFormat))] (mkBlankImg fmt)
 
-    unsupportedFormat :: Response
-    unsupportedFormat = responseLBS status415 [("content-type", "text/plain")] ""
+    unsupportedFormat = do
+      $logDebug $ "Unsupported Format: " <> show wmsMapFormat
+      respond $ responseLBS status415 [("content-type", "text/plain")] ""
 
 dimToVariable :: Wms.Dimension -> (Text, Mapnik.Value)
 dimToVariable (Wms.Dimension k n) = (k, Mapnik.TextValue (toS n))
@@ -194,6 +197,7 @@ toProj4 _             = Nothing
 renderError
   :: (MonadLogger m, MonadReader OgcEnv m, MonadBaseControl IO m)
   => ParseError -> Wai.Request -> (Response -> m ResponseReceived) -> m ResponseReceived
-renderError err _ respond = respond $
-  responseLBS status400 [("content-type", "text/plain")] (show err)
+renderError err _ respond = do
+  $logDebug $ "Invalid WMS Request: " <> show err
+  respond $ responseLBS status400 [("content-type", "text/plain")] (show err)
 
