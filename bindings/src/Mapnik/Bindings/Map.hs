@@ -296,13 +296,21 @@ setActiveLayers m Nothing =
     it->set_active(true);
   }
   }|]
-setActiveLayers m (Just ls) = forM_ ls $ \ (encodeUtf8 -> l) ->
+setActiveLayers m (Just ls) = do
   [C.block|void {
   auto & layers = $fptr-ptr:(Map *m)->layers();
   for (auto it=layers.begin(); it!=layers.end(); ++it) {
-    it->set_active(std::string($bs-ptr:l, $bs-len:l) == it->name());
+    it->set_active(false);
   }
   }|]
+  forM_ ls $ \ (encodeUtf8 -> l) -> [C.block|void {
+    auto & layers = $fptr-ptr:(Map *m)->layers();
+    for (auto it=layers.begin(); it!=layers.end(); ++it) {
+      if (std::string($bs-ptr:l, $bs-len:l) == it->name()) {
+        it->set_active(true);
+      }
+    }
+    }|]
 
 getStyles :: Map -> IO [(StyleName,Style)]
 getStyles m = do

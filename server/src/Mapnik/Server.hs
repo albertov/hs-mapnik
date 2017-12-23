@@ -70,7 +70,7 @@ ogcServer
   -> m Application
 ogcServer cfg m = do
   logger_ <- askLoggerIO
-  $logInfo "Creating map pool for Mapnik OGCServer"
+  -- $logInfo "Creating map pool for Mapnik OGCServer"
   app logger_ <$> liftBase
     (P.createPool
       (runLoggingT createMap_ logger_)
@@ -81,10 +81,10 @@ ogcServer cfg m = do
       )
   where
   createMap_   = do
-    $logDebug "Map pool: Creating map"
+    $logDebug $ "Map pool: Creating map: " <> show m
     liftBase $ Mapnik.toMapnik m
   finalizeMap_ m' = do
-    $logDebug "Map pool: destroying map"
+    $logDebug $ "Map pool: destroying map"
     liftBase (finalizeMap m')
   app logger_ p req ( (liftBase .) -> resp ) = flip runLoggingT logger_ $
     let env = OgcEnv { settings = cfg, theMap = m, mapPool = p }
@@ -100,7 +100,7 @@ withMap f = asks mapPool >>= (`P.withResource` f)
 dispatchWms
   :: (MonadLogger m, MonadReader OgcEnv m, MonadBaseControl IO m)
   => LiftedApplication (Wms.Request t) m
-dispatchWms GetMap
+dispatchWms req@GetMap
   { wmsMapLayers
   , wmsMapCrs
   , wmsMapBbox
@@ -125,6 +125,7 @@ dispatchWms GetMap
                  & Mapnik.layers ?~ toActiveLayers wmsMapLayers
                  & Mapnik.backgroundColor .~ toMapnikBgColor wmsMapTransparent wmsMapBackground
                  & Mapnik.variables .~ fromList (map dimToVariable allDims)
+            -- $logDebug $ "Rendering WMS: " <> show req
             bs <- maybe (panic "invalid format string returned by toFormatString")
                         return (Mapnik.serialize fmt img)
             respond $ responseLBS
