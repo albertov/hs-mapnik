@@ -63,6 +63,7 @@ type LiftedApplication r m = r -> (Response -> m ResponseReceived) -> m Response
 finalizeMap :: MapnikB.Map -> IO ()
 finalizeMap (MapnikB.Map fp) = finalizeForeignPtr fp
 
+
 ogcServer
   :: (MonadLoggerIO m, MonadBaseControl IO m)
   => Settings
@@ -70,7 +71,6 @@ ogcServer
   -> m Application
 ogcServer cfg m = do
   logger_ <- askLoggerIO
-  -- $logInfo "Creating map pool for Mapnik OGCServer"
   app logger_ <$> liftBase
     (P.createPool
       (runLoggingT createMap_ logger_)
@@ -125,7 +125,6 @@ dispatchWms req@GetMap
                  & Mapnik.layers ?~ toActiveLayers wmsMapLayers
                  & Mapnik.backgroundColor .~ toMapnikBgColor wmsMapTransparent wmsMapBackground
                  & Mapnik.variables .~ fromList (map dimToVariable allDims)
-            -- $logDebug $ "Rendering WMS: " <> show req
             bs <- maybe (panic "invalid format string returned by toFormatString")
                         return (Mapnik.serialize fmt img)
             respond $ responseLBS
