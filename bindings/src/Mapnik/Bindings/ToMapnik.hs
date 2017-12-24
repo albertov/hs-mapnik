@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -114,8 +115,9 @@ instance ToMapnik Mapnik.Datasource where
   type MapnikType Mapnik.Datasource = Datasource
   toMapnik (Mapnik.Datasource ps) = Datasource.create =<< toMapnik ps
 
-instance ToMapnik (Either Datasource.HsDatasource Mapnik.Datasource) where
-  type MapnikType (Either Datasource.HsDatasource Mapnik.Datasource) = Datasource
+instance (ToMapnik a, ToMapnik b, MapnikType a ~ MapnikType b) => ToMapnik (Either a b) where
+  {-# SPECIALIZE instance ToMapnik (Either Datasource.HsDatasource Mapnik.Datasource) #-}
+  type MapnikType (Either a b) = MapnikType a
   toMapnik = either toMapnik toMapnik
 
 
