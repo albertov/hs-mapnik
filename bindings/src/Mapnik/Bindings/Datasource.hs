@@ -225,13 +225,13 @@ queryBox b = Query
 
 data HsDatasource where
   HsVector ::
-    { _extent             :: !Box
+    { _extent            :: !Box
     , fieldNames         :: !(Vector Text)
     , getFeatures        :: !(Query -> IO [Feature])
     , getFeaturesAtPoint :: !(Pair -> Double -> IO [Feature])
     } -> HsDatasource
   HsRaster :: RasterType a =>
-    { _extent             :: !Box
+    { _extent            :: !Box
     , fieldNames         :: !(Vector Text)
     , getRasters         :: !(Query -> IO [Raster a])
     , getFeaturesAtPoint :: !(Pair -> Double -> IO [Feature])

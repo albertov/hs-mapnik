@@ -4,3 +4,4 @@ result
 dist
 dist-newstyle
 core
+cabal.project

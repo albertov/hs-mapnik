@@ -13,9 +13,9 @@ import Mapnik.Style
 
 import Data.Text (Text)
 
-data Layer = Layer
+data Layer s = Layer
   { name                    :: !Text
-  , dataSource              :: !(Maybe Datasource)
+  , dataSource              :: !(Maybe s)
   , styles                  :: ![StyleName]
   , srs                     :: !(Maybe Proj4)
   , minimumScaleDenominator :: !(Maybe Double)
@@ -29,7 +29,7 @@ data Layer = Layer
   } deriving (Eq, Show, Generic)
 deriveMapnikJSON ''Layer
 
-layer :: Text -> Layer
+layer :: Text -> Layer s
 layer n = Layer
   { name                    = n
   , dataSource              = Nothing

@@ -32,8 +32,11 @@ class ToMapnik a where
   toMapnik :: a -> IO (MapnikType a)
 
 
-instance ToMapnik Mapnik.Map where
-  type MapnikType Mapnik.Map = Map
+instance (MapnikType s ~ Datasource, ToMapnik s) => ToMapnik (Mapnik.Map s) where
+  {-# SPECIALIZE instance ToMapnik (Mapnik.Map Mapnik.Datasource) #-}
+  {-# SPECIALIZE instance ToMapnik (Mapnik.Map Datasource.HsDatasource) #-}
+  {-# SPECIALIZE instance ToMapnik (Mapnik.Map (Either Datasource.HsDatasource Mapnik.Datasource)) #-}
+  type MapnikType (Mapnik.Map s) = Map
   toMapnik Mapnik.Map{..} = do
     m' <- Map.create
     forM_ backgroundColor        (setBackground m')
@@ -83,8 +86,11 @@ instance ToMapnik Mapnik.Map where
     ensureRelative Nothing s = s
     ensureRelative (Just b) s = b </> s
 
-instance ToMapnik Mapnik.Layer where
-  type MapnikType Mapnik.Layer = Layer
+instance (MapnikType s ~ Datasource, ToMapnik s) => ToMapnik (Mapnik.Layer s) where
+  type MapnikType (Mapnik.Layer s) = Layer
+  {-# SPECIALIZE instance ToMapnik (Mapnik.Layer Mapnik.Datasource) #-}
+  {-# SPECIALIZE instance ToMapnik (Mapnik.Layer Datasource.HsDatasource) #-}
+  {-# SPECIALIZE instance ToMapnik (Mapnik.Layer (Either Datasource.HsDatasource Mapnik.Datasource)) #-}
   toMapnik Mapnik.Layer {..} = do
     l <- Layer.create name
     forM_ dataSource              (Layer.setDatasource l <=< toMapnik)
@@ -100,9 +106,18 @@ instance ToMapnik Mapnik.Layer where
     forM_ styles                  (addStyle l)
     return l
 
+instance ToMapnik Datasource.HsDatasource where
+  type MapnikType Datasource.HsDatasource = Datasource
+  toMapnik = Datasource.createHsDatasource
+
 instance ToMapnik Mapnik.Datasource where
   type MapnikType Mapnik.Datasource = Datasource
   toMapnik (Mapnik.Datasource ps) = Datasource.create =<< toMapnik ps
+
+instance ToMapnik (Either Datasource.HsDatasource Mapnik.Datasource) where
+  type MapnikType (Either Datasource.HsDatasource Mapnik.Datasource) = Datasource
+  toMapnik = either toMapnik toMapnik
+
 
 instance ToMapnik Mapnik.Parameters where
   type MapnikType Mapnik.Parameters = Parameters

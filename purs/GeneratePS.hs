@@ -87,8 +87,8 @@ floatBridge = do
   return psNumber
 
 myTypes :: [SumType 'Haskell]
-myTypes = [ mkSumType (Proxy :: Proxy Map)
-          , mkSumType (Proxy :: Proxy Layer)
+myTypes = [ mkSumType (Proxy :: Proxy (Map A))
+          , mkSumType (Proxy :: Proxy (Layer A))
           , mkSumType (Proxy :: Proxy Style)
           , mkSumType (Proxy :: Proxy Rule)
           , mkSumType (Proxy :: Proxy Symbolizer)

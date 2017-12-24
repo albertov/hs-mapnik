@@ -47,6 +47,7 @@ module Mapnik.Bindings.Map (
 , getFontSetMap
 , registerFonts
 , removeAllLayers
+, unsafeFinalizeMap
 ) where
 
 import           Mapnik (Color(..), StyleName, AspectFixMode(..), CompositeMode
@@ -70,7 +71,7 @@ import           Data.Text (Text, unpack)
 import           Data.Text.Encoding (encodeUtf8)
 import           Data.ByteString (ByteString)
 import qualified Data.HashMap.Strict as M
-import           Foreign.ForeignPtr (FinalizerPtr)
+import           Foreign.ForeignPtr (FinalizerPtr, finalizeForeignPtr)
 import           Foreign.Ptr (Ptr)
 import           Foreign.C.String (CString)
 import           Foreign.Storable (poke)
@@ -99,6 +100,13 @@ foreign import ccall "&hs_mapnik_destroy_Map" destroyMap :: FinalizerPtr Map
 
 unsafeNew :: (Ptr (Ptr Map) -> IO ()) -> IO Map
 unsafeNew = mkUnsafeNew Map destroyMap
+
+-- | Calls the finalizer on the 'Map' pointer immediately. The pointer
+-- must not be used afterwards
+unsafeFinalizeMap :: Map -> IO ()
+unsafeFinalizeMap (Map fp) = finalizeForeignPtr fp
+
+
 
 create :: IO Map
 create = unsafeNew $ \p -> [C.block|void{*$(Map** p) = new Map();}|]

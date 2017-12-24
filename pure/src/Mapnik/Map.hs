@@ -19,7 +19,7 @@ import Mapnik.Layer
 import Prelude hiding (map)
 
 
-data Map = Map
+data Map s = Map
   { backgroundColor        :: !(Maybe Color)
   , backgroundImage        :: !(Maybe FilePath)
   , backgroundImageCompOp  :: !(Maybe CompositeMode)
@@ -31,12 +31,12 @@ data Map = Map
   , basePath               :: !(Maybe FilePath)
   , fontSets               :: !FontSetMap
   , styles                 :: !Styles
-  , layers                 :: ![Layer]
+  , layers                 :: ![Layer s]
   , parameters             :: !Parameters
   } deriving (Eq, Show, Generic)
 deriveMapnikJSON ''Map
 
-instance Default Map where
+instance Default (Map s) where
   def = Map
     { backgroundColor        = Nothing
     , backgroundImage        = Nothing

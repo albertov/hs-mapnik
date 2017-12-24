@@ -10,38 +10,39 @@
 module Mapnik.Server (Settings(..), ogcServer) where
 
 import qualified Mapnik.Bindings as Mapnik
-import Mapnik.Bindings.Render as RR (renderSettings, render)
-import Mapnik.Bindings.VectorTile.Render as VR (renderSettings, render)
-import qualified Mapnik.Bindings.Types  as MapnikB (Map(Map))
+import           Mapnik.Bindings.Render as RR (renderSettings, render)
+import           Mapnik.Bindings.VectorTile.Render as VR (renderSettings, render)
+import qualified Mapnik.Bindings.Types  as MapnikB (Map, Datasource)
+import qualified Mapnik.Bindings.Map  as MapnikB (unsafeFinalizeMap)
 
-import Control.Lens
-import Control.Monad.Reader     ( MonadReader )
-import Control.Monad.Logger     ( MonadLogger, logDebug, runLoggingT
-                                , MonadLoggerIO(askLoggerIO)
-                                , logInfo, logDebug)
-import Control.Monad.Base       (MonadBase(liftBase))
-import Control.Monad.Trans.Control (MonadBaseControl)
-import Codec.MIME.Type          (Type(..), MIMEType(..), showType)
-import Data.Time                (NominalDiffTime)
-import Data.Maybe               (fromJust)
-import Data.Scientific          (Scientific)
+import           Control.Lens
+import           Control.Monad.Reader ( MonadReader )
+import           Control.Monad.Logger (
+                    MonadLogger, logDebug, runLoggingT
+                  , MonadLoggerIO(askLoggerIO)
+                  , logInfo, logDebug)
+import           Control.Monad.Base (MonadBase(liftBase))
+import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Codec.MIME.Type (Type(..), MIMEType(..), showType)
+import           Data.Time       (NominalDiffTime)
+import           Data.Maybe      (fromJust)
+import           Data.Scientific (Scientific)
 import qualified Data.Vector.Storable as V
 import qualified Data.Pool as P
-import Protolude hiding (Map, hPutStrLn, replace, to)
-import Foreign.ForeignPtr (finalizeForeignPtr)
-import Network.Wai as Wai (
-    Application
-  , Request(..)
-  , responseLBS
-  , Response
-  , ResponseReceived
-  )
-import Network.Wai.Ogc.Common (parseRequest, ParseError(..))
-import Network.Wai.Ogc.Wms (SomeRequest(..), Request(..))
+import           Protolude hiding (Map, hPutStrLn, replace, to)
+import           Network.Wai as Wai (
+                    Application
+                  , Request(..)
+                  , responseLBS
+                  , Response
+                  , ResponseReceived
+                  )
+import           Network.Wai.Ogc.Common (parseRequest, ParseError(..))
+import           Network.Wai.Ogc.Wms (SomeRequest(..), Request(..))
 import qualified Network.Wai.Ogc.Wms as Wms
-import Network.HTTP.Types (status200, status415, status400)
-import GHC.Exts (fromList)
-import Prelude (String)
+import           Network.HTTP.Types (status200, status415, status400)
+import           GHC.Exts (fromList)
+import           Prelude (String)
 
 
 
@@ -51,41 +52,40 @@ data Settings = Settings
  , poolSize :: Int
  }
 
-data OgcEnv = OgcEnv
+data OgcEnv s = OgcEnv
   { settings :: Settings
-  , theMap :: Mapnik.Map
+  , theMap :: Mapnik.Map s
   , mapPool  :: P.Pool MapnikB.Map
   }
 
 type LiftedApplication r m = r -> (Response -> m ResponseReceived) -> m ResponseReceived
 
--- TODO: Move to bindings
-finalizeMap :: MapnikB.Map -> IO ()
-finalizeMap (MapnikB.Map fp) = finalizeForeignPtr fp
-
-
 ogcServer
-  :: (MonadLoggerIO m, MonadBaseControl IO m)
+  :: ( MonadLoggerIO m
+     , MonadBaseControl IO m
+     , Mapnik.ToMapnik s
+     , Mapnik.MapnikType s ~  MapnikB.Datasource
+     )
   => Settings
-  -> Mapnik.Map
+  -> Mapnik.Map s
   -> m Application
 ogcServer cfg m = do
   logger_ <- askLoggerIO
   app logger_ <$> liftBase
     (P.createPool
       (runLoggingT createMap_ logger_)
-      (flip runLoggingT logger_ . finalizeMap_)
+      (flip runLoggingT logger_ . finalizeMap)
       (poolStripes cfg)
       (poolTimeout cfg)
       (poolSize cfg)
       )
   where
   createMap_   = do
-    $logDebug $ "Map pool: Creating map: " <> show m
+    $logDebug $ "Map pool: Creating map"
     liftBase $ Mapnik.toMapnik m
-  finalizeMap_ m' = do
+  finalizeMap m' = do
     $logDebug $ "Map pool: destroying map"
-    liftBase (finalizeMap m')
+    liftBase (MapnikB.unsafeFinalizeMap m')
   app logger_ p req ( (liftBase .) -> resp ) = flip runLoggingT logger_ $
     let env = OgcEnv { settings = cfg, theMap = m, mapPool = p }
     in case parseRequest (queryString req) Nothing of
@@ -94,11 +94,11 @@ ogcServer cfg m = do
       Left  err ->
         runReaderT (renderError err req resp) env
 
-withMap :: (MonadReader OgcEnv m, MonadBaseControl IO m) => (MapnikB.Map -> m a) -> m a
+withMap :: (MonadReader (OgcEnv s) m, MonadBaseControl IO m) => (MapnikB.Map -> m a) -> m a
 withMap f = asks mapPool >>= (`P.withResource` f)
 
 dispatchWms
-  :: (MonadLogger m, MonadReader OgcEnv m, MonadBaseControl IO m)
+  :: (MonadLogger m, MonadReader (OgcEnv s) m, MonadBaseControl IO m)
   => LiftedApplication (Wms.Request t) m
 dispatchWms req@GetMap
   { wmsMapLayers
@@ -198,7 +198,7 @@ toProj4 _             = Nothing
 
 -- | FIXME: Should honor what wmsMap
 renderError
-  :: (MonadLogger m, MonadReader OgcEnv m, MonadBaseControl IO m)
+  :: (MonadLogger m, MonadReader (OgcEnv s) m, MonadBaseControl IO m)
   => ParseError -> LiftedApplication Wai.Request m
 renderError err _ respond = do
   $logDebug $ "Invalid WMS Request: " <> show err

@@ -65,7 +65,7 @@ makePrisms ''ImageFilter
 -- Instances
 --------------------------------------------------------------------------
 
-instance HasStyleLst Map.Map [(StyleName,Style)] where
+instance HasStyleLst (Map.Map s) [(StyleName,Style)] where
   styleLst = lens (M.toList . Map.styles)
                   (\s a -> s { Map.styles = M.fromList a})
 

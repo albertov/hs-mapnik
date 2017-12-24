@@ -29,7 +29,7 @@ import           Prelude hiding (filter)
 import qualified Prelude as P
 import           Paths_hs_mapnik (getDataFileName)
 
-instance Arbitrary Map where
+instance Arbitrary s => Arbitrary (Map s) where
   arbitrary = resize 10 $ do
     backgroundColor        <- arbitrary
     backgroundImage        <- arbitrary
@@ -46,7 +46,7 @@ instance Arbitrary Map where
     layers                 <- listOf (arbitraryLayer (M.keys styles))
     pure Map{..}
 
-instance Arbitrary Layer where
+instance Arbitrary s => Arbitrary (Layer s) where
   arbitrary = arbitraryLayer =<< listOf arbitrary
 
 instance Arbitrary Datasource where
@@ -621,7 +621,7 @@ arbitraryMinMaxScaleDenom = do
     Nothing   -> maybeArb (getPositive <$> arbitrary)
   pure (min_, max_)
 
-arbitraryLayer :: [StyleName] -> Gen Layer
+arbitraryLayer :: Arbitrary s => [StyleName] -> Gen (Layer s)
 arbitraryLayer stylesInMap = do
   name                    <- arbitrary
   dataSource              <- arbitrary

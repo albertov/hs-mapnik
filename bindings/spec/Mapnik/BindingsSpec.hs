@@ -400,7 +400,7 @@ mapXmlEq a b =
   (==) <$> (Map.toXml =<< toMapnik a)
        <*> (Map.toXml =<< toMapnik b)
 
-setExistingDatasources :: Map -> Map
+setExistingDatasources :: Map Datasource -> Map Datasource
 setExistingDatasources = layers . traverse . dataSource ?~ existingDatasource
   where
     existingDatasource = Datasource
@@ -409,7 +409,7 @@ setExistingDatasources = layers . traverse . dataSource ?~ existingDatasource
       , "file"     .= ("spec"</>"data"</>"popplaces")
       ]
 
-setExistingFontDir :: Map -> Map
+setExistingFontDir :: Map s -> Map s
 setExistingFontDir =
     (fontDirectory ?~ "spec"</>"data"</>"visual"</>"fonts"</>"Awesome")
   . (basePath ?~ ".")

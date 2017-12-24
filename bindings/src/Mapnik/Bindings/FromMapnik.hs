@@ -34,7 +34,7 @@ instance FromMapnik a => FromMapnik (Maybe a) where
   fromMapnik (Just a) = Just <$> fromMapnik a
 
 instance FromMapnik Map where
-  type HsType Map = Mapnik.Map
+  type HsType Map = Mapnik.Map Mapnik.Datasource
   fromMapnik m = do
     backgroundColor <- Map.getBackground m
     backgroundImage <- Map.getBackgroundImage m
@@ -69,7 +69,7 @@ instance FromMapnik Rule where
 
 
 instance FromMapnik Layer where
-  type HsType Layer = Mapnik.Layer
+  type HsType Layer = Mapnik.Layer Mapnik.Datasource
   fromMapnik l = do
     name                    <- Layer.getName l
     dataSource              <- fromMapnik =<< Layer.getDatasource l

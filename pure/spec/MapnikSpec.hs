@@ -19,7 +19,7 @@ main = hspec spec
 spec :: Spec
 spec = parallel $ do
   describe "JSON" $ do
-    describe "Map"   $ jsonProp (Proxy @Map)
+    describe "Map"   $ jsonProp (Proxy @(Map Datasource))
 
   describe "ImageFilter" $ do
     prop "parse (toText x) = Right x" $ \x ->

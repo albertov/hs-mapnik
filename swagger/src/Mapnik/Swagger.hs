@@ -7,6 +7,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Mapnik.Swagger () where
 
 import Mapnik hiding (properties)
@@ -66,8 +67,8 @@ deriving instance ToSchema VerticalAlignment
 deriving instance ToSchema TextTransform
 instance ToSchema TextPlacements where declareNamedSchema = allNullableSumSchema
 deriving instance ToSchema LineCap
-deriving instance ToSchema Layer
-deriving instance ToSchema Map
+deriving instance ToSchema (Layer Datasource)
+deriving instance ToSchema (Map Datasource)
 deriving instance ToSchema Datasource
 deriving instance ToSchema Box
 deriving instance ToSchema PixelRgba8
