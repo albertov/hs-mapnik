@@ -452,7 +452,13 @@ arbitraryGroupRule fontMap = do
   return GroupRule{..}
 
 arbitraryPlacements :: FontSetMap -> Gen TextPlacements
-arbitraryPlacements fontMap = Dummy <$> arbitraryTextSymProperties fontMap
+arbitraryPlacements fontMap = oneof [ dummy, list, simple ]
+  where
+    dummy = Dummy <$> arbitraryTextSymProperties fontMap
+    simple = Simple <$> arbitraryTextSymProperties fontMap
+                    <*> arbitrary
+    list = List <$> arbitraryTextSymProperties fontMap
+                <*> listOf (arbitraryTextSymProperties fontMap)
 
 arbitraryTextSymProperties :: FontSetMap -> Gen TextSymProperties
 arbitraryTextSymProperties fontMap = do
@@ -478,6 +484,11 @@ instance Arbitrary TextProperties where
     largestBoxOnly          <- arbitrary
     upright                 <- arbitrary
     pure TextProperties{..}
+
+instance Arbitrary SimplePlacementPosition where
+  arbitrary = SimplePlacementPosition
+          <$> arbitrary
+          <*> arbitrary
 
 instance Arbitrary TextLayoutProperties where
   arbitrary = do

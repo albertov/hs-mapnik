@@ -8,7 +8,6 @@ module Mapnik.Layer where
 
 import Mapnik.Imports
 import Mapnik.Common
-import Mapnik.Datasource
 import Mapnik.Style
 
 import Data.Text (Text)

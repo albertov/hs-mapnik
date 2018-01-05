@@ -114,10 +114,15 @@ module Mapnik (
 , textSym
 -- *** Properties
 , TextSymProperties
-, TextPlacements
 , TextProperties
 , TextFormatProperties
 , TextLayoutProperties
+-- **** Placements
+, TextPlacements
+, SimplePlacementPosition
+, dummyPlacements
+, listPlacements
+, simplePlacements
 -- **** Format
 , Format
 , formatExp

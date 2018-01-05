@@ -241,10 +241,33 @@ data TextSymProperties = TextSymProperties
   , format           :: !Format
   } deriving (Eq, Show, Generic, Default)
 
+data SimplePlacementPosition = SimplePlacementPosition
+  { textSizes            :: ![Int]
+  , directions           :: ![PlacementDirection]
+  } deriving (Eq, Show, Generic, Default)
 
-newtype TextPlacements = Dummy TextSymProperties
-  deriving (Generic)
-  deriving newtype (Eq, Show, Default)
+ 
+data TextPlacements
+  = Simple
+    { defaults  :: !TextSymProperties
+    , positions :: !(PropValue [SimplePlacementPosition])
+    }
+  | List
+    { defaults :: !TextSymProperties
+    , placements :: ![TextSymProperties]
+    }
+  | Dummy
+    { defaults :: !TextSymProperties
+    }
+  deriving (Eq, Show, Generic)
+
+simplePlacements, listPlacements, dummyPlacements :: TextPlacements
+simplePlacements = Simple def def
+listPlacements = List def def
+dummyPlacements = Dummy def
+
+instance Default TextPlacements where def = dummyPlacements
+
 
 #define BASE_PROPS \
     simplifyTolerance :: !(PropValue Double) \
@@ -564,3 +587,4 @@ deriveMapnikJSON ''Stop
 deriveMapnikJSON ''Colorizer
 deriveMapnikJSON ''GroupLayout
 deriveMapnikJSON ''GroupRule
+deriveMapnikJSON ''SimplePlacementPosition

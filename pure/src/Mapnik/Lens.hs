@@ -41,6 +41,8 @@ makeMapnikFields ''Rule
 makeMapnikFields ''Style
 makeMapnikFields ''Format
 makeMapnikFields ''TextProperties
+makeMapnikFields ''TextPlacements
+makeMapnikFields ''SimplePlacementPosition
 makeMapnikFields ''TextFormatProperties
 makeMapnikFields ''TextLayoutProperties
 makeMapnikFields ''TextSymProperties
@@ -59,6 +61,7 @@ makePrisms ''Format
 makePrisms ''GroupLayout
 makePrisms ''Font
 makePrisms ''ImageFilter
+makePrisms ''TextPlacements
 
 
 --------------------------------------------------------------------------
