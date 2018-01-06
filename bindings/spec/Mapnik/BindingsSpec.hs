@@ -124,19 +124,7 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
     it "can parse and serialize all mapnik test maps" $ do
       let styleDir = "spec"</>"data"</>"visual"</>"styles"
       maps <- listDirectory styleDir
-      let unsupported = [ "formatting.xml" -- XXX: Has non-dummy placements
-                        , "list.xml" -- XXX: Has non-dummy placements
-                        , "shield-on-polygon.xml" -- XXX: Has non-dummy placements
-                        , "simple-E.xml" -- XXX: Has non-dummy placements
-                        , "simple-N.xml" -- XXX: Has non-dummy placements
-                        , "simple-NE.xml" -- XXX: Has non-dummy placements
-                        , "simple-NW.xml" -- XXX: Has non-dummy placements
-                        , "simple-SE.xml" -- XXX: Has non-dummy placements
-                        , "simple-SW.xml" -- XXX: Has non-dummy placements
-                        , "simple-W.xml" -- XXX: Has non-dummy placements
-                        , "simple-S.xml" -- XXX: Has non-dummy placements
-                        , "simple-shield.xml" -- XXX: Has non-dummy placements
-                        , "simple.xml" -- XXX: Has non-dummy placements
+      let unsupported = [ "list.xml" -- XXX: Has list placements
                         , "text-bug1533.xml" -- Ditto
                         , "text-multi-layout-1.xml" -- ditto
 

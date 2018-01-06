@@ -28,7 +28,7 @@ module Mapnik.Bindings.Symbolizer (
 
 import qualified Mapnik
 import           Mapnik.Lens
-import           Mapnik.Symbolizer (Prop(..))
+import           Mapnik.Symbolizer (Prop(..), placementPositionToText, parsePlacementPosition)
 import qualified Mapnik.Symbolizer as Mapnik
 import qualified Mapnik.Common as Mapnik
 import           Mapnik.Enums
@@ -746,29 +746,82 @@ keyIndex FfSettings = [C.pure|keys{keys::ff_settings}|]
 foreign import ccall "&hs_mapnik_destroy_TextPlacements" destroyTextPlacements :: FinalizerPtr TextPlacements
 
 createTextPlacements :: Mapnik.TextPlacements -> SvM TextPlacements
-createTextPlacements (Mapnik.Dummy defs) = unsafeNew' $ \p -> do
+createTextPlacements (Mapnik.Dummy defs) = unsafeNewPlacements $ \p -> do
   defaults <- createTextSymProps defs
   [C.block|void {
     auto placements = new text_placements_dummy;
     *$(text_placements_ptr **p) = new text_placements_ptr(placements);
     placements->defaults = *$fptr-ptr:(text_symbolizer_properties *defaults);
   }|]
-  where
-    unsafeNew' = mkUnsafeNew TextPlacements destroyTextPlacements
+createTextPlacements (Mapnik.Simple defs (Val poss)) = unsafeNewPlacements $ \p -> do
+  let s = encodeUtf8 (placementPositionToText (Val poss))
+      szs = V.fromList (poss^.textSizes)
+      dirs = V.fromList (poss^.directions.to (map fromEnum)) :: V.Vector Int
+  defaults <- createTextSymProps defs
+  [C.block|void {
+    std::vector<int> szs($vec-len:szs);
+    std::vector<directions_e> dirs($vec-len:dirs);
+    auto placements = new text_placements_simple(
+      std::string($bs-ptr:s, $bs-len:s), std::move(dirs), std::move(szs));
+    *$(text_placements_ptr **p) = new text_placements_ptr(placements);
+    placements->defaults = *$fptr-ptr:(text_symbolizer_properties *defaults);
+  }|]
+createTextPlacements (Mapnik.Simple defs (Exp (Mapnik.Expression poss))) = unsafeNewPlacements $ \p ->
+  case Expression.parse poss of
+    Right e -> do
+      defaults <- createTextSymProps defs
+      [C.block|void {
+        auto placements = new text_placements_simple($fptr-ptr:(expression_ptr *e));
+        *$(text_placements_ptr **p) = new text_placements_ptr(placements);
+        placements->defaults = *$fptr-ptr:(text_symbolizer_properties *defaults);
+      }|]
+    Left e -> throwIO (ConfigError ("Could not parse placements expression" ++ e))
+
+unsafeNewPlacements :: (Ptr (Ptr TextPlacements)
+                    -> ReaderT Mapnik.FontSetMap IO ())
+                    -> ReaderT Mapnik.FontSetMap IO TextPlacements
+unsafeNewPlacements = mkUnsafeNew TextPlacements destroyTextPlacements
 
 
 
 unCreateTextPlacements :: TextPlacements -> SvM Mapnik.TextPlacements
-unCreateTextPlacements p =
-  fmap Mapnik.Dummy . unCreateTextSymProps =<< C.withPtr_ (\ret ->
-    [C.catchBlock|
-    auto ptr = dynamic_cast<text_placements_dummy *>($fptr-ptr:(text_placements_ptr *p)->get());
-    if (!ptr) {
-       throw (std::runtime_error("hs-mapnik only supports DummyPlacements"));
-       }
-    *$(text_symbolizer_properties **ret) = &ptr->defaults;
-    |])
+unCreateTextPlacements p = do
+  dummy <- uncreateDummy
+  simple <- uncreateSimple
+  maybe (throwIO (FromMapnikError "Unsupported text placements")) return
+    (dummy <|> simple)
+  where
+    uncreateDummy = do
+      ptr <- C.withPtr_ $ \ ret -> [C.block|void {
+        auto ptr = dynamic_cast<text_placements_dummy *>($fptr-ptr:(text_placements_ptr *p)->get());
+        if (ptr) {
+          *$(text_symbolizer_properties **ret) = &ptr->defaults;
+        } else {
+          *$(text_symbolizer_properties **ret) = nullptr;
+        }
+      }|]
+      if ptr == nullPtr then return Nothing else
+        Just . Mapnik.Dummy <$> unCreateTextSymProps ptr
 
+    uncreateSimple = do
+      (props,ptr,len) <- C.withPtrs_  $ \ (props, ptr,len) -> [C.block|void {
+        auto ptr = dynamic_cast<text_placements_simple *>($fptr-ptr:(text_placements_ptr *p)->get());
+        if (ptr) {
+          mallocedString(ptr->get_positions(), $(char **ptr), $(int *len));
+          *$(text_symbolizer_properties **props) = &ptr->defaults;
+        } else {
+          *$(char **ptr) = nullptr;
+        }
+      }|]
+      if ptr == nullPtr then pure Nothing else do
+        pos <- newText "get_positions" $ \(ptr',len') -> liftIO $ do
+          poke ptr' ptr
+          poke len' len
+        case parsePlacementPosition pos of
+          Right ps -> do
+            defs <- unCreateTextSymProps props
+            pure (Just (Mapnik.Simple defs ps))
+          Left e -> throwIO (FromMapnikError e)
 
 instance Variant SymbolizerValue Mapnik.TextPlacements where
   peekV p = unCreateTextPlacements =<<
@@ -1139,7 +1192,7 @@ peekFont :: MonadBaseControl IO m
   => m (Either (Ptr (Maybe String)) (Ptr String))
   -> m (Ptr (Maybe FontSet))
   -> m (Maybe Mapnik.Font)
-peekFont f1 f2 = ((<|>) <$> (getFaceName =<< f1) <*> (getFontSetName =<< f2)) where
+peekFont f1 f2 = (<|>) <$> (getFaceName =<< f1) <*> (getFontSetName =<< f2) where
   getFaceName (Left p) = fmap (fmap Mapnik.FaceName) $
     newTextMaybe "unFormat(peekFont.faceName)" $ \(ret,len) ->
     [C.block|void {
@@ -1607,7 +1660,7 @@ peekGroupRule p = do
     }|]
   symsRef <- newIORef []
   let cb :: Ptr Symbolizer -> IO ()
-      cb p = do s <- mkUnsafeNew Symbolizer destroySymbolizer (flip poke p)
+      cb p = do s <- mkUnsafeNew Symbolizer destroySymbolizer (`poke` p)
                 modifyIORef' symsRef (s:)
   [C.safeBlock|void {
     auto const r = *$(group_rule_ptr *p);

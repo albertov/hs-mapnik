@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RankNTypes #-}
@@ -18,7 +19,13 @@ import Mapnik.Common
 import Mapnik.Color
 import Mapnik.Enums
 
+import Control.Applicative ((<|>), optional)
+import Control.Monad (unless, void, when)
 import Data.Text (Text)
+import Data.Maybe (fromMaybe)
+import Data.Monoid ((<>))
+import qualified Data.Text as T
+import Data.Attoparsec.Text
 import Data.Default (Default(def))
 
 import GHC.Exts (IsList(..))
@@ -241,16 +248,70 @@ data TextSymProperties = TextSymProperties
   , format           :: !Format
   } deriving (Eq, Show, Generic, Default)
 
+
 data SimplePlacementPosition = SimplePlacementPosition
   { textSizes            :: ![Int]
   , directions           :: ![PlacementDirection]
-  } deriving (Eq, Show, Generic, Default)
+  } deriving (Eq, Show, Generic)
 
+instance Default SimplePlacementPosition where
+  def = SimplePlacementPosition [] [PExact]
+
+placementPositionToText :: Prop SimplePlacementPosition -> Text
+placementPositionToText (Exp (Expression e)) = e
+placementPositionToText (Val (SimplePlacementPosition sizes dirs)) =
+  wrap (T.intercalate "," $ map toTextDir dirs ++ map toTextSz sizes)
+  where
+    -- work around mapnik strainge behaviour
+    wrap s
+      | length dirs ==1 && null sizes = "'" <> s <> "'"
+      | otherwise                     = s
+    toTextDir North = "N"
+    toTextDir East = "E"
+    toTextDir South = "S"
+    toTextDir West = "W"
+    toTextDir NorthEast = "NE"
+    toTextDir SouthEast = "SE"
+    toTextDir NorthWest = "NW"
+    toTextDir SouthWest = "SW"
+    toTextDir PExact = "X"
+
+    toTextSz = T.pack . show
+
+parsePlacementPosition :: Text -> Either String (Prop SimplePlacementPosition)
+parsePlacementPosition = parseOnly (
+  (   (Val <$> placementParser)
+  <|> (Val <$> (char '\'' *> placementParser <* char '\''))
+  <|> (Exp . Expression <$> takeText)
+  ) <* endOfInput)
+
+placementParser :: Parser SimplePlacementPosition
+placementParser = do
+  dirs <- fromMaybe [] <$> optional (directionParser `sepBy` char ',')
+  sizes <- fromMaybe [] <$> optional (do
+    unless (null dirs) (void (char ','))
+    decimal `sepBy` char ','
+    )
+  when (null dirs && null sizes) (fail "no dirs or sizes")
+  pure (SimplePlacementPosition sizes dirs)
+
+directionParser :: Parser PlacementDirection
+directionParser = choice
+  [ "NE" *> pure NorthEast
+  , "NW" *> pure NorthWest
+  , "SE" *> pure SouthEast
+  , "SW" *> pure SouthWest
+  , "N"  *> pure North
+  , "S"  *> pure South
+  , "E"  *> pure East
+  , "W"  *> pure West
+  , "X"  *> pure PExact
+  ]
  
 data TextPlacements
   = Simple
     { defaults  :: !TextSymProperties
-    , positions :: !(PropValue [SimplePlacementPosition])
+    , positions :: !(Prop SimplePlacementPosition)
     }
   | List
     { defaults :: !TextSymProperties
@@ -262,7 +323,7 @@ data TextPlacements
   deriving (Eq, Show, Generic)
 
 simplePlacements, listPlacements, dummyPlacements :: TextPlacements
-simplePlacements = Simple def def
+simplePlacements = Simple def (Val def)
 listPlacements = List def def
 dummyPlacements = Dummy def
 

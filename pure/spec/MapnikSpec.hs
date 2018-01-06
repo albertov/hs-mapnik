@@ -4,6 +4,7 @@ module MapnikSpec (main, spec) where
 
 import Mapnik
 import Mapnik.ImageFilter as IF
+import Mapnik.Symbolizer (parsePlacementPosition, placementPositionToText)
 import Mapnik.Color as Color
 import Mapnik.QuickCheck ()
 
@@ -38,6 +39,11 @@ spec = parallel $ do
           str = Color.toText x
       in counterexample (show (str, res)) $ res == Right x
 
+  describe "SimplePlacementPosition" $
+    prop "parse (toText x) = Right x" $ \x ->
+      let res = parsePlacementPosition str
+          str = placementPositionToText (Val x)
+      in counterexample (show (str, res)) $ res == Right (Val x)
 
 jsonProp
   :: forall p a.
