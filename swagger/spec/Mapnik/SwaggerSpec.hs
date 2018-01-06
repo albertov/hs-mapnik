@@ -66,6 +66,7 @@ spec = describe "ToJSON matches ToSchema" $ do
   describe "VerticalAlignment" $ swaggerProp(Proxy @VerticalAlignment)
   describe "TextTransform" $ swaggerProp(Proxy @TextTransform)
   describe "TextPlacements" $ swaggerProp(Proxy @TextPlacements)
+  describe "SimplePlacementPosition" $ swaggerProp(Proxy @SimplePlacementPosition)
   describe "LineCap" $ swaggerProp(Proxy @LineCap)
   describe "ImageFilter" $ swaggerProp(Proxy @ImageFilter)
   describe "Layer" $ swaggerProp(Proxy @(Layer Datasource))

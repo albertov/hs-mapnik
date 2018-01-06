@@ -65,7 +65,8 @@ instance ToSchema GroupRule where declareNamedSchema = allNullableSumSchema
 deriving instance ToSchema JustifyAlignment
 deriving instance ToSchema VerticalAlignment
 deriving instance ToSchema TextTransform
-instance ToSchema TextPlacements where declareNamedSchema = allNullableSumSchema
+instance ToSchema TextPlacements
+instance ToSchema SimplePlacementPosition
 deriving instance ToSchema LineCap
 deriving instance ToSchema (Layer Datasource)
 deriving instance ToSchema (Map Datasource)
