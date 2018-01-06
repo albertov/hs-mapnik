@@ -124,15 +124,11 @@ spec = beforeAll_ registerDefaults $ parallel $ do --replicateM_ 500 $ do
     it "can parse and serialize all mapnik test maps" $ do
       let styleDir = "spec"</>"data"</>"visual"</>"styles"
       maps <- listDirectory styleDir
-      let unsupported = [ "list.xml" -- XXX: Has list placements
-                        , "text-bug1533.xml" -- Ditto
-                        , "text-multi-layout-1.xml" -- ditto
-
-                        , "multipolygon-centroid-postgis.xml" -- No postgis for tests
+      let unsupported = [ "multipolygon-centroid-postgis.xml" -- No postgis for tests
                         , "text-line-null.xml" -- ditto
                         , "text-point-null.xml" --ditto
-                        , "postgis-inline.xml"
-                        , "rasterlite-globe.xml"
+                        , "postgis-inline.xml"  -- ditto
+                        , "rasterlite-globe.xml" -- no rasterlite
                         ] :: [String]
       forM_ maps $ \sty -> unless (sty `elem` unsupported) $ do
         m1 <- Map.fromXmlFile (styleDir</>sty)

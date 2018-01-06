@@ -452,7 +452,7 @@ arbitraryGroupRule fontMap = do
   return GroupRule{..}
 
 arbitraryPlacements :: FontSetMap -> Gen TextPlacements
-arbitraryPlacements fontMap = oneof [ dummy, simple ]
+arbitraryPlacements fontMap = oneof [ dummy, simple, list ]
   where
     dummy = Dummy <$> arbitraryTextSymProperties fontMap
     simple = Simple <$> arbitraryTextSymProperties fontMap

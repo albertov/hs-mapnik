@@ -776,6 +776,19 @@ createTextPlacements (Mapnik.Simple defs (Exp (Mapnik.Expression poss))) = unsaf
         placements->defaults = *$fptr-ptr:(text_symbolizer_properties *defaults);
       }|]
     Left e -> throwIO (ConfigError ("Could not parse placements expression" ++ e))
+createTextPlacements (Mapnik.List defs ps) = unsafeNewPlacements $ \p -> do
+  defaults <- createTextSymProps defs
+  [C.block|void {
+    auto placements = new text_placements_list;
+    *$(text_placements_ptr **p) = new text_placements_ptr(placements);
+    placements->defaults = *$fptr-ptr:(text_symbolizer_properties *defaults);
+  }|]
+  forM_ ps $ \ placement -> do
+    props <- createTextSymProps placement
+    [C.block|void {
+      auto ptr = dynamic_cast<text_placements_list *>((*$(text_placements_ptr **p))->get());
+      ptr->add() = *$fptr-ptr:(text_symbolizer_properties *props);
+    }|]
 
 unsafeNewPlacements :: (Ptr (Ptr TextPlacements)
                     -> ReaderT Mapnik.FontSetMap IO ())
@@ -788,8 +801,9 @@ unCreateTextPlacements :: TextPlacements -> SvM Mapnik.TextPlacements
 unCreateTextPlacements p = do
   dummy <- uncreateDummy
   simple <- uncreateSimple
+  list <- uncreateList
   maybe (throwIO (FromMapnikError "Unsupported text placements")) return
-    (dummy <|> simple)
+    (dummy <|> simple <|> list)
   where
     uncreateDummy = do
       ptr <- C.withPtr_ $ \ ret -> [C.block|void {
@@ -822,6 +836,26 @@ unCreateTextPlacements p = do
             defs <- unCreateTextSymProps props
             pure (Just (Mapnik.Simple defs ps))
           Left e -> throwIO (FromMapnikError e)
+    uncreateList = do
+      ref <- newIORef []
+      fontMap <- ask
+      let cb :: Ptr TextSymProperties -> IO ()
+          cb ptr = do
+            props <- runReaderT (unCreateTextSymProps ptr) fontMap
+            modifyIORef' ref (props:)
+      [C.safeBlock|void {
+        auto ptr = dynamic_cast<text_placements_list *>($fptr-ptr:(text_placements_ptr *p)->get());
+        if (ptr) {
+          $fun:(void (*cb)(text_symbolizer_properties *))(&ptr->defaults);
+          for (int i=0; i<ptr->size(); ++i) {
+            $fun:(void (*cb)(text_symbolizer_properties *))(&ptr->get(i));
+          }
+        }
+      }|]
+      ps <- reverse <$> readIORef ref
+      case ps of
+        (p:rest) -> pure (Just (Mapnik.List p rest))
+        []       -> pure Nothing
 
 instance Variant SymbolizerValue Mapnik.TextPlacements where
   peekV p = unCreateTextPlacements =<<
