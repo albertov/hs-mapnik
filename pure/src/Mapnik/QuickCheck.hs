@@ -40,14 +40,17 @@ instance Arbitrary s => Arbitrary (Map s) where
     maximumExtent          <- arbitrary
     fontDirectory          <- arbitrary
     basePath               <- arbitrary
-    fontSets               <- arbitrary
+    fontSets               <- arbitraryFontSets
     parameters             <- arbitrary
-    styles                 <- M.fromList <$> listOf ((,) <$> arbitrary <*> arbitraryStyle fontSets)
+    styles                 <- M.fromList <$> listOf ((,) <$> arbitraryText <*> arbitraryStyle fontSets)
     layers                 <- listOf (arbitraryLayer (M.keys styles))
     pure Map{..}
 
+arbitraryFontSets :: Gen FontSetMap
+arbitraryFontSets = M.fromList <$> listOf ((,) <$> arbitraryText <*> listOf arbitraryText)
+
 instance Arbitrary s => Arbitrary (Layer s) where
-  arbitrary = arbitraryLayer =<< listOf arbitrary
+  arbitrary = arbitraryLayer =<< listOf arbitraryText
 
 instance Arbitrary Datasource where
   arbitrary = pure $ Datasource
@@ -67,7 +70,7 @@ arbitraryStyle fontMap = do
 
 arbitraryRule :: FontSetMap -> Gen Rule
 arbitraryRule fontMap = do
-  name                      <- maybeArb arbitrary
+  name                      <- maybeArb arbitraryText
   symbolizers               <- scale (min 5) (listOf (arbitrarySymbolizer fontMap))
   filter                    <- arbitrary
   hasElse                   <- arbitrary
@@ -410,7 +413,7 @@ instance Arbitrary Dash where
                    <*> (getPositive <$> arbitrary)
 
 instance Arbitrary Value where
-  arbitrary = oneof [ TextValue   <$> arbitrary
+  arbitrary = oneof [ TextValue   <$> arbitraryText
                     , DoubleValue <$> arbitrary
                     , IntValue    <$> arbitrary
                     , BoolValue   <$> arbitrary
@@ -430,7 +433,7 @@ instance Arbitrary Stop where
     value <- arbitrary
     color <- arbitrary
     mode  <- arbitrary
-    label <- maybeArb arbitrary
+    label <- maybeArb arbitraryText
     pure Stop{..}
 
 arbitraryGroupSymProperties :: FontSetMap -> Gen GroupSymProperties
@@ -524,9 +527,9 @@ arbitraryTextFormatProperties fontMap = do
   pure TextFormatProperties{..}
 
 arbitraryFont :: FontSetMap -> Gen Font
-arbitraryFont fontMap | M.null fontMap = FaceName <$> arbitrary
+arbitraryFont fontMap | M.null fontMap = FaceName <$> arbitraryText
 arbitraryFont fontMap = oneof
-  [ FaceName <$> arbitrary
+  [ FaceName <$> arbitraryText
   , FontSetName <$> elements  (M.keys fontMap)
   ]
 
@@ -586,7 +589,7 @@ arbitraryFormat fontMap = oneof
   arbitraryFormatExp = FormatExp <$> arbitrary
 
 instance Arbitrary Font where
-  arbitrary = oneof [FaceName <$> arbitraryFaceName, FontSetName <$> arbitrary]
+  arbitrary = oneof [FaceName <$> arbitraryFaceName, FontSetName <$> arbitraryText]
     where
       arbitraryFaceName = elements
         [ "DejaVu Sans Book"
@@ -635,7 +638,7 @@ arbitraryMinMaxScaleDenom = do
 
 arbitraryLayer :: Arbitrary s => [StyleName] -> Gen (Layer s)
 arbitraryLayer stylesInMap = do
-  name                    <- arbitrary
+  name                    <- arbitraryText
   dataSource              <- arbitrary
   styles                  <- if null stylesInMap then pure [] else
                              listOf (elements stylesInMap)
@@ -645,7 +648,7 @@ arbitraryLayer stylesInMap = do
   queryable               <- arbitrary
   clearLabelCache         <- arbitrary
   cacheFeatures           <- arbitrary
-  groupBy                 <- maybeArb arbitrary
+  groupBy                 <- maybeArb arbitraryText
   bufferSize              <- maybeArb (getNonNegative <$> arbitrary)
   maximumExtent           <- arbitrary
   pure Layer{..}
@@ -656,9 +659,6 @@ maybeArb gen = oneof [pure Nothing, Just <$> gen]
 instance Arbitrary v => Arbitrary (M.HashMap T.Text v) where
   arbitrary = sized $ \n ->
     M.fromList <$> (zip <$> vectorOf n arbitraryText <*> arbitrary)
-
-instance Arbitrary T.Text where
-  arbitrary = arbitraryText
 
 arbitraryText :: Gen T.Text
 arbitraryText =
