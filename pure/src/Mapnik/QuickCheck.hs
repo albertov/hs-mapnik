@@ -18,7 +18,6 @@ import           Mapnik.ImageFilter
 import           Mapnik.Enums
 import           Mapnik.Parameter
 
-import           Data.Char (isPrint)
 import qualified Data.HashMap.Strict as M
 import qualified Data.Text as T
 import qualified Data.Vector.Storable as St
@@ -663,8 +662,3 @@ instance Arbitrary v => Arbitrary (M.HashMap T.Text v) where
 arbitraryText :: Gen T.Text
 arbitraryText =
   sized $ \n -> T.pack <$> vectorOf n arbitraryPrintableChar
-
-arbitraryPrintableChar :: Gen Char
-arbitraryPrintableChar = do
-  c <- arbitrary
-  if isPrint c then pure c else arbitraryPrintableChar

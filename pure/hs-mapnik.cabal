@@ -53,7 +53,7 @@ test-suite spec
                   , hspec
                   , hspec-core >= 1.13
                   , hs-mapnik
-                  , QuickCheck
+                  , QuickCheck >= 2.10
                   , aeson
 
   hs-source-dirs:   spec
