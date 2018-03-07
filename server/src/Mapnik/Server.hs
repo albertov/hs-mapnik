@@ -29,7 +29,7 @@ import           Data.Maybe      (fromJust)
 import           Data.Scientific (Scientific)
 import qualified Data.Vector.Storable as V
 import qualified Data.Pool as P
-import           Protolude hiding (Map, hPutStrLn, replace, to)
+import           Protolude hiding (Map, Type, hPutStrLn, replace, to)
 import           Network.Wai as Wai (
                     Application
                   , Request(..)
