@@ -20,21 +20,23 @@ mapnikConfigHook f (pkg0, pbi) flags = do
  configureWithMapnikConfig f lbi flags
 
 configureWithMapnikConfig f lbi flags = do
-  myExtraLibs    <- getFlagValues 'l' <$> mapnikConfig ["--libs"]
-  myExtraLibDirs <- getFlagValues 'L' <$> mapnikConfig ["--ldflags"]
-  myIncludeDirs  <- getFlagValues 'I' <$> mapnikConfig ["--includes", "--dep-includes"]
-  myCppOptions   <- words <$> mapnikConfig ["--defines"]
+  myExtraLibs     <- getFlagValues 'l' <$> mapnikConfig ["--libs"]
+  icuExtraLibs    <- getFlagValues 'l' <$> icuConfig ["--ldflags"]
+  icuExtraLibDirs <- getFlagValues 'L' <$> icuConfig ["--ldflags"]
+  myExtraLibDirs  <- getFlagValues 'L' <$> mapnikConfig ["--ldflags"]
+  myIncludeDirs   <- getFlagValues 'I' <$> mapnikConfig ["--includes", "--dep-includes"]
+  myCppOptions    <- words <$> mapnikConfig ["--defines"]
   -- Strip optimization flags to avoid -O3 on development. We can still set it with
   -- "cc-options"
   myCcOptions    <- filter (not . isPrefixOf "-O") . words
                 <$> mapnikConfig ["--defines", "--cxxflags"]
   myLdOptions    <- words <$> mapnikConfig ["--ldflags"]
   icuLdOptions    <- words <$> icuConfig ["--ldflags"]
-  mapnikInputPluginDir <- (escapeWinPathSep . head . words) <$>
-    mapnikConfig ["--input-plugins"]
-  mapnikFontDir <- (escapeWinPathSep . head . words) <$> (mapnikConfig ["--fonts"])
-  let updBinfo bi = f $ bi { extraLibDirs = extraLibDirs bi ++ myExtraLibDirs
-                           , extraLibs    = extraLibs    bi ++ myExtraLibs
+  mapnikInputPluginDir <- (escapeWinPathSep . head . words)
+                      <$> mapnikConfig ["--input-plugins"]
+  mapnikFontDir <- escapeWinPathSep . head . words <$> mapnikConfig ["--fonts"]
+  let updBinfo bi = f $ bi { extraLibDirs = extraLibDirs bi ++ myExtraLibDirs ++ icuExtraLibDirs
+                           , extraLibs    = extraLibs    bi ++ myExtraLibs ++ icuExtraLibs
                            , includeDirs  = includeDirs  bi ++ myIncludeDirs
                            , ccOptions    = ccOptions    bi ++ myCcOptions
                            , ldOptions    = ldOptions    bi ++ myLdOptions ++ icuLdOptions
