@@ -1,15 +1,12 @@
 language: nix
 sudo: false
 
-env:
-  - RECIPE=with_821
-
 os:
   - linux
   - osx
 
 script:
-  - nix-build -A ${RECIPE} travis.nix
+  - nix-build nix/travis.nix
 
 cache:
   directories:

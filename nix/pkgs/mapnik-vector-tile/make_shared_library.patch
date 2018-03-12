@@ -1,0 +1,48 @@
+diff --git a/gyp/build.gyp b/gyp/build.gyp
+index 7ab392a..1547081 100644
+--- a/gyp/build.gyp
++++ b/gyp/build.gyp
+@@ -32,7 +32,7 @@
+       "target_name": "vector_tile",
+       'dependencies': [ 'make_vector_tile' ],
+       'hard_dependency': 1,
+-      "type": "static_library",
++      "type": "shared_library",
+       "sources": [
+         "<(SHARED_INTERMEDIATE_DIR)/vector_tile.pb.cc"
+       ],
+@@ -41,14 +41,14 @@
+       ],
+       'cflags_cc' : [
+           '-D_THREAD_SAFE',
+-          '<!@(mapnik-config --cflags)',
++          '<!@(mapnik-config --cflags | sed s/-fvisibility=hidden//g) '
+           '-Wno-sign-compare',
+           '-Wno-sign-conversion'
+       ],
+       'xcode_settings': {
+         'OTHER_CPLUSPLUSFLAGS':[
+            '-D_THREAD_SAFE',
+-           '<!@(mapnik-config --cflags)',
++           '<!@(mapnik-config --cflags | sed s/-fvisibility=hidden//g) '
+            '-Wno-sign-compare',
+            '-Wno-sign-conversion'
+         ],
+@@ -74,7 +74,7 @@
+       "target_name": "mapnik_vector_tile_impl",
+       'dependencies': [ 'vector_tile' ],
+       'hard_dependency': 1,
+-      "type": "static_library",
++      "type": "shared_library",
+       "sources": [
+         "<!@(find ../src/ -name '*.cpp')"
+       ],
+@@ -82,7 +82,7 @@
+         "<@(common_defines)"
+       ],
+       'cflags_cc' : [
+-          '<!@(mapnik-config --cflags)'
++          '<!@(mapnik-config --cflags | sed s/-fvisibility=hidden//g) '
+       ],
+       'xcode_settings': {
+         'OTHER_CPLUSPLUSFLAGS':[
