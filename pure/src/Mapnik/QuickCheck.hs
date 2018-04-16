@@ -655,9 +655,11 @@ arbitraryLayer stylesInMap = do
 maybeArb :: Gen a -> Gen (Maybe a)
 maybeArb gen = oneof [pure Nothing, Just <$> gen]
 
-instance Arbitrary v => Arbitrary (M.HashMap T.Text v) where
-  arbitrary = sized $ \n ->
-    M.fromList <$> (zip <$> vectorOf n arbitraryText <*> arbitrary)
+instance Arbitrary Parameters where arbitrary = arbitraryStrMap
+
+arbitraryStrMap :: Arbitrary v => Gen (M.HashMap T.Text v)
+arbitraryStrMap = sized $ \n ->
+  M.fromList <$> (zip <$> vectorOf n arbitraryText <*> arbitrary)
 
 arbitraryText :: Gen T.Text
 arbitraryText =
