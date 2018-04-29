@@ -88,10 +88,10 @@ fromRgba8 (ImageRgba8 (fromIntegral -> width, fromIntegral -> height) rgba8) =
   unsafePerformIO $ fmap Just $ unsafeNew $ \ptr ->
     [C.block|void {
     *$(image_rgba8 **ptr) =
-      new mapnik::image_rgba8(
-        $(int width), $(int height),
-        $vec-ptr:(pixel_rgba8 *rgba8)
-        );
+      new mapnik::image_rgba8($(int width), $(int height));
+    std::memcpy((*$(image_rgba8 **ptr))->data(),
+                $vec-ptr:(pixel_rgba8 *rgba8), 
+                $(int width)*$(int height)*sizeof(pixel_rgba8));
     }|]
 {-# NOINLINE fromRgba8 #-}
 
